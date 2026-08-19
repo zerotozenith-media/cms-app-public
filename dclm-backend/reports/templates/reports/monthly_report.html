@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: A4; margin: 2.2cm; @bottom-center { content: counter(page); font-size: 9pt; color: #5A667C; } }
+  body { font-family: 'DejaVu Sans', sans-serif; color: #0F1B2E; font-size: 10.5pt; line-height: 1.5; }
+  .cover { text-align: center; padding-top: 6cm; page-break-after: always; }
+  .cover-mark { width: 70px; height: 70px; border-radius: 50%; background: #0B3C91; color: #fff;
+    display: inline-flex; align-items: center; justify-content: center; font-weight: bold; margin-bottom: 24px; }
+  .cover h1 { color: #082C69; font-size: 22pt; margin: 0; }
+  .cover .sub { color: #5A667C; font-size: 13pt; margin-top: 4px; }
+  .cover .report-label { margin-top: 50px; font-size: 15pt; font-weight: bold; color: #0B3C91; }
+  .cover .period { font-size: 12pt; margin-top: 4px; }
+  .cover .contact { margin-top: 70px; font-size: 9.5pt; color: #5A667C; }
+  h2 { color: #082C69; font-size: 13pt; border-bottom: 2px solid #0B3C91; padding-bottom: 4px; margin-top: 26px; }
+  h2:first-child { margin-top: 0; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 18px; font-size: 9.5pt; }
+  th { text-align: left; background: #EAF1FC; color: #082C69; padding: 6px 8px; border: 1px solid #E4E9F1; }
+  td { padding: 6px 8px; border: 1px solid #E4E9F1; }
+  .muted { color: #5A667C; font-style: italic; }
+  .toc-list { font-size: 11pt; line-height: 2.2; }
+  ul.plain { list-style: none; padding: 0; margin: 0; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="cover-mark">DCLM</div>
+  <h1>Deeper Life Bible Church</h1>
+  <div class="sub">Bahrain</div>
+  <div class="report-label">Monthly Report</div>
+  <div class="period">{{ period_label }}</div>
+  <div class="contact">dclm-bh.org &middot; +973 0000 0000</div>
+  <div class="muted" style="margin-top: 8px;">Generated {{ generated_date }} by {{ generated_by_name }}</div>
+</div>
+
+<h2>Table of Contents</h2>
+<ol class="toc-list">
+  <li>Executive Summary</li><li>Attendance</li><li>Finance</li>
+  <li>Testimonies</li><li>Challenges</li><li>Goals and Growth</li>
+  <li>Other Additions</li><li>Conclusion</li>
+</ol>
+
+<h2>1. Executive Summary</h2>
+<p>Friday Worship attendance totaled {{ fw_total }} across {{ fw_session_count }} recorded
+session(s) in {{ period_label }}. Giving for the period totaled BHD {{ income_total }}
+against BHD {{ expense_total }} in expenses, a net position of BHD {{ net_total }}.</p>
+
+<h2>2. Attendance</h2>
+{% if attendance_rows %}
+<table><thead><tr><th>Date</th><th>Meeting</th><th>Location</th><th>Total</th></tr></thead>
+<tbody>
+{% for row in attendance_rows %}
+<tr><td>{{ row.date }}</td><td>{{ row.meeting }}</td><td>{{ row.location }}</td><td>{{ row.total }}</td></tr>
+{% endfor %}
+</tbody></table>
+{% else %}<p class="muted">No filled sessions recorded this period.</p>{% endif %}
+
+<h2>3. Finance</h2>
+<p><b>Income:</b> BHD {{ income_total }} &nbsp; <b>Expenses:</b> BHD {{ expense_total }} &nbsp; <b>Net:</b> BHD {{ net_total }}</p>
+{% if by_fund %}
+<table><thead><tr><th>Fund</th><th>Amount (BHD)</th></tr></thead><tbody>
+{% for f in by_fund %}<tr><td>{{ f.fund }}</td><td>{{ f.total }}</td></tr>{% endfor %}
+</tbody></table>
+{% endif %}
+{% if by_category %}
+<table><thead><tr><th>Expense category</th><th>Amount (BHD)</th></tr></thead><tbody>
+{% for c in by_category %}<tr><td>{{ c.category }}</td><td>{{ c.total }}</td></tr>{% endfor %}
+</tbody></table>
+{% endif %}
+
+<h2>4. Testimonies</h2>
+{% if testimonies %}
+{% for t in testimonies %}<p>&ldquo;{{ t.text }}&rdquo; &mdash; {{ t.who }}, {{ t.service }}</p>{% endfor %}
+{% else %}<p class="muted">None recorded this period.</p>{% endif %}
+
+<h2>5. Challenges</h2>
+{% if notes %}
+{% for n in notes %}<p><b>{{ n.department }}:</b> {{ n.challenges }}</p>{% endfor %}
+{% else %}<p class="muted">None recorded this period.</p>{% endif %}
+
+<h2>6. Goals and Growth</h2>
+<table><thead><tr><th>Goal</th><th>Horizon</th><th>Progress</th><th>%</th></tr></thead><tbody>
+{% for g in goals %}
+<tr><td>{{ g.name }}</td><td>{{ g.horizon }}</td><td>{{ g.current }}{{ g.unit }} / {{ g.target }}{{ g.unit }}</td><td>{{ g.pct }}%</td></tr>
+{% endfor %}
+</tbody></table>
+
+<h2>7. Other Additions</h2>
+<p>{% if other_additions %}{{ other_additions }}{% else %}<span class="muted">None added.</span>{% endif %}</p>
+
+<h2>8. Conclusion</h2>
+<p>This report was compiled from live records in the DCLM Bahrain Church Management System as of {{ generated_date }}.</p>
+
+</body>
+</html>
