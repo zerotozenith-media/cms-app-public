@@ -24,6 +24,7 @@ dashboards never call this; they only ever read whatever is actually
 in the database.
 """
 import datetime
+from decimal import Decimal
 import random
 
 from django.core.management import call_command
@@ -121,6 +122,8 @@ class Command(BaseCommand):
                 self._seed_finance_history(funds, methods, categories, bahrain, others, members)
                 services, departments = self._seed_reports_config()
                 self._seed_testimonies_and_notes(services, departments, members)
+                self._seed_shepherds_and_followup(bahrain, members)
+                self._seed_enquiries(members)
         finally:
             post_save.connect(audit_on_save)
             post_delete.connect(audit_on_delete)
@@ -152,7 +155,11 @@ class Command(BaseCommand):
         admin_role, _ = Role.objects.get_or_create(name="Administrator")
         coord_role, _ = Role.objects.get_or_create(name="Location Coordinator")
         for role, full in [(admin_role, True), (coord_role, False)]:
-            for module in ["members", "attendance", "newcomers", "finance", "goals", "reports", "admin"]:
+            # "outreach" governs campaign and spend data. Included here so
+            # the demo administrator can actually see the Outreach screen;
+            # a real church grants it only to whoever runs the advertising.
+            for module in ["members", "attendance", "newcomers", "finance",
+                           "goals", "reports", "outreach", "admin"]:
                 RolePermission.objects.get_or_create(
                     role=role, module=module,
                     defaults={
@@ -184,8 +191,12 @@ class Command(BaseCommand):
 
     def _seed_meeting_types(self):
         specs = [
+            # The main service tracks absence, which is what drives
+            # follow-up. Without a start time the check has nothing to
+            # measure "a few hours after" against, so it is set too.
             dict(id="fri-worship", name="Friday Worship Service", day="Friday",
-                 frequency="weekly", detail_level="detailed", monthly_target=45),
+                 frequency="weekly", detail_level="detailed", monthly_target=45,
+                 counts_for_absence=True, start_time=datetime.time(18, 0)),
             dict(id="mon-bs", name="Monday Bible Study", day="Monday",
                  frequency="weekly", detail_level="detailed", monthly_target=25),
             dict(id="sat-workers", name="Saturday Workers Meeting", day="Saturday",
@@ -553,3 +564,178 @@ class Command(BaseCommand):
             d += datetime.timedelta(days=28)  # roughly monthly per department, not every week
 
         self.stdout.write(f"Seeded {t_count} testimonies and {n_count} weekly notes.")
+
+    # --- Shepherds, check-in, follow-up, enquiries ---
+    #
+    # Added when the follow-up, enquiries and outreach features landed.
+    # Without these the relevant screens seed empty, which reads as the
+    # features being broken rather than simply unused.
+
+    def _seed_shepherds_and_followup(self, bahrain, members):
+        """Assign shepherds, check people in to recent services, and
+        create follow-up tasks in a realistic mix of states."""
+        from members.models import MemberFollowUpTask
+        from attendance.models import AttendanceSessionMember
+
+        workers = [m for m in members if m.category == Member.Category.WORKER]
+        shepherd_users = list(User.objects.filter(member__isnull=False))
+        if not shepherd_users:
+            # Link a few worker records to accounts so tasks have somebody
+            # to belong to.
+            for i, worker in enumerate(workers[:3]):
+                user = User.objects.filter(member__isnull=True).first()
+                if not user:
+                    break
+                user.member = worker
+                user.save()
+                shepherd_users.append(user)
+        if not shepherd_users:
+            return 0, 0, 0
+
+        # Most members have a shepherd; a couple deliberately do not, so
+        # the "Unassigned" count on screen is not always zero.
+        assigned = 0
+        for i, member in enumerate(members):
+            if i % 11 == 0:
+                continue
+            member.assigned_to = shepherd_users[i % len(shepherd_users)]
+            member.save(update_fields=["assigned_to"])
+            assigned += 1
+
+        # Named check-in on the most recent tracked sessions, with a few
+        # people absent so follow-up has something to act on.
+        tracked = list(
+            AttendanceSession.objects
+            .filter(meeting_type__counts_for_absence=True, status="filled")
+            .order_by("-date")[:3]
+        )
+        checked_in = 0
+        absentees = []
+        for session in tracked:
+            at_location = [m for m in members if m.location_id == session.location_id]
+            present = at_location[:max(1, int(len(at_location) * 0.75))]
+            missing = at_location[len(present):]
+            for member in present:
+                AttendanceSessionMember.objects.get_or_create(
+                    session=session, member=member,
+                    defaults={"mode": "online" if checked_in % 9 == 0 else "in-person"},
+                )
+                checked_in += 1
+            absentees.append((session, missing))
+
+        # Follow-up tasks: some open, some overdue, some completed with a
+        # full record, so every filter on the screen shows something.
+        tasks = 0
+        for session, missing in absentees:
+            for i, member in enumerate(missing[:4]):
+                due = session.date + datetime.timedelta(days=2)
+                task = MemberFollowUpTask.objects.create(
+                    member=member,
+                    text=f"Missed {session.meeting_type.name}, check in",
+                    due_date=due,
+                    assigned_to=member.assigned_to,
+                    missed_session=session,
+                    missed_meeting_name=session.meeting_type.name,
+                    missed_date=session.date,
+                )
+                tasks += 1
+                if i % 3 == 0:
+                    task.done = True
+                    task.contact_date = due
+                    task.contact_method = "Home visit"
+                    task.contact_goal = "Find out why they missed and reconnect them"
+                    task.contact_scripture = "Hebrews 10:25, on not forsaking the assembling together"
+                    task.contact_root_cause = "New work shift clashing with the service time"
+                    task.contact_next_step = "Attending the midweek study for now, call again next month"
+                    task.save()
+
+        self.stdout.write(
+            f"Assigned {assigned} shepherd(s), checked in {checked_in}, "
+            f"created {tasks} follow-up task(s)."
+        )
+        return assigned, checked_in, tasks
+
+    def _seed_enquiries(self, members):
+        """Online enquiries and the campaigns that produced them."""
+        from enquiries.models import EnquirySource, Campaign, Enquiry, EnquiryTask
+        from newcomers.models import Newcomer, NewcomerSource
+
+        call_command("seed_enquiry_sources", verbosity=0)
+        by_name = {s.name: s for s in EnquirySource.objects.all()}
+        instagram = by_name.get("Instagram")
+        facebook = by_name.get("Facebook")
+        whatsapp = by_name.get("WhatsApp")
+
+        campaigns = [
+            Campaign.objects.create(
+                name="Christmas Service 2025", source=facebook, spend=Decimal("120.000"),
+                started_on=TODAY - datetime.timedelta(days=250),
+                ended_on=TODAY - datetime.timedelta(days=220)),
+            Campaign.objects.create(
+                name="Reels: Why We Gather", source=instagram, spend=Decimal("80.000"),
+                started_on=TODAY - datetime.timedelta(days=60)),
+            Campaign.objects.create(
+                name="None (organic)", spend=Decimal("0")),
+        ]
+
+        leaders = list(User.objects.filter(member__isnull=False))
+        people = [
+            ("Joy Mensah", instagram, "", "@joymensah", "new",
+             "Saw your reel, when are your services?", "Riffa", campaigns[1]),
+            ("Ahmed Rahman", facebook, "+973 3300 1122", "", "contacted",
+             "Clicked the Christmas advert, asking about location", "Manama", campaigns[0]),
+            ("Blessing Okoro", whatsapp, "+973 3900 8877", "", "invited",
+             "A friend forwarded your number, wants to visit", "", campaigns[2]),
+            ("Daniel Okafor", facebook, "+973 3311 4455", "", "attended",
+             "Asked about the midweek Bible study", "Muharraq", campaigns[0]),
+            ("Sara Ahmed", instagram, "", "@sara_bh", "not-pursuing",
+             "Asked if there is a youth group", "", campaigns[2]),
+        ]
+
+        created = 0
+        for name, source, phone, handle, stage, text, area, campaign in people:
+            enquiry = Enquiry.objects.create(
+                name=name, source=source or instagram, phone=phone, social_handle=handle,
+                enquiry_text=text, area=area, stage=stage, campaign=campaign,
+                received_at=TODAY - datetime.timedelta(days=RNG.randint(3, 40)),
+                assigned_to=RNG.choice(leaders) if leaders else None,
+                not_pursuing_note="Has since joined a church near her home"
+                if stage == "not-pursuing" else "",
+            )
+            created += 1
+
+            # One who actually turned up, so the conversion figures and
+            # the outreach report are not all zeroes.
+            if stage == "attended":
+                source_name = f"{enquiry.source.name} (online enquiry)"
+                nc_source, _ = NewcomerSource.objects.get_or_create(name=source_name)
+                newcomer = Newcomer.objects.create(
+                    name=enquiry.name, source=nc_source, location=enquiry.assigned_to.location
+                    if enquiry.assigned_to and enquiry.assigned_to.location
+                    else Location.objects.get(id="bahrain"),
+                    stage="visiting", created_at=enquiry.received_at,
+                    stage_since=TODAY, phone=enquiry.phone, email=enquiry.email,
+                )
+                enquiry.converted_newcomer = newcomer
+                enquiry.save(update_fields=["converted_newcomer"])
+
+            if stage in ("new", "contacted", "invited"):
+                task = EnquiryTask.objects.create(
+                    enquiry=enquiry, text="Reply and invite to the next service",
+                    due_date=TODAY + datetime.timedelta(days=RNG.randint(-4, 5)),
+                    assigned_to=enquiry.assigned_to,
+                )
+                if stage == "invited":
+                    task.done = True
+                    task.contact_date = TODAY - datetime.timedelta(days=2)
+                    task.contact_method = "WhatsApp"
+                    task.contact_goal = "Invite them to Friday service"
+                    task.contact_scripture = "Psalm 122:1"
+                    task.contact_root_cause = "New to Bahrain and looking for a church home"
+                    task.contact_next_step = "Coming this Friday, send the address"
+                    task.save()
+
+        self.stdout.write(
+            f"Seeded {created} online enquiries across {len(campaigns)} campaign(s)."
+        )
+        return created

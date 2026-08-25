@@ -228,6 +228,12 @@ three questions. A built-in check command then tests that the server is
 genuinely ready and names the fix for anything wrong, rather than
 leaving someone to work through a checklist by hand.
 
+The system deliberately avoids anything that ties it to one host. Report
+PDFs, for instance, are generated in pure Python rather than with a
+graphics engine that would need libraries a managed host may not permit.
+That keeps the choice of where to run it open, including cheap shared
+hosting the church may already be paying for.
+
 The ongoing burden is a nightly backup copied somewhere safe, and
 occasional system updates. Everything else runs on its own.
 

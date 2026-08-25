@@ -55,14 +55,12 @@ echo
 
 step "Installing system packages"
 sudo apt-get update -qq
-# The pango, cairo and gdk-pixbuf packages are required by WeasyPrint,
-# which generates the monthly report PDFs. Without them report
-# generation fails at runtime with an unhelpful error, so they go in now
-# rather than being discovered later.
+# Report PDFs are drawn with ReportLab, which is pure Python, so no
+# graphics libraries are needed. This is why the system runs on managed
+# hosts that do not let you install system packages.
 sudo apt-get install -y -qq \
-  python3-venv python3-pip postgresql nginx curl \
-  libpango-1.0-0 libpangoft2-1.0-0 libcairo2 libgdk-pixbuf-2.0-0
-ok "python, postgresql, nginx, and the PDF libraries"
+  python3-venv python3-pip postgresql nginx curl
+ok "python, postgresql, nginx"
 
 if ! command -v node >/dev/null || [ "$(node -v | cut -c2- | cut -d. -f1)" -lt 20 ]; then
   step "Installing Node 20"

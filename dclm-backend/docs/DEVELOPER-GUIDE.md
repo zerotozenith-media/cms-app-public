@@ -47,8 +47,23 @@ The app is on `http://localhost:5173`. If your backend is not on port
 
 ### Getting data to look at
 
-There is no seed command in the repository, deliberately: the church's
-real data should not be mixed with fixtures. Create what you need:
+```bash
+python manage.py seed_demo_data
+```
+
+Roughly 2.5 years of realistic invented data: members with shepherds
+assigned, attendance history with named check-in, follow-up tasks in
+open, overdue and completed states, newcomers, online enquiries with
+campaigns and one conversion, giving, expenses, goals, testimonies and
+weekly notes. Every screen has something on it, so nothing looks broken
+because it is merely empty.
+
+Refuses to run twice. **Never run it on a production server:** there is
+no undo if it runs against real data.
+
+Sign in as `chinedu@dclm-bh.org` / `RealPass123!`.
+
+To create an account by hand instead:
 
 ```bash
 python manage.py shell
@@ -477,6 +492,21 @@ tokens rotate.
 
 ---
 
+### Report PDFs
+
+`reports/pdf.py` gathers the data; `reports/layout.py` draws it. Split
+deliberately, so queries and appearance change independently.
+
+Drawn with ReportLab rather than an HTML engine. WeasyPrint produced
+good output but needs pango, cairo and gdk-pixbuf, system libraries that
+managed hosts like Azure App Service will not let you install. ReportLab
+is pure Python, so the report works wherever Django does, and it draws
+charts natively, which the HTML version could not do at all.
+
+Every section degrades on its own: a month with no testimonies still
+produces a valid report saying so, rather than failing or leaving a gap.
+Worth preserving when adding sections, since early months will be sparse.
+
 ## 8b. Deploying
 
 `bash deploy/install.sh` on a fresh Ubuntu server does everything:
@@ -490,7 +520,7 @@ Two commands support it:
   and role it needs. Reads credentials from the environment rather than
   arguments, so the password stays out of shell history. Idempotent.
 - `preflight` checks a server is genuinely ready: DEBUG off, real secret
-  key, PostgreSQL not SQLite, WeasyPrint's system libraries present, the
+  key, PostgreSQL not SQLite, PDF generation available, the
   cron jobs actually scheduled, tracked meetings having start times,
   backups configured. Exits non-zero on problems, so it works in a
   pipeline.

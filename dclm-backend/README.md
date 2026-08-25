@@ -538,14 +538,11 @@ SDK or Azure Storage Explorer, then set `AZURE_CONNECTION_STRING` in
 `.env` to point at it. Not required for normal development , local
 filesystem storage is the default.
 
-**One extra step beyond earlier batches:** PDF generation (Batch 2.6)
-needs system libraries, not just Python packages. On Debian/Ubuntu:
-```bash
-sudo apt-get install libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0
-```
-Without these, `pip install -r requirements.txt` still succeeds, but
-report generation will fail at runtime , this is exactly why the note
-above exists for Phase 5 as well.
+**No extra system packages are needed.** Report PDFs are drawn with
+ReportLab, which is pure Python, so `pip install -r requirements.txt` is
+the whole story. This is deliberate: the previous HTML-based renderer
+needed pango and cairo, which managed hosts like Azure App Service will
+not let you install.
 
 ```bash
 python3 -m venv venv

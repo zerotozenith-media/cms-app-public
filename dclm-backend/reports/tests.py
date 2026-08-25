@@ -11,6 +11,7 @@ from attendance.models import MeetingType, AttendanceSession
 from core.models import Location
 from finance.models import Fund, PaymentMethod, ExpenseCategory, Giving, Expense
 from .models import Service, Department, Testimony, WeeklyNote, Report
+from newcomers.models import Newcomer, NewcomerSource
 from .pdf import gather_report_data, render_report_pdf
 
 
@@ -203,3 +204,123 @@ class TestimonyWeeklyNoteFilterTestCase(APITestCase):
         results = resp.data["results"]
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]["challenges"], "Need more ushers")
+
+
+class ReportSectionsTestCase(TestCase):
+    """
+    Covers the sections and behaviour added when the report moved from
+    HTML to ReportLab: the newcomers section, the attendance trend, and
+    the requirement that a sparse month still produces a usable report
+    rather than failing.
+    """
+    def setUp(self):
+        self.bahrain = Location.objects.create(id="bahrain", name="Bahrain", is_core=True)
+        self.mt = MeetingType.objects.create(
+            id="fri-worship", name="Friday Worship Service", day="Friday",
+            frequency="weekly", detail_level="detailed")
+        self.role = Role.objects.create(name="Administrator")
+        self.user = User.objects.create_user(email="admin@test.com", password="x", role=self.role)
+
+    def _session(self, day, men=10, women=15):
+        return AttendanceSession.objects.create(
+            meeting_type=self.mt, date=datetime.date(2026, 8, day), location=self.bahrain,
+            mode="in-person", status="filled", men=men, women=women,
+            youth_boys=2, youth_girls=3, children_boys=4, children_girls=1)
+
+    def _newcomer(self, name, stage, source):
+        return Newcomer.objects.create(
+            name=name, source=source, location=self.bahrain, stage=stage,
+            created_at=datetime.date(2026, 8, 10), stage_since=datetime.date(2026, 8, 10))
+
+    # ---- new sections ----
+
+    def test_newcomer_figures_are_gathered(self):
+        source = NewcomerSource.objects.create(name="Invited by a member")
+        self._newcomer("Contacted One", "contacted", source)
+        self._newcomer("Visiting One", "visiting", source)
+        self._newcomer("Untouched", "new", source)
+
+        data = gather_report_data(2026, 8, "", self.user)
+        self.assertEqual(data["newcomers_registered"], 3)
+        self.assertEqual(data["newcomers_contacted"], 2, "Anyone past New counts as contacted")
+        self.assertEqual(data["newcomers_visiting"], 1)
+
+    def test_newcomers_are_broken_down_by_source(self):
+        invited = NewcomerSource.objects.create(name="Invited by a member")
+        website = NewcomerSource.objects.create(name="Church website")
+        self._newcomer("A", "visiting", invited)
+        self._newcomer("B", "new", invited)
+        self._newcomer("C", "contacted", website)
+
+        rows = {r["source"]: r for r in gather_report_data(2026, 8, "", self.user)["newcomer_rows"]}
+        self.assertEqual(rows["Invited by a member"]["registered"], 2)
+        self.assertEqual(rows["Invited by a member"]["returned"], 1)
+        self.assertEqual(rows["Church website"]["contacted"], 1)
+
+    def test_newcomers_outside_the_month_are_excluded(self):
+        source = NewcomerSource.objects.create(name="Walk-in")
+        Newcomer.objects.create(
+            name="July Person", source=source, location=self.bahrain, stage="new",
+            created_at=datetime.date(2026, 7, 20), stage_since=datetime.date(2026, 7, 20))
+        self.assertEqual(gather_report_data(2026, 8, "", self.user)["newcomers_registered"], 0)
+
+    def test_attendance_trend_follows_the_main_service_in_date_order(self):
+        self._session(14, men=20)
+        self._session(7, men=10)
+        data = gather_report_data(2026, 8, "", self.user)
+        self.assertEqual(len(data["trend_values"]), 2)
+        self.assertLess(data["trend_values"][0], data["trend_values"][1],
+                        "Earlier session must come first, not whatever order the DB returned")
+
+    def test_average_is_rounded_not_truncated(self):
+        self._session(7, men=10, women=10)    # 10+10+2+3+4+1 = 30
+        self._session(14, men=11, women=10)   # 31
+        data = gather_report_data(2026, 8, "", self.user)
+        self.assertEqual(data["fw_total"], 61)
+        self.assertEqual(data["fw_average"], 31, "30.5 should round, not truncate to 30")
+
+    def test_attendance_rows_split_youth_and_children(self):
+        self._session(7)
+        row = gather_report_data(2026, 8, "", self.user)["attendance_rows"][0]
+        self.assertEqual(row["youth"], 5, "Boys and girls combined into one youth figure")
+        self.assertEqual(row["children"], 5)
+
+    # ---- degrading gracefully ----
+
+    def test_a_month_with_no_data_still_produces_a_valid_pdf(self):
+        """Early months will be sparse. A report that fails on an empty
+        month is worse than one that says there is nothing to report."""
+        pdf = render_report_pdf(2019, 1, "", self.user)
+        self.assertTrue(pdf.startswith(b"%PDF"))
+        text = pdf_text(pdf)
+        self.assertIn("No filled sessions recorded", text)
+        self.assertIn("None recorded this period", text)
+
+    def test_a_single_session_does_not_break_the_trend_chart(self):
+        """A line chart needs two points. One session must not raise."""
+        self._session(7)
+        pdf = render_report_pdf(2026, 8, "", self.user)
+        self.assertTrue(pdf.startswith(b"%PDF"))
+
+    def test_no_giving_does_not_break_the_charts(self):
+        self._session(7)
+        pdf = render_report_pdf(2026, 8, "", self.user)
+        self.assertIn("No giving recorded this period", pdf_text(pdf))
+
+    # ---- content actually reaches the page ----
+
+    def test_headline_figures_appear_on_the_cover(self):
+        self._session(7, men=10, women=10)
+        pdf_bytes = render_report_pdf(2026, 8, "", self.user)
+        first_page = PdfReader(io.BytesIO(pdf_bytes)).pages[0].extract_text()
+        self.assertIn("MONTHLY REPORT", first_page)
+        self.assertIn("AUGUST 2026", first_page)
+        self.assertIn("THE MONTH AT A GLANCE", first_page,
+                      "The cover carries the headline figures, not just a title")
+
+    def test_every_numbered_section_is_present(self):
+        text = pdf_text(render_report_pdf(2026, 8, "", self.user))
+        for section in ["1. Executive Summary", "2. Attendance", "3. Finance",
+                        "4. Newcomers and Follow-up", "5. Testimonies",
+                        "6. Challenges", "7. Goals and Growth", "8. Conclusion"]:
+            self.assertIn(section, text)

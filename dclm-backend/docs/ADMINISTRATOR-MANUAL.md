@@ -219,8 +219,11 @@ what kind of record you are interested in.
 - Check Newcomers, Follow-up for the same.
 
 **Monthly**
-- Reports, generate the monthly report. It pulls the month's attendance,
-  giving, newcomers and testimonies into one document.
+- Reports, generate the monthly report. It produces a designed PDF with
+  a cover, headline figures, an attendance trend chart, giving and
+  expense charts, newcomer progress by source, testimonies, challenges
+  raised, and progress bars against each goal. Suitable to hand to the
+  board as it is.
 - Goals, see where the church stands against its targets.
 - Skim the audit log if anything looked unexpected.
 

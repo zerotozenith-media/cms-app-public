@@ -135,16 +135,16 @@ class Command(BaseCommand):
             self.bad(f"cannot reach the database: {exc}", "Check DATABASE_URL in .env.")
 
     def check_pdf_libraries(self):
-        """WeasyPrint needs system libraries that pip cannot install.
-        Missing, monthly reports fail at the moment someone tries to
-        generate one, with an error that does not explain itself."""
+        """ReportLab is pure Python, so this should never fail once
+        requirements are installed. Checked anyway because a broken
+        report only surfaces when someone tries to generate one."""
         try:
-            import weasyprint  # noqa: F401
-            self.ok("PDF libraries present, monthly reports will work")
+            import reportlab  # noqa: F401
+            self.ok("PDF generation available, monthly reports will work")
         except Exception:
             self.bad(
                 "PDF generation will fail",
-                "sudo apt install libpango-1.0-0 libpangoft2-1.0-0 libcairo2 libgdk-pixbuf-2.0-0",
+                "pip install -r requirements.txt",
             )
 
     def check_accounts(self):

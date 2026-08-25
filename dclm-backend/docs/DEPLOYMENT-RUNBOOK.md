@@ -38,8 +38,7 @@ bash deploy/install.sh
 
 It asks three questions, then does the rest on its own:
 
-- Installs Python, PostgreSQL, nginx, Node, and the libraries WeasyPrint
-  needs for report PDFs
+- Installs Python, PostgreSQL, nginx and Node
 - Creates the database with a generated password
 - Writes `.env` with a generated secret key, locked to your user
 - Installs dependencies, migrates, seeds the enquiry sources
@@ -98,13 +97,12 @@ usermod -aG sudo dclm
 su - dclm
 
 sudo apt update
-sudo apt install -y python3-venv python3-pip postgresql nginx git \
-  libpango-1.0-0 libpangoft2-1.0-0 libcairo2 libgdk-pixbuf-2.0-0
+sudo apt install -y python3-venv python3-pip postgresql nginx git
 ```
 
-The last four are required by WeasyPrint, which generates the monthly
-report PDFs. Without them report generation fails at runtime with an
-unhelpful error, so install them now.
+No graphics libraries are needed. Report PDFs are drawn with ReportLab,
+which is pure Python, which is also why this system runs on managed
+hosts that do not allow installing system packages.
 
 ### 3.2 Create the database
 
@@ -499,7 +497,7 @@ It checks, and tells you the exact fix for anything wrong:
 - DEBUG is off and the secret key is real, not a placeholder
 - The domain is set in ALLOWED_HOSTS
 - PostgreSQL is in use, not SQLite
-- The PDF libraries are present, so monthly reports will actually work
+- PDF generation is available, so monthly reports will actually work
 - At least one account exists
 - The absence check and weekly session creation are genuinely in cron
 - Every meeting tracked for absence has a start time, without which it
@@ -565,7 +563,7 @@ sudo tail -50 /var/log/nginx/error.log      # web server
 | Notification emails never arrive | `NOTIFICATIONS_ENABLED` is not True, the two commands are not scheduled, or no tracked service happened so the digest correctly sent nothing |
 | Emails arrive in spam | The provider's DNS records are not set at your registrar |
 | No sessions appear each week | `generate_recurring_sessions` is not scheduled |
-| Report PDF generation fails | The WeasyPrint system packages from 3.1 are missing |
+| Report PDF generation fails | Dependencies not fully installed. Run `pip install -r requirements.txt` |
 | Login works but every request then fails | `CORS_ALLOWED_ORIGINS` or `DJANGO_ALLOWED_HOSTS` does not match the real domain |
 | Receipts upload but will not open | nginx is not serving `/media/`, or storage is misconfigured |
 | Site unreachable after a certificate change | HSTS is remembered by browsers; fix the certificate rather than reverting to HTTP |

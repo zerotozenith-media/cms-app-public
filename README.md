@@ -73,8 +73,18 @@ npm run dev
 The app is on `http://localhost:5173`, the API on
 `http://localhost:8000/api/`.
 
-You will need an account to log in. The developer guide has a snippet
-that creates one, along with the location and role it depends on.
+Then load demo data so every screen has something on it:
+
+```bash
+cd dclm-backend && source venv/bin/activate
+python manage.py seed_demo_data
+```
+
+Sign in as `chinedu@dclm-bh.org` with password `RealPass123!`.
+
+Roughly 2.5 years of invented data: members, attendance, follow-up
+tasks, newcomers, online enquiries, campaigns, giving and goals. Never
+run it on a production server.
 
 **Tests:**
 ```bash
