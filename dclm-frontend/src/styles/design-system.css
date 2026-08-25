@@ -145,6 +145,10 @@
   .stackbar-col{display:flex;flex-direction:column;align-items:center;flex:1;height:100%}
   .stackbar-track{flex:1;width:100%;display:flex;flex-direction:column-reverse;background:var(--sky-2);border-radius:8px;overflow:hidden;min-height:6px}
   .stackbar-seg:first-child{border-radius:0 0 8px 8px}
+  /* Stage dropdown on kanban cards. Drag and drop does not work on
+     touch screens at all, so without this nobody could move a card
+     along from a phone. */
+  .kstage-select{width:100%;margin-top:8px;font-size:.78rem;padding:.35rem .5rem;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--blue-deep);font-weight:600}
   .followup-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
   .followup-row:last-child{border-bottom:0}
   .avatar{width:36px;height:36px;border-radius:50%;background:var(--sky);color:var(--blue);display:grid;place-items:center;font-weight:800;font-size:.85rem;flex:none}
@@ -242,7 +246,14 @@
   .side-brand{position:relative}
 
   /* ---- Live check-in ---- */
-  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  /* position:fixed rather than absolute. With absolute and no
+     positioned ancestor, the element anchors to the page and is laid
+     out wherever its content sits: inside a horizontally scrolling
+     kanban that meant a label on a card in the last column stretched
+     the whole page 589px wide. Fixed takes it out of flow entirely, so
+     it cannot affect layout anywhere, while remaining in the
+     accessibility tree for screen readers. */
+  .sr-only{position:fixed;top:0;left:0;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   .checkin-header{position:sticky;top:0;z-index:2}
   .checkin-header-row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
   .checkin-group{font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;font-weight:800;color:var(--muted);margin:14px 0 6px}

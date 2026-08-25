@@ -66,6 +66,7 @@ Suggested starting roles:
 | Shepherd / worker | Members: view and edit. Attendance: view |
 | Follow-up team | Newcomers: view, create, edit. Members: view |
 | Finance officer | Finance: view, create, edit. Nothing else |
+| Outreach | Outreach: view, create, edit. Newcomers: view |
 
 **Give the narrowest role that lets someone do their job.** An
 attendance recorder does not need to see giving figures, and the system
@@ -129,7 +130,19 @@ Goals marked **auto-tracked** calculate themselves from real records and
 need no maintenance. **Manual** goals are ones no data can measure, so
 someone types in the current figure as it changes.
 
-### Step 8: The lists
+### Step 8: Online enquiry sources
+
+Run once, or add them by hand in Admin:
+
+```
+python manage.py seed_enquiry_sources
+```
+
+This creates Instagram, WhatsApp, Facebook, TikTok, the website contact
+form, phone call and referrals. Without it, whoever tries to record
+their first enquiry opens an empty dropdown and cannot save anything.
+
+### Step 9: The lists
 
 **Admin, Config Lists.**
 
@@ -164,6 +177,23 @@ longer sign in.
 
 Members, tick the boxes next to the people to move, choose a shepherd
 from the bar that appears, press Assign.
+
+### Tracking which adverts actually work
+
+**Online Enquiries, Outreach.** Only visible to roles with the outreach
+permission.
+
+Add a campaign for each advert or push, with what it cost. When
+recording an enquiry, whoever has outreach access can tag it to the
+campaign. The table then shows, per campaign: enquiries received, how
+many went on to attend, the conversion rate, and cost per newcomer.
+
+**Cost per newcomer is the number to watch.** Cost per enquiry flatters
+a campaign that generates messages from people who never turn up.
+
+Campaign and spend are deliberately hidden from follow-up workers. They
+see the person and how to reach them, not what the church paid to find
+them. Grant outreach only to whoever actually runs the advertising.
 
 ### Changing whether newcomers get auto-assigned
 
@@ -261,6 +291,17 @@ after a service, and leadership a weekly summary on Monday. Nobody gets
 an email per task, which would be unreadable within a week. If people
 stop receiving them, that is a server matter rather than something to
 fix from these screens.
+
+**Checking the server is healthy.** Whoever runs the server can run one
+command that tests everything at once:
+
+```
+python manage.py preflight
+```
+
+It reports anything wrong along with the fix. Worth asking for after any
+change to the server, and worth asking for now if follow-up tasks or
+weekly sessions have stopped appearing.
 
 **Also needing a developer:**
 - Changing how long after a meeting the absence check runs (currently

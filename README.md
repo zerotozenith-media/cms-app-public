@@ -83,6 +83,29 @@ cd dclm-backend && source venv/bin/activate && python manage.py test
 
 ---
 
+## Deploying to a real server
+
+One script. Copy the project to an Ubuntu server, then:
+
+```bash
+cd dclm-backend
+bash deploy/install.sh
+```
+
+It asks three questions (domain, admin email, admin password) and does
+everything else: packages, database, secrets, migrations, first
+administrator, frontend build, gunicorn, nginx, and the scheduled jobs.
+Safe to re-run.
+
+Then turn on HTTPS with certbot, and check it over:
+
+```bash
+./venv/bin/python manage.py preflight
+```
+
+Full detail in
+[dclm-backend/docs/DEPLOYMENT-RUNBOOK.md](dclm-backend/docs/DEPLOYMENT-RUNBOOK.md).
+
 ## One thing that must be scheduled
 
 Absence follow-up is created by a management command:
@@ -93,8 +116,11 @@ python manage.py check_absences
 
 **Nothing runs this automatically.** Until it is scheduled on the server,
 no follow-up tasks will ever be created and the feature will appear
-broken while being entirely functional. Plain cron on the app host is
-free and sufficient; a cloud timer works equally well.
+broken while being entirely functional.
+
+`deploy/install.sh` schedules it for you. If you install by hand, see
+`deploy/crontab.example`, and run `manage.py preflight` afterwards to
+confirm it is genuinely in place.
 
 ---
 

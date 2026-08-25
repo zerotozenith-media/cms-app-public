@@ -16,6 +16,9 @@ export const NAV_ITEMS: NavItem[] = [
   { key: 'attendance', label: 'Attendance', icon: 'check', path: '/attendance', module: 'attendance' },
   { key: 'members', label: 'Members', icon: 'users', path: '/members', module: 'members' },
   { key: 'newcomers', label: 'Newcomers & Follow-up', icon: 'userplus', path: '/newcomers', module: 'newcomers' },
+  // Under the newcomers module: the same people do both jobs, and a
+  // separate permission would mean one more thing to configure for no gain.
+  { key: 'enquiries', label: 'Online Enquiries', icon: 'userplus', path: '/enquiries', module: 'newcomers' },
   { key: 'finance', label: 'Giving & Finance', icon: 'coin', path: '/finance', module: 'finance' },
   { key: 'goals', label: 'Goals', icon: 'target', path: '/goals', module: 'goals' },
   { key: 'reports', label: 'Reports', icon: 'doc', path: '/reports', module: 'reports' },

@@ -1,64 +1,94 @@
 # Deployment Runbook
 
-For whoever installs and runs this system on a server. Follow it in
-order. Everything you need to decide is called out explicitly.
+For whoever installs and runs this system on a server.
+
+**Most people should use the quick path in section 2.** It does
+everything in section 3 automatically. Section 3 remains as the manual
+version, for anyone who wants to understand or adjust each step.
 
 ---
 
-## 1. Choose where to host it
+## 1. Before you start
 
-Two workable paths. Pick one before starting.
+Get these three things ready. Everything else is handled for you.
 
-### Option A: a single VPS (recommended for a church this size)
+| What | Notes |
+|---|---|
+| A server | Ubuntu 24.04, 2GB memory is comfortable. Hetzner, DigitalOcean, Linode and Vultr all cost roughly 5 to 15 USD a month. |
+| A domain, pointed at it | e.g. `cms.dclm-bh.org`. Set the DNS A record to the server's IP before starting, since HTTPS will not work until it resolves. |
+| An email and password for the first administrator | This becomes login number one. |
 
-One small Linux server running everything: Django, PostgreSQL, and the
-built frontend behind nginx.
-
-- **Cost:** roughly 5 to 15 USD a month
-- **Good because:** cheapest, simplest, cron is already there for the
-  absence check, one machine to understand
-- **Trade-off:** you patch the server yourself, and backups are your job
-
-Suitable providers: Hetzner, DigitalOcean, Linode, Vultr. A 2GB instance
-is comfortable for a church of a few hundred members.
-
-### Option B: Azure App Service
-
-The production settings file is written for this, and includes Azure
-Blob Storage for receipts and report PDFs.
-
-- **Cost:** typically 30 to 80 USD a month once App Service, PostgreSQL
-  and storage are combined
-- **Good because:** managed patching, easy scaling, integrates with
-  Key Vault for secrets
-- **Trade-off:** more moving parts, more cost, and scheduling the
-  absence check needs a separate Azure Function or WebJob
-
-**If you are unsure, choose Option A.** Nothing about the application
-requires Azure; only `config/settings/production.py` currently assumes
-it, and section 6 shows the one change needed to run without it.
+Decide the domain before installing. Changing it later means reissuing
+certificates and editing three settings.
 
 ---
 
-## 2. Before you start, gather these
+## 2. The quick path
 
-| What | Where it comes from | Notes |
-|---|---|---|
-| Domain name | Your registrar | e.g. `cms.dclm-bh.org` |
-| DNS access | Your registrar | To point the domain at the server |
-| Server or Azure subscription | Your provider | See section 1 |
-| A long random secret key | Generate it, section 4 | Never reuse, never commit |
-| Database password | Generate it | Long and random |
-| Email for the first admin account | The church | This becomes login one |
+Copy the project onto the server, then run one script.
 
-Decide the domain before deploying. Changing it later means reissuing
-certificates and updating three settings.
+```bash
+# On the server, as a user with sudo
+cd ~
+# upload and unzip the project here, or: git clone <your repo>
+
+cd dclm-backend
+bash deploy/install.sh
+```
+
+It asks three questions, then does the rest on its own:
+
+- Installs Python, PostgreSQL, nginx, Node, and the libraries WeasyPrint
+  needs for report PDFs
+- Creates the database with a generated password
+- Writes `.env` with a generated secret key, locked to your user
+- Installs dependencies, migrates, seeds the enquiry sources
+- Creates the first administrator
+- Builds the frontend
+- Sets up gunicorn as a service and nginx as the web server
+- Schedules the absence check, weekly sessions, digests and backups
+
+Then two commands it prints for you:
+
+```bash
+# 1. Turn on HTTPS. The site will not work properly until you do,
+#    because production settings force it.
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d your-domain
+
+# 2. Check everything is right.
+cd ~/dclm-backend && ./venv/bin/python manage.py preflight
+```
+
+`preflight` tests each thing rather than asking you to confirm it: DEBUG
+off, a real secret key, PostgreSQL rather than SQLite, the PDF libraries
+present, an account existing, the scheduled jobs actually in cron,
+tracked meetings having a start time, and backups configured. Anything
+wrong comes with the specific command to fix it.
+
+When it reports no problems, sign in and change that first password.
+
+**The script is safe to re-run.** Every step checks whether it has
+already been done, and it never touches an existing database.
+
+### If something fails partway
+
+Run it again. It picks up from where it stopped. If a specific step is
+the problem, section 3 has that step on its own.
 
 ---
 
-## 3. Option A: VPS deployment, step by step
+## 3. The manual path
+
+Everything the script does, step by step, for anyone who wants to
+understand it or adjust something. Skip this if section 2 worked.
+
+### The steps in full
 
 Assumes Ubuntu 24.04 and a domain already pointing at the server's IP.
+
+Ready-made config files are in `deploy/`: `dclm.service`, `nginx.conf`
+and `crontab.example`. Copy them rather than retyping from here.
 
 ### 3.1 Create a user and install packages
 
@@ -142,38 +172,36 @@ else, fix before going further.
 ### 3.6 Create the first administrator
 
 ```bash
-python manage.py shell
+source venv/bin/activate
+DJANGO_ADMIN_EMAIL="admin@dclm-bh.org" \
+DJANGO_ADMIN_PASSWORD="a-strong-temporary-password" \
+  python manage.py bootstrap_admin
 ```
 
-```python
-from core.models import Location
-from accounts.models import Role, RolePermission, User
+This also creates the Bahrain location and the Administrator role, which
+the account needs. Safe to re-run: if the account exists it says so and
+changes nothing.
 
-# Bahrain is the core location and cannot be deleted later.
-bahrain = Location.objects.create(id="bahrain", name="Bahrain", is_core=True)
+The password comes from the environment rather than an argument so it
+does not end up in shell history or show in the process list.
 
-role = Role.objects.create(name="Administrator")
-for module in ["members", "attendance", "newcomers", "finance", "goals", "reports", "admin"]:
-    RolePermission.objects.create(
-        role=role, module=module,
-        can_view=True, can_create=True, can_edit=True, can_delete=True,
-    )
-
-User.objects.create_user(
-    email="admin@dclm-bh.org",
-    password="a-strong-temporary-password",
-    role=role,
-    first_name="First",
-    last_name="Administrator",
-)
-```
-
-Tell that person to change the password immediately after first login.
+Tell that person to change it after first login.
 
 **Do not run `seed_demo_data` on a production server.** It exists for
 local development and creates roughly 2.5 years of invented members,
 attendance and giving. It refuses to run twice, but there is no undo if
 it runs once against real data.
+
+### 3.6b Seed the online enquiry sources
+
+```bash
+source venv/bin/activate
+python manage.py seed_enquiry_sources
+```
+
+Creates Instagram, WhatsApp, Facebook and the rest. Safe to re-run.
+Without it the add-enquiry form has an empty dropdown and nobody can
+record an enquiry.
 
 ### 3.7 Run Django under gunicorn
 
@@ -460,29 +488,36 @@ and generated reports live there.
 
 ## 7. Go-live checklist
 
-Work through this before telling staff the system is live.
+Most of this is now automated. Run:
 
-- [ ] Domain resolves to the server
-- [ ] HTTPS works and HTTP redirects to it
-- [ ] `python manage.py check --deploy` shows only the HSTS preload note
-- [ ] `DEBUG` is False (it is, in production settings)
-- [ ] `.env` is `chmod 600` and not in version control
-- [ ] First administrator can log in
-- [ ] That administrator has changed their password
-- [ ] A test member, meeting type and session can be created
-- [ ] `check_absences` runs by hand without error
-- [ ] `generate_recurring_sessions` runs by hand without error
-- [ ] Both are in cron and the log file shows them running
-- [ ] If using email: `send_followup_digests --dry-run` shows the right
-      people, and a real send arrives rather than landing in spam
-- [ ] A monthly report generates as a PDF (this proves the WeasyPrint
-      system packages are present)
-- [ ] A receipt uploads and can be opened again afterwards
-- [ ] Nightly backup runs and the file appears
-- [ ] A backup has been restored into a scratch database successfully
-- [ ] Backups are copied off the server
+```bash
+cd ~/dclm-backend && ./venv/bin/python manage.py preflight
+```
 
----
+It checks, and tells you the exact fix for anything wrong:
+
+- DEBUG is off and the secret key is real, not a placeholder
+- The domain is set in ALLOWED_HOSTS
+- PostgreSQL is in use, not SQLite
+- The PDF libraries are present, so monthly reports will actually work
+- At least one account exists
+- The absence check and weekly session creation are genuinely in cron
+- Every meeting tracked for absence has a start time, without which it
+  is never checked
+- Email is either off, or on with a working configuration
+- A database backup is scheduled
+
+It exits non-zero if anything is wrong, so it can be used in a
+deployment pipeline.
+
+**Four things it cannot check for you:**
+
+- [ ] HTTPS works and HTTP redirects to it. Open the site and look.
+- [ ] The first administrator can sign in, and has changed their password
+- [ ] A monthly report actually generates as a PDF
+- [ ] **Backups are copied off this server**, and one has been restored
+      into a scratch database successfully. A backup that has never been
+      restored is a guess, not a safeguard.
 
 ## 8. After go-live
 

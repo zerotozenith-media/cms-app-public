@@ -49,4 +49,8 @@ export interface LoginAttempt {
   timestamp: string;
 }
 
-export const MODULES = ['members', 'attendance', 'newcomers', 'finance', 'goals', 'reports', 'admin'] as const;
+// 'outreach' governs campaign and spend data. Deliberately separate
+// from 'admin': whoever runs the church's adverts should be able to see
+// what a campaign cost per person reached without also being able to
+// create accounts and change church settings.
+export const MODULES = ['members', 'attendance', 'newcomers', 'finance', 'goals', 'reports', 'outreach', 'admin'] as const;

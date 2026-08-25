@@ -1,6 +1,6 @@
 # DCLM Bahrain CMS: Outstanding Work Log
 
-Last updated: 2026-08-18 (batches A-G delivered)
+Last updated: 2026-08-24 (enquiries complete)
 
 ---
 
@@ -76,6 +76,14 @@ Last updated: 2026-08-18 (batches A-G delivered)
 ## ALSO DONE
 - All 51 em dashes removed from the app, replaced contextually
   (en dash for empty cells, middot for separators, rewritten sentences)
+
+### Online Enquiries (DONE, backend + frontend + docs)
+- Separate pipeline for people who contacted the church online but have
+  not attended. Converts to a Newcomer once they do, keeping the link so
+  "how many online enquiries became members" stays answerable.
+- Campaign and spend tracking behind an `outreach` permission: which
+  advert produced people in the room, and what each cost. Hidden from
+  follow-up workers entirely.
 
 ## POST GO-LIVE (agreed to defer)
 - SECURE_HSTS_PRELOAD: turn on once live on HTTPS for a few weeks and

@@ -1,0 +1,28 @@
+# systemd unit for the DCLM Bahrain CMS API.
+#
+# Copy to /etc/systemd/system/dclm.service, then:
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now dclm
+#
+# Adjust User and the paths if you did not install to /home/dclm.
+
+[Unit]
+Description=DCLM Bahrain CMS
+After=network.target postgresql.service
+
+[Service]
+User=dclm
+Group=www-data
+WorkingDirectory=/home/dclm/dclm-backend
+EnvironmentFile=/home/dclm/dclm-backend/.env
+ExecStart=/home/dclm/dclm-backend/venv/bin/gunicorn \
+  --workers 3 \
+  --bind unix:/home/dclm/dclm-backend/dclm.sock \
+  --access-logfile - \
+  --error-logfile - \
+  config.wsgi:application
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

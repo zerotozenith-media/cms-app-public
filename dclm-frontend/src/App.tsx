@@ -12,6 +12,10 @@ import { NewSessionPage } from './pages/attendance/NewSessionPage';
 import { SessionRecordPage } from './pages/attendance/SessionRecordPage';
 import { LiveCheckInPage } from './pages/attendance/LiveCheckInPage';
 import { NewcomersListPage } from './pages/newcomers/NewcomersListPage';
+import { EnquiriesPage } from './pages/enquiries/EnquiriesPage';
+import { AddEnquiryPage } from './pages/enquiries/AddEnquiryPage';
+import { EnquiryProfilePage } from './pages/enquiries/EnquiryProfilePage';
+import { OutreachPage } from './pages/enquiries/OutreachPage';
 import { NewcomerFollowUpTab } from './pages/newcomers/NewcomerFollowUpTab';
 import { NewcomerProfilePage } from './pages/newcomers/NewcomerProfilePage';
 import { ManualEntryPage } from './pages/newcomers/ManualEntryPage';
@@ -54,6 +58,10 @@ export default function App() {
       <Route path="/newcomers/follow-up" element={page('Newcomers & Follow-up', 'newcomers', <NewcomerFollowUpTab />)} />
       <Route path="/newcomers/:id" element={page('Newcomers & Follow-up', 'newcomers', <NewcomerProfilePage />)} />
 
+      <Route path="/enquiries" element={page('Online Enquiries', 'newcomers', <EnquiriesPage />)} />
+      <Route path="/enquiries/new" element={page('Online Enquiries', 'newcomers', <AddEnquiryPage />)} />
+      <Route path="/enquiries/outreach" element={page('Outreach', 'outreach', <OutreachPage />)} />
+      <Route path="/enquiries/:id" element={page('Online Enquiries', 'newcomers', <EnquiryProfilePage />)} />
       <Route path="/finance" element={page('Giving & Finance', 'finance', <FinancePage />)} />
       <Route path="/goals" element={page('Goals', 'goals', <GoalsPage />)} />
       <Route path="/reports" element={page('Reports', 'reports', <ReportsPage />)} />

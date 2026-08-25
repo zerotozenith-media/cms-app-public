@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "members",
     "attendance",
     "newcomers",
+    "enquiries",
     "finance",
     "goals",
     "reports",

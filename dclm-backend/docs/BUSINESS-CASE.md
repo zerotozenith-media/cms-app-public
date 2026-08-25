@@ -100,7 +100,29 @@ shorter one.
 **Measured by:** newcomers contacted within the target window, and how
 many progress from New through to Integrated.
 
-### 3.5 The church can answer questions about itself
+### 3.5 People who reach out online are followed up too
+
+Someone who messages the church on Instagram or WhatsApp, or replies to
+an advert, has taken a real step toward the church. Before this they
+were a message in an inbox that someone might remember to answer.
+
+Online enquiries are recorded separately from newcomers, because an
+enquirer has not attended and may not even live in Bahrain. They move
+through their own stages: contacted, invited, attended. When they do
+attend, one action turns them into a newcomer while keeping the link,
+so the church can see how many online enquiries became people in the
+room, and which platform they came from.
+
+Where the church pays for adverts, each enquiry can be tagged to the
+campaign that brought it. The church can then see not just which
+platform people come from, but which advert actually produced people in
+the room, and what each one cost. That is the difference between knowing
+where people come from and knowing what to spend money on.
+
+**Measured by:** enquiries awaiting first contact, how many convert to
+newcomers, and cost per newcomer by campaign.
+
+### 3.6 The church can answer questions about itself
 
 Attendance trends, giving by fund, expenses by category, newcomer
 progress and membership growth are all derived from the same records
@@ -110,7 +132,7 @@ anyone reconstructing figures.
 **Measured by:** progress against the church's own goals, which the
 system tracks automatically where the data allows.
 
-### 3.6 Information reaches only the people who should see it
+### 3.7 Information reaches only the people who should see it
 
 Giving figures are visible to those with finance responsibility and
 nobody else. An attendance recorder sees attendance. This is enforced by
@@ -126,9 +148,10 @@ retrieve them by typing a web address directly.
 |---|---|---|
 | Usher / attendance recorder | Records who attended each meeting | Attendance, member names |
 | Shepherd / worker | Follows up members who miss services | Their follow-up list, member profiles |
-| Follow-up / care team | Contacts and tracks newcomers | Newcomer pipeline and tasks |
+| Follow-up / care team | Contacts and tracks newcomers and online enquiries | Newcomer pipeline, enquiries, tasks |
 | Finance officer | Records giving and expenses | Giving, expenses, projects |
 | Pastor / leadership | Reviews how the church is doing | Dashboard, goals, monthly reports |
+| Outreach | Runs the church's adverts | Campaigns, spend, and what each produced |
 | Administrator | Sets the system up and manages accounts | Everything |
 
 One person often holds several of these. Roles are configurable, so the
@@ -144,6 +167,8 @@ to fixed categories.
 - Attendance: headcounts and named check-in
 - Automatic absence detection and follow-up assignment
 - Newcomer registration, pipeline and follow-up
+- Online enquiries from social media and the website, with conversion
+  into newcomers once they attend
 - Giving, expenses and projects
 - Goals, monthly reports, testimonies and weekly notes
 - Users, roles, permissions and an audit log
@@ -191,6 +216,20 @@ their history. Deleting them would destroy the record of years of
 pastoral work.
 
 ---
+
+## 6b. What it takes to run
+
+Deliberately modest, because a church should not need a systems
+administrator on staff.
+
+One small server, roughly 5 to 15 USD a month, is enough for a
+congregation of a few hundred. Installation is a single script that asks
+three questions. A built-in check command then tests that the server is
+genuinely ready and names the fix for anything wrong, rather than
+leaving someone to work through a checklist by hand.
+
+The ongoing burden is a nightly backup copied somewhere safe, and
+occasional system updates. Everything else runs on its own.
 
 ## 7. What still needs a person
 

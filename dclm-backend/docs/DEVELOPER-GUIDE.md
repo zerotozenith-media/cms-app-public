@@ -109,8 +109,10 @@ dclm-backend/          Django 5 + Django REST Framework
   goals/               Goals and their calculations
   members/             Members, households, follow-up, assignment
   newcomers/           Newcomer pipeline, tasks, milestones
+  enquiries/           Online enquiries and their conversion to newcomers
   reports/             Monthly reports, testimonies, weekly notes
   config/settings/     base.py, local.py, production.py
+  deploy/              install.sh, plus ready-made systemd, nginx and cron files
   docs/                This guide, the business case, data dictionaries
 
 dclm-frontend/         React 18 + TypeScript + Vite
@@ -123,7 +125,7 @@ dclm-frontend/         React 18 + TypeScript + Vite
   src/styles/          design-system.css holds every shared class
 ```
 
-33 models, 50 registered routes (20 explicit paths plus 30 router-registered viewsets).
+39 models, 56 registered routes.
 
 ### Data flow
 
@@ -156,7 +158,7 @@ A **User** has one **Role**. A Role has **RolePermission** rows, one per
 module, each carrying `can_view`, `can_create`, `can_edit`, `can_delete`.
 
 The modules are: `members`, `attendance`, `newcomers`, `finance`,
-`goals`, `reports`, `admin`.
+`goals`, `reports`, `outreach`, `admin`.
 
 ### On the backend
 
@@ -354,6 +356,41 @@ There is also a legacy `contact_notes` field. Records created before the
 structured fields existed only have that, and the display component
 falls back to it. Do not write to it in new code.
 
+### Online enquiries
+
+Someone who contacted the church online but has not attended. Kept in
+its own app rather than folded into newcomers, because an enquirer has
+no location, no meeting attended, and the pipeline ends at "attended"
+rather than "integrated". Mixing them would inflate newcomer figures
+with people who were never in the room.
+
+`Enquiry.convert` creates the linked Newcomer, records the source as
+"Instagram (online enquiry)" or similar, and keeps the enquiry with a
+`converted_newcomer` link. Keeping it is the whole point: it is what
+makes "how many online enquiries became members" answerable.
+
+Governed by the `newcomers` module permission, not its own: the same
+people do both jobs, and a separate module would be one more thing for
+every church to configure for no benefit.
+
+`python manage.py seed_enquiry_sources` creates the usual platforms.
+Without it an administrator opens the add form to an empty dropdown.
+
+**Campaigns and the `outreach` permission.** A `Campaign` records an
+advert and what it cost. It is behind its own module rather than
+`admin`, because whoever runs the church's adverts is not necessarily an
+administrator and should be able to see performance without also being
+able to create accounts.
+
+`EnquirySerializer.to_representation` removes the campaign fields
+entirely for a role without `outreach`, rather than blanking them: an
+empty field invites the question, an absent one does not. The frontend
+hides the tab and `ProtectedRoute` blocks the URL, but the serializer is
+the actual control.
+
+Cost per newcomer is `None` until someone converts. Reporting zero would
+read as free.
+
 ### Notifications
 
 `core/notifications.py` holds the single `send_notification` function.
@@ -439,6 +476,32 @@ JWT access tokens last 8 hours, refresh tokens 14 days, and refresh
 tokens rotate.
 
 ---
+
+## 8b. Deploying
+
+`bash deploy/install.sh` on a fresh Ubuntu server does everything:
+packages, database, .env with generated secrets, migrations, the first
+administrator, the frontend build, gunicorn, nginx, and the scheduled
+jobs. It asks three questions and is safe to re-run.
+
+Two commands support it:
+
+- `bootstrap_admin` creates the first administrator plus the location
+  and role it needs. Reads credentials from the environment rather than
+  arguments, so the password stays out of shell history. Idempotent.
+- `preflight` checks a server is genuinely ready: DEBUG off, real secret
+  key, PostgreSQL not SQLite, WeasyPrint's system libraries present, the
+  cron jobs actually scheduled, tracked meetings having start times,
+  backups configured. Exits non-zero on problems, so it works in a
+  pipeline.
+
+`preflight` exists because several of these fail silently in ways that
+look like broken software. An unscheduled absence check means no
+follow-up task is ever created, and missing PDF libraries only surface
+when someone tries to generate a monthly report.
+
+The `deploy/` folder holds `dclm.service`, `nginx.conf` and
+`crontab.example`, so config is copied rather than retyped.
 
 ## 9. Known gaps
 
