@@ -7,6 +7,7 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
+from attendance.models import MeetingType
 from accounts.audit import log_audit
 from accounts.permissions import ModulePermission, LocationScopedQuerySetMixin
 from .intake import match_invited_by_member, create_auto_tasks
@@ -212,6 +213,26 @@ def _get_client_ip(request):
     if forwarded:
         return forwarded.split(",")[0].strip()
     return request.META.get("REMOTE_ADDR", "0.0.0.0")
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def public_meeting_types(request):
+    """
+    The meeting list for the public registration form.
+
+    The visitor filling that form is not signed in, so it cannot use the
+    normal meeting-types endpoint, which is behind the attendance
+    permission. Without this the "which meeting did you attend" dropdown
+    is simply empty and the visitor cannot answer the question.
+
+    Returns only what the form needs, id and name, rather than the full
+    record with attendance targets and absence settings.
+    """
+    return Response([
+        {"id": mt.id, "name": mt.name}
+        for mt in MeetingType.objects.all().order_by("name")
+    ])
 
 
 @api_view(["POST"])

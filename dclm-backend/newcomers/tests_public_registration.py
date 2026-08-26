@@ -155,3 +155,41 @@ class PublicRegistrationTestCase(APITestCase):
         attempt = PublicRegistrationAttempt.objects.latest("id")
         self.assertTrue(attempt.successful)
         self.assertEqual(attempt.reason, "success")
+
+
+class PublicMeetingTypesTestCase(APITestCase):
+    """
+    The public registration form needs the meeting list, but the visitor
+    filling it in is not signed in. Found in acceptance testing: the
+    "which meeting did you attend" dropdown was simply empty, because the
+    form was reading the protected endpoint and getting a 401.
+    """
+    def setUp(self):
+        self.bahrain = Location.objects.create(id="bahrain", name="Bahrain", is_core=True)
+        MeetingType.objects.create(
+            id="fri-worship", name="Friday Worship Service", day="Friday",
+            frequency="weekly", detail_level="detailed")
+        MeetingType.objects.create(
+            id="mon-bs", name="Monday Bible Study", day="Monday",
+            frequency="weekly", detail_level="simple")
+
+    def test_anonymous_visitor_can_read_the_meeting_list(self):
+        resp = self.client.get("/api/public/meeting-types/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 2)
+
+    def test_the_protected_endpoint_still_refuses_anonymous_access(self):
+        """The open endpoint must not weaken the normal one."""
+        resp = self.client.get("/api/meeting-types/")
+        self.assertIn(resp.status_code, (401, 403))
+
+    def test_it_returns_only_what_the_form_needs(self):
+        """Not attendance targets or absence settings, which are none of a
+        visitor's business."""
+        resp = self.client.get("/api/public/meeting-types/")
+        self.assertEqual(set(resp.data[0].keys()), {"id", "name"})
+
+    def test_meetings_come_back_in_a_stable_order(self):
+        resp = self.client.get("/api/public/meeting-types/")
+        names = [m["name"] for m in resp.data]
+        self.assertEqual(names, sorted(names))

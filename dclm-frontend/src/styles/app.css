@@ -1,9 +1,0 @@
-/* Structural resets on top of design-system.css , not part of the ported
-   demo styles, just what's needed to remove Vite's default #root
-   centering/max-width, which conflicts with a full-width app shell. */
-#root {
-  max-width: none;
-  margin: 0;
-  padding: 0;
-  text-align: left;
-}

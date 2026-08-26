@@ -154,12 +154,25 @@ class Command(BaseCommand):
     def _seed_roles_and_users(self, bahrain, others):
         admin_role, _ = Role.objects.get_or_create(name="Administrator")
         coord_role, _ = Role.objects.get_or_create(name="Location Coordinator")
+        # The two roles must differ in WHICH MODULES they can see, not only
+        # in what they may edit. Previously can_view was True for every
+        # module on both, so a Location Coordinator could open Admin,
+        # Finance and Outreach. That is wrong on its own, and it also made
+        # the permission tests impossible to run, since no role existed
+        # that lacked finance or outreach.
+        #
+        # "outreach" governs campaign and spend data. The administrator has
+        # it so the demo screen is reachable; a real church grants it only
+        # to whoever runs the advertising.
+        ROLE_MODULES = {
+            admin_role.id: ["members", "attendance", "newcomers", "finance",
+                            "goals", "reports", "outreach", "admin"],
+            # A coordinator runs services and people at their location. No
+            # money, no user accounts, no advertising spend.
+            coord_role.id: ["members", "attendance", "newcomers", "reports"],
+        }
         for role, full in [(admin_role, True), (coord_role, False)]:
-            # "outreach" governs campaign and spend data. Included here so
-            # the demo administrator can actually see the Outreach screen;
-            # a real church grants it only to whoever runs the advertising.
-            for module in ["members", "attendance", "newcomers", "finance",
-                           "goals", "reports", "outreach", "admin"]:
+            for module in ROLE_MODULES[role.id]:
                 RolePermission.objects.get_or_create(
                     role=role, module=module,
                     defaults={

@@ -5,6 +5,7 @@ from .views import (
     NewcomerSourceViewSet, MilestoneTypeViewSet, FollowUpUrgencySettingViewSet,
     NewcomerViewSet, NewcomerTaskViewSet, NewcomerStatusHistoryViewSet,
     public_newcomer_registration,
+    public_meeting_types,
 )
 
 router = DefaultRouter()
@@ -17,4 +18,5 @@ router.register("newcomer-status-history", NewcomerStatusHistoryViewSet, basenam
 
 urlpatterns = router.urls + [
     path("public/newcomer-registration/", public_newcomer_registration, name="public-newcomer-registration"),
+    path("public/meeting-types/", public_meeting_types, name="public-meeting-types"),
 ]

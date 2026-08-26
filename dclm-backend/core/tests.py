@@ -1,6 +1,8 @@
 import datetime
 from decimal import Decimal
 
+from django.core.management import call_command
+from django.test import TestCase
 from rest_framework.test import APITestCase
 
 from accounts.models import Role, RolePermission, User
@@ -248,3 +250,42 @@ class AppSettingsAPITestCase(APITestCase):
             AuditLog.objects.filter(entity_type="Setting", entity_name="auto_assign_newcomers").exists(),
             "Changing a church-wide setting should be traceable.",
         )
+
+
+class DemoRolePermissionsTestCase(TestCase):
+    """
+    The two demo roles must genuinely differ in which modules they can
+    see, not only in what they may edit.
+
+    Found in acceptance testing: a Location Coordinator could open Admin,
+    Finance and Outreach, because can_view was set True for every module
+    on both roles. That is wrong on its own, and it also made the
+    permission tests impossible to run, since no role existed that lacked
+    finance or outreach to test against.
+    """
+    def test_the_coordinator_cannot_see_admin_finance_or_outreach(self):
+        call_command("seed_demo_data", verbosity=0)
+        coord = Role.objects.get(name="Location Coordinator")
+        modules = set(RolePermission.objects.filter(
+            role=coord, can_view=True).values_list("module", flat=True))
+        for forbidden in ("admin", "finance", "outreach"):
+            self.assertNotIn(forbidden, modules,
+                             f"A Location Coordinator should not be able to view {forbidden}")
+
+    def test_the_administrator_can_see_everything(self):
+        call_command("seed_demo_data", verbosity=0)
+        admin = Role.objects.get(name="Administrator")
+        modules = set(RolePermission.objects.filter(
+            role=admin, can_view=True).values_list("module", flat=True))
+        for expected in ("admin", "finance", "outreach", "members",
+                         "attendance", "newcomers", "goals", "reports"):
+            self.assertIn(expected, modules)
+
+    def test_the_two_roles_are_not_identical(self):
+        """The whole point of a second demo role is having something to
+        test permission rules against."""
+        call_command("seed_demo_data", verbosity=0)
+        def mods(name):
+            return set(RolePermission.objects.filter(
+                role__name=name, can_view=True).values_list("module", flat=True))
+        self.assertNotEqual(mods("Administrator"), mods("Location Coordinator"))
