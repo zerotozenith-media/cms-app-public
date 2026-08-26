@@ -30,3 +30,33 @@ def mark_explicitly_logged(model_label, pk):
 def was_explicitly_logged(model_label, pk):
     logged = explicitly_logged_var.get()
     return logged is not None and (model_label, pk) in logged
+
+
+# The generic entry the signal writes, remembered so an explicit entry
+# written moments later can replace it.
+#
+# The ordering is the problem this solves: post_save fires DURING the
+# save, but a view calls log_audit() with the instance AFTER it. So at
+# the moment the signal checks was_explicitly_logged() the answer is
+# always False for a creation, and every create ended up logged twice,
+# once attributed to "System" and once to the real person. The System
+# row was the misleading one: it reads as though the software acted on
+# its own.
+auto_entries_var = contextvars.ContextVar("auto_audit_entries", default=None)
+
+
+def remember_auto_entry(model_label, pk, entry_id):
+    entries = auto_entries_var.get()
+    if entries is None:
+        entries = {}
+        auto_entries_var.set(entries)
+    entries[(model_label, pk)] = entry_id
+
+
+def pop_auto_entry(model_label, pk):
+    """The id of the generic entry for this instance, if one was written
+    during this request, so the caller can remove it."""
+    entries = auto_entries_var.get()
+    if not entries:
+        return None
+    return entries.pop((model_label, pk), None)

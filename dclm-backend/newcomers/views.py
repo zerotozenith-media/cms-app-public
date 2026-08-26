@@ -8,6 +8,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from attendance.models import MeetingType
+from accounts.clientip import get_client_ip
 from accounts.audit import log_audit
 from accounts.permissions import ModulePermission, LocationScopedQuerySetMixin
 from .intake import match_invited_by_member, create_auto_tasks
@@ -209,10 +210,10 @@ GENERIC_REGISTRATION_ERROR = {"detail": "We couldn't process your submission. Pl
 
 
 def _get_client_ip(request):
-    forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR", "0.0.0.0")
+    # Kept as a thin alias so the call sites below read unchanged. The
+    # rule itself lives in accounts.clientip, because login logs an
+    # address too and both were getting it wrong in the same way.
+    return get_client_ip(request)
 
 
 @api_view(["GET"])

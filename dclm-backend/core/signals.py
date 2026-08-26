@@ -12,7 +12,7 @@ something quietly worked around.
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 
-from .audit_context import get_current_user, was_explicitly_logged
+from .audit_context import get_current_user, was_explicitly_logged, remember_auto_entry
 
 TRACKED_APP_LABELS = {
     "core", "accounts", "members", "attendance",
@@ -39,12 +39,17 @@ def audit_on_save(sender, instance, created, **kwargs):
         return  # a specific, hand-written entry already covered this exact save
 
     from accounts.audit import log_audit
-    log_audit(
+    entry = log_audit(
         user=get_current_user(),
         action="Created" if created else "Updated",
         entity_type=sender._meta.verbose_name.title(),
         entity_name=str(instance),
     )
+    # Remembered so that if the view goes on to write its own, more
+    # specific entry for this same instance, this generic one can be
+    # removed rather than sitting beside it as a duplicate.
+    if entry is not None:
+        remember_auto_entry(model_label, instance.pk, entry.pk)
 
 
 @receiver(post_delete)

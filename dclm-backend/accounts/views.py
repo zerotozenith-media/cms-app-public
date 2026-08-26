@@ -25,6 +25,9 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from .audit import log_audit
 from .models import LoginAttempt, User
+from rest_framework_simplejwt.views import TokenRefreshView
+
+from .clientip import get_client_ip
 from .names import display_name
 
 GENERIC_ERROR = {"detail": "Invalid email or password."}
@@ -32,21 +35,6 @@ RATE_LIMIT_WINDOW_MINUTES = 15
 MAX_FAILED_PER_ACCOUNT = 5
 MAX_FAILED_PER_IP = 20
 MIN_SUBMIT_SECONDS = 1.5
-
-
-def get_client_ip(request):
-    forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
-    if forwarded:
-        ip = forwarded.split(",")[0].strip()
-    else:
-        ip = request.META.get("REMOTE_ADDR", "0.0.0.0")
-
-    # Azure's front-end can append :port to the forwarded IPv4 address.
-    # Guard for IPv6 (multiple colons) so we don't mangle a real one.
-    if ip.count(":") == 1:
-        ip = ip.rsplit(":", 1)[0]
-
-    return ip
 
 
 class LoginView(APIView):
@@ -261,3 +249,26 @@ class LoginAttemptViewSet(viewsets.ReadOnlyModelViewSet):
         if successful is not None:
             qs = qs.filter(successful=successful.lower() == "true")
         return qs
+
+
+class SafeTokenRefreshView(TokenRefreshView):
+    """
+    Refreshing a token for a user who no longer exists.
+
+    The stock view lets User.DoesNotExist escape, which Django turns into
+    a 500. Seen in production after demo accounts were deleted while a
+    browser still held their refresh token: every page load produced a
+    server error in the log.
+
+    A token naming a user who is gone is simply an invalid token, so 401
+    is the honest answer. The client already knows to sign the person in
+    again on a 401.
+    """
+    def post(self, request, *args, **kwargs):
+        try:
+            return super().post(request, *args, **kwargs)
+        except User.DoesNotExist:
+            return Response(
+                {"detail": "This session is no longer valid. Please sign in again."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )

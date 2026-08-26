@@ -1,3 +1,4 @@
+from .clientip import get_client_ip
 from .names import display_name
 from members.models import Member
 import datetime
@@ -266,3 +267,88 @@ class DisplayNameTestCase(TestCase):
     def test_handles_no_user_at_all(self):
         """The audit log passes None for system-generated actions."""
         self.assertIsNone(display_name(None))
+
+
+class ClientIpTestCase(TestCase):
+    """
+    Working out the caller's address.
+
+    Found in production on Azure: X-Forwarded-For there carries the source
+    port, so the header read "102.91.5.47:152". Stored into a
+    GenericIPAddressField on PostgreSQL, which is an inet column, that
+    raised a DataError and turned every public registration and every
+    login into a 500. It never appeared in development because SQLite
+    stores the column as text and validates nothing.
+    """
+    def _request(self, forwarded=None, remote="127.0.0.1"):
+        from django.test import RequestFactory
+        req = RequestFactory().post("/")
+        req.META["REMOTE_ADDR"] = remote
+        if forwarded is not None:
+            req.META["HTTP_X_FORWARDED_FOR"] = forwarded
+        return req
+
+    def test_azure_style_header_with_a_port(self):
+        self.assertEqual(get_client_ip(self._request("102.91.5.47:152")), "102.91.5.47")
+
+    def test_a_plain_address_is_unchanged(self):
+        self.assertEqual(get_client_ip(self._request("102.91.5.47")), "102.91.5.47")
+
+    def test_the_first_proxy_entry_is_used(self):
+        self.assertEqual(
+            get_client_ip(self._request("102.91.5.47:152, 10.0.0.1, 10.0.0.2")),
+            "102.91.5.47")
+
+    def test_bare_ipv6_is_not_mistaken_for_an_address_with_a_port(self):
+        """IPv6 is full of colons. Stripping after the last one would
+        quietly corrupt a valid address."""
+        self.assertEqual(get_client_ip(self._request("2001:db8::1")), "2001:db8::1")
+
+    def test_bracketed_ipv6_with_a_port(self):
+        self.assertEqual(get_client_ip(self._request("[2001:db8::1]:443")), "2001:db8::1")
+
+    def test_falls_back_to_remote_addr_when_there_is_no_header(self):
+        self.assertEqual(get_client_ip(self._request(remote="10.1.2.3")), "10.1.2.3")
+
+    def test_rubbish_never_takes_the_request_down(self):
+        """Logging an imperfect address is a far smaller problem than
+        refusing a visitor who is trying to register."""
+        self.assertEqual(get_client_ip(self._request("not-an-address", remote="bad")), "0.0.0.0")
+
+    def test_the_result_is_always_storable(self):
+        import ipaddress
+        for header in ["102.91.5.47:152", "2001:db8::1", "[2001:db8::1]:443",
+                       "not-an-address", "", "10.0.0.1, 10.0.0.2"]:
+            ip = get_client_ip(self._request(header))
+            ipaddress.ip_address(ip)   # raises if it could not go in an inet column
+
+
+class StaleRefreshTokenTestCase(APITestCase):
+    """
+    A refresh token naming a user who has since been deleted.
+
+    Seen in production after the demo accounts were removed while a
+    browser still held their token: the stock view let User.DoesNotExist
+    escape and every page load logged a 500. An invalid token deserves a
+    401, which the client already knows how to handle.
+    """
+    def test_a_token_for_a_deleted_user_gives_401_not_500(self):
+        from rest_framework_simplejwt.tokens import RefreshToken
+        role = Role.objects.create(name="Temporary")
+        user = User.objects.create_user(email="gone@t.com", password="x", role=role)
+        token = str(RefreshToken.for_user(user))
+        user.delete()
+
+        resp = self.client.post("/api/auth/token/refresh/", {"refresh": token}, format="json")
+        self.assertEqual(resp.status_code, 401)
+        self.assertIn("sign in again", str(resp.data).lower())
+
+    def test_a_valid_token_still_refreshes(self):
+        from rest_framework_simplejwt.tokens import RefreshToken
+        role = Role.objects.create(name="Still here")
+        user = User.objects.create_user(email="here@t.com", password="x", role=role)
+        token = str(RefreshToken.for_user(user))
+
+        resp = self.client.post("/api/auth/token/refresh/", {"refresh": token}, format="json")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("access", resp.data)

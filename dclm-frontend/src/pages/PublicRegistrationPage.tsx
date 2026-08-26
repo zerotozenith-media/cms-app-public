@@ -33,10 +33,36 @@ export function PublicRegistrationPage() {
       });
       setSubmitted(true);
     } catch (err: any) {
-      if (err?.response?.status === 429) {
+      // A visitor who mistyped their email needs to be told that, not sent
+      // to find a leader. Only the anti-spam guards stay deliberately
+      // vague, since naming which one tripped would help a bot tune
+      // around it. Everything else names the field so they can fix it.
+      const status = err?.response?.status;
+      const data = err?.response?.data;
+
+      if (status === 429) {
         setError('Too many submissions from this connection. Please see a leader at the welcome desk.');
-      } else if (err?.response?.data?.name) {
-        setError('Please enter your name.');
+      } else if (data && typeof data === 'object' && !data.detail) {
+        const FIELD_LABELS: Record<string, string> = {
+          name: 'name', first_name: 'first name', last_name: 'last name',
+          phone: 'phone number', email: 'email address',
+          meeting_attended: 'meeting attended', address: 'address',
+          city_governorate: 'city or governorate', gender: 'gender',
+          age_group: 'age group', invited_by_name: 'who invited you',
+          prayer_request: 'prayer request',
+        };
+        const [field, messages] = Object.entries(data)[0] ?? [];
+        const label = FIELD_LABELS[field as string] ?? (field as string);
+        const detail = Array.isArray(messages) ? messages[0] : String(messages ?? '');
+        // "Please enter your name" is only right when it is missing. If
+        // the name was entered but rejected, say why, or the visitor has
+        // no idea what to change.
+        const isMissing = /required|may not be blank|cannot be blank/i.test(detail);
+        setError(
+          field === 'name' && isMissing
+            ? 'Please enter your name.'
+            : `Please check your ${label}. ${detail}`.trim(),
+        );
       } else {
         setError("We couldn't process your submission. Please see a leader at the welcome desk.");
       }

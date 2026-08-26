@@ -5,7 +5,7 @@ from django.core.management import call_command
 from django.test import TestCase
 from rest_framework.test import APITestCase
 
-from accounts.models import Role, RolePermission, User
+from accounts.models import Role, RolePermission, User, AuditLog
 from attendance.models import MeetingType, AttendanceSession
 from finance.models import Fund, PaymentMethod, ExpenseCategory, Giving, Expense
 from goals.models import Goal
@@ -289,3 +289,74 @@ class DemoRolePermissionsTestCase(TestCase):
             return set(RolePermission.objects.filter(
                 role__name=name, can_view=True).values_list("module", flat=True))
         self.assertNotEqual(mods("Administrator"), mods("Location Coordinator"))
+
+
+class AuditNoDuplicateEntriesTestCase(APITestCase):
+    """
+    One action, one audit entry, attributed to the person who did it.
+
+    Found through a test failing on a developer's machine and not on
+    mine. Creating a member wrote two entries: post_save fires during
+    the save, but a view calls log_audit() with the instance after it, so
+    the suppression check always came too late for a creation. One entry
+    named the real user, the other said "System", which reads as though
+    the software acted on its own.
+
+    The test that caught it asserted on .first(), and the two rows were
+    milliseconds apart. On Linux they sorted predictably; on Windows,
+    with coarser timestamps, they did not, so the test passed here and
+    failed there. The flakiness was the symptom; the duplicate was the
+    fault.
+    """
+    def setUp(self):
+        self.bahrain = Location.objects.create(id="bahrain", name="Bahrain", is_core=True)
+        role = Role.objects.create(name="Administrator")
+        for module in ["members", "attendance", "newcomers", "finance",
+                       "goals", "reports", "outreach", "admin"]:
+            RolePermission.objects.create(
+                role=role, module=module,
+                can_view=True, can_create=True, can_edit=True, can_delete=True)
+        self.admin = User.objects.create_user(
+            email="auditor@test.com", password="x", role=role)
+        self.client.force_authenticate(user=self.admin)
+
+    def test_creating_a_member_writes_exactly_one_entry(self):
+        AuditLog.objects.all().delete()
+        resp = self.client.post("/api/members/", {
+            "surname": "Noor", "first_name": "Fatima", "location": "bahrain",
+            "joined_date": "2024-09-14"})
+        self.assertEqual(resp.status_code, 201)
+        entries = AuditLog.objects.filter(entity_type="Member", entity_name="Fatima Noor")
+        self.assertEqual(entries.count(), 1,
+                         "One action should produce one entry, not a generic one alongside a specific one")
+
+    def test_the_entry_names_the_person_not_the_system(self):
+        AuditLog.objects.all().delete()
+        self.client.post("/api/members/", {
+            "surname": "Noor", "first_name": "Fatima", "location": "bahrain",
+            "joined_date": "2024-09-14"})
+        entry = AuditLog.objects.get(entity_type="Member", entity_name="Fatima Noor")
+        self.assertNotEqual(entry.user_name_snapshot, "System",
+                            'An action taken by a signed-in user must not be credited to "System"')
+        self.assertEqual(entry.user_name_snapshot, "auditor@test.com")
+
+    def test_result_does_not_depend_on_row_ordering(self):
+        """The original test only passed because the rows happened to sort
+        the right way. With one row there is nothing to sort."""
+        AuditLog.objects.all().delete()
+        self.client.post("/api/members/", {
+            "surname": "Bello", "first_name": "Peace", "location": "bahrain",
+            "joined_date": "2024-09-14"})
+        rows = AuditLog.objects.filter(entity_name="Peace Bello")
+        self.assertEqual(rows.count(), 1)
+        for ordering in ("timestamp", "-timestamp", "id", "-id"):
+            self.assertEqual(rows.order_by(ordering).first().user_name_snapshot,
+                             "auditor@test.com")
+
+    def test_an_action_with_no_signed_in_user_still_records_as_system(self):
+        """The System label is correct when nobody was signed in, for
+        example a scheduled job. It should not disappear entirely."""
+        from accounts.audit import log_audit
+        AuditLog.objects.all().delete()
+        log_audit(None, "Created", "Member", "Someone")
+        self.assertEqual(AuditLog.objects.get().user_name_snapshot, "System")

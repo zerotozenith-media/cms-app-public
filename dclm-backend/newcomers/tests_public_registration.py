@@ -1,3 +1,4 @@
+from datetime import timedelta
 """
 Tests for the public QR self-registration endpoint (Batch 3.6). A real
 unauthenticated write endpoint is a genuine attack surface, so this
@@ -193,3 +194,59 @@ class PublicMeetingTypesTestCase(APITestCase):
         resp = self.client.get("/api/public/meeting-types/")
         names = [m["name"] for m in resp.data]
         self.assertEqual(names, sorted(names))
+
+
+class PublicRegistrationErrorMessagesTestCase(APITestCase):
+    """
+    Which failures stay vague and which name the problem.
+
+    Found in acceptance testing: every rejection produced "We couldn't
+    process your submission, please see a leader at the welcome desk."
+    That is right for the anti-spam guards, since naming which one
+    tripped would help a bot tune around it. It is wrong for an ordinary
+    mistake, because the visitor is left with nothing to correct.
+    """
+    def setUp(self):
+        self.bahrain = Location.objects.create(id="bahrain", name="Bahrain", is_core=True)
+        self.url = "/api/public/newcomer-registration/"
+
+    def _payload(self, **over):
+        data = {"name": "Test Visitor", "phone": "+973 3900 0000", "website": "",
+                "form_loaded_at": (timezone.now() - timedelta(seconds=30)).isoformat()}
+        data.update(over)
+        return data
+
+    def test_the_honeypot_stays_vague(self):
+        """A bot must not learn which guard caught it."""
+        resp = self.client.post(self.url, self._payload(website="http://spam"), format="json")
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("detail", resp.data)
+        self.assertNotIn("website", resp.data)
+
+    def test_submitting_too_fast_stays_vague(self):
+        resp = self.client.post(
+            self.url, self._payload(form_loaded_at=timezone.now().isoformat()), format="json")
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("detail", resp.data)
+
+    def test_an_ordinary_mistake_names_the_field(self):
+        """The visitor has to be able to fix it themselves."""
+        resp = self.client.post(self.url, self._payload(name="X" * 200), format="json")
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("name", resp.data)
+        self.assertNotIn("detail", resp.data)
+
+    def test_a_bad_email_names_the_field(self):
+        resp = self.client.post(self.url, self._payload(email="not-an-email"), format="json")
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("email", resp.data)
+
+    def test_an_unknown_meeting_names_the_field(self):
+        resp = self.client.post(
+            self.url, self._payload(meeting_attended="no-such-meeting"), format="json")
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("meeting_attended", resp.data)
+
+    def test_a_good_submission_still_succeeds(self):
+        resp = self.client.post(self.url, self._payload(), format="json")
+        self.assertEqual(resp.status_code, 201)
