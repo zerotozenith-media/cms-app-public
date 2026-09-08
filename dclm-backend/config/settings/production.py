@@ -25,6 +25,12 @@ CSRF_COOKIE_SECURE = True
 SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 
+# Azure App Service terminates TLS upstream and forwards requests to the
+# container over plain HTTP, setting X-Forwarded-Proto to tell us the
+# original scheme. Without this, Django can't see the request was HTTPS
+# and SECURE_SSL_REDIRECT loops forever trying to "upgrade" it.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 # Azure Blob Storage (Batch 2.8) , real storage backend for receipts and
 # generated report PDFs. A connection string is used (Azure's standard
 # format, also what the Azurite local emulator expects) rather than
