@@ -36,9 +36,16 @@ MIN_SUBMIT_SECONDS = 1.5
 
 def get_client_ip(request):
     forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR", "0.0.0.0")
+    ip = forwarded.split(",")[0].strip() if forwarded else request.META.get("REMOTE_ADDR", "0.0.0.0")
+
+    # Azure's proxy can pass "ip:port" for IPv4 clients rather than a bare
+    # IP. ip_address is a Postgres inet column and rejects the port, so
+    # strip it here. Only strip when there's exactly one colon — IPv6
+    # addresses have several and must be left alone.
+    if ip.count(":") == 1:
+        ip = ip.split(":")[0]
+
+    return ip
 
 
 class LoginView(APIView):
