@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { DATE_RANGES, rangeBounds, type DateRangeKey } from '../../lib/dateRanges';
 import { useNavigate } from 'react-router-dom';
 import {
   useFunds, usePaymentMethods, useExpenseCategories, useProjects, useFinanceSummary,
@@ -33,27 +34,36 @@ export function FinancePage() {
   const [givingFund, setGivingFund] = useState('all');
   const [givingMethod, setGivingMethod] = useState('all');
   const [givingSort, setGivingSort] = useState('-date');
+  const [givingRange, setGivingRange] = useState<DateRangeKey>('all');
   const [givingPage, setGivingPage] = useState(1);
   const givingPageSize = 6;
   const { data: givingList } = useGivingList({
     fund: givingFund !== 'all' ? givingFund : undefined,
     method: givingMethod !== 'all' ? givingMethod : undefined,
+    date_from: rangeBounds(givingRange)?.[0],
+    date_to: rangeBounds(givingRange)?.[1],
     ordering: givingSort, page: givingPage, page_size: givingPageSize,
   });
 
   // --- Expense list state ---
   const [expenseCategory, setExpenseCategory] = useState('all');
   const [expenseSort, setExpenseSort] = useState('-date');
+  const [expenseRange, setExpenseRange] = useState<DateRangeKey>('all');
   const [expensePage, setExpensePage] = useState(1);
   const expensePageSize = 6;
   const { data: expenseList } = useExpenseList({
     category: expenseCategory !== 'all' ? expenseCategory : undefined,
+    date_from: rangeBounds(expenseRange)?.[0],
+    date_to: rangeBounds(expenseRange)?.[1],
     ordering: expenseSort, page: expensePage, page_size: expensePageSize,
   });
 
   // --- Giving form ---
   const [givingEditId, setGivingEditId] = useState<number | null>(null);
   const [gFund, setGFund] = useState('');
+  // Where the money was sent. The system knew which fund it went into but
+  // not where it went afterwards, which the monthly report has to state.
+  const [gRemit, setGRemit] = useState('retained');
   const [gMethod, setGMethod] = useState('');
   const [gAmount, setGAmount] = useState('');
   const [gLocation, setGLocation] = useState('');
@@ -82,7 +92,7 @@ export function FinancePage() {
   async function handleGivingSubmit(e: React.FormEvent) {
     e.preventDefault();
     const payload = {
-      fund: Number(gFund), method: Number(gMethod), amount: gAmount,
+      fund: Number(gFund), method: Number(gMethod), amount: gAmount, remitted_to: gRemit,
       location: gLocation, member: gMember ? Number(gMember) : null,
       date: today,
     };
@@ -214,6 +224,15 @@ export function FinancePage() {
                 </select>
               </div>
               <div className="field">
+                <label htmlFor="g-remit">Remitted to</label>
+                <select id="g-remit" value={gRemit} onChange={(e) => setGRemit(e.target.value)}>
+                  <option value="retained">Retained in location account</option>
+                  <option value="dubai">DLBC account, Dubai</option>
+                  <option value="lagos">DLBC account, Lagos</option>
+                  <option value="qatar">DLBC account, Qatar</option>
+                </select>
+              </div>
+              <div className="field">
                 <label htmlFor="g-method">Method</label>
                 <select id="g-method" value={gMethod} onChange={(e) => setGMethod(e.target.value)}>
                   {(methods ?? []).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
@@ -288,6 +307,10 @@ export function FinancePage() {
         <div className="toolbar">
           <h3 style={{ flex: 'none' }}>Giving entries</h3>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <select className="selectbox" value={givingRange}
+              onChange={(e) => { setGivingRange(e.target.value as DateRangeKey); setGivingPage(1); }}>
+              {DATE_RANGES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
+            </select>
             <select className="selectbox" value={givingFund} onChange={(e) => { setGivingFund(e.target.value); setGivingPage(1); }}>
               <option value="all">All funds</option>
               {(funds ?? []).map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
@@ -341,6 +364,10 @@ export function FinancePage() {
         <div className="toolbar">
           <h3 style={{ flex: 'none' }}>Expense entries</h3>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <select className="selectbox" value={expenseRange}
+              onChange={(e) => { setExpenseRange(e.target.value as DateRangeKey); setExpensePage(1); }}>
+              {DATE_RANGES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
+            </select>
             <select className="selectbox" value={expenseCategory} onChange={(e) => { setExpenseCategory(e.target.value); setExpensePage(1); }}>
               <option value="all">All categories</option>
               {(categories ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}

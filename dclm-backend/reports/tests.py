@@ -237,7 +237,7 @@ class ReportSectionsTestCase(TestCase):
     def test_newcomer_figures_are_gathered(self):
         source = NewcomerSource.objects.create(name="Invited by a member")
         self._newcomer("Contacted One", "contacted", source)
-        self._newcomer("Visiting One", "visiting", source)
+        self._newcomer("Attending One", "attending", source)
         self._newcomer("Untouched", "new", source)
 
         data = gather_report_data(2026, 8, "", self.user)
@@ -248,7 +248,7 @@ class ReportSectionsTestCase(TestCase):
     def test_newcomers_are_broken_down_by_source(self):
         invited = NewcomerSource.objects.create(name="Invited by a member")
         website = NewcomerSource.objects.create(name="Church website")
-        self._newcomer("A", "visiting", invited)
+        self._newcomer("A", "attending", invited)
         self._newcomer("B", "new", invited)
         self._newcomer("C", "contacted", website)
 

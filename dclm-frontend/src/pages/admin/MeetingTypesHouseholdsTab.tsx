@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useMeetingTypes, useCreateMeetingType, useDeleteMeetingType } from '../../api/attendance';
+import { useFellowships, useCreateFellowship, useDeleteFellowship, useMeetingTypes, useCreateMeetingType, useDeleteMeetingType } from '../../api/attendance';
 import { useHouseholds, useCreateHousehold, useDeleteHousehold } from '../../api/members';
 import { Badge } from '../../components/ui/Badge';
 import { Icon } from '../../components/ui/Icon';
@@ -7,6 +7,12 @@ import { useAppSettings, useUpdateAppSetting } from '../../api/settings';
 import { HelpMark } from '../../components/ui/HelpMark';
 
 export function MeetingTypesHouseholdsTab() {
+  const { data: fellowships } = useFellowships();
+  const createFellowship = useCreateFellowship();
+  const deleteFellowship = useDeleteFellowship();
+  const [newFellowship, setNewFellowship] = useState('');
+  const [newArea, setNewArea] = useState('');
+  const [fellowshipError, setFellowshipError] = useState('');
   const { data: settings } = useAppSettings();
   const updateSetting = useUpdateAppSetting();
   const { data: meetingTypes } = useMeetingTypes();
@@ -177,6 +183,61 @@ export function MeetingTypesHouseholdsTab() {
           {households?.length === 0 && <div className="empty">No households yet.</div>}
         </div>
       </div>
-    </>
+    
+      <div className="card section-gap">
+        <div className="toolbar">
+          <h3 style={{ flex: 'none' }}>House fellowships</h3>
+        </div>
+        <p className="muted" style={{ fontSize: '.8rem', marginBottom: 10 }}>
+          Several fellowships meet on the same evening, so a session belongs to a fellowship as
+          well as a date. The list is configurable because the number changes as the church grows.
+        </p>
+        <table className="cardtable">
+          <thead><tr><th>Fellowship</th><th>Area</th><th>Sessions recorded</th><th /></tr></thead>
+          <tbody>
+            {(fellowships ?? []).map((f) => (
+              <tr key={f.id}>
+                <td data-label="Fellowship"><b>{f.name}</b></td>
+                <td data-label="Area">{f.area || '-'}</td>
+                <td data-label="Sessions recorded">{f.session_count}</td>
+                <td className="td-actions">
+                  <button className="icon-btn" title="Remove"
+                    onClick={async () => {
+                      setFellowshipError('');
+                      try { await deleteFellowship.mutateAsync(f.id); }
+                      catch (err: any) {
+                        setFellowshipError(err?.response?.data?.detail
+                          ?? 'That fellowship could not be removed.');
+                      }
+                    }}>
+                    <Icon name="trash" size={14} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {fellowshipError && <p className="form-error">{fellowshipError}</p>}
+        <div className="form-row" style={{ marginTop: 12 }}>
+          <div className="field">
+            <label htmlFor="new-fellowship">Add a fellowship</label>
+            <input id="new-fellowship" value={newFellowship}
+              onChange={(e) => setNewFellowship(e.target.value)} placeholder="e.g. HCF Youth" />
+          </div>
+          <div className="field">
+            <label htmlFor="new-fellowship-area">Area</label>
+            <input id="new-fellowship-area" value={newArea}
+              onChange={(e) => setNewArea(e.target.value)} placeholder="e.g. Isa Town" />
+          </div>
+        </div>
+        <button className="btn sm" disabled={!newFellowship.trim() || createFellowship.isPending}
+          onClick={async () => {
+            await createFellowship.mutateAsync({ name: newFellowship.trim(), area: newArea.trim() });
+            setNewFellowship(''); setNewArea('');
+          }}>
+          <Icon name="plus" size={14} /> Add
+        </button>
+      </div>
+</>
   );
 }

@@ -14,6 +14,8 @@ justified at this scale.
 import calendar
 import datetime
 
+from decimal import Decimal
+
 from django.db.models import Count, Sum
 
 from attendance.models import AttendanceSession
@@ -41,13 +43,20 @@ def gather_report_data(period_year, period_month, other_additions, generated_by)
     )
     fw_total = sum(s.total for s in fw_sessions)
 
-    all_sessions = AttendanceSession.objects.filter(status="filled", date__gte=start, date__lte=end)
+    all_sessions = (AttendanceSession.objects
+                    .filter(status="filled", date__gte=start, date__lte=end)
+                    .prefetch_related("giving"))
     attendance_rows = [
         {
             "date": s.date, "meeting": s.meeting_type.name, "location": s.location.name,
             "men": s.men, "women": s.women,
             "youth": s.youth_boys + s.youth_girls,
             "children": s.children_boys + s.children_girls,
+            "online": s.online_total,
+            "new_comers": s.new_comers,
+            "new_converts": s.new_converts,
+            "led_by": s.led_by.full_name if s.led_by else "",
+            "offering": sum((g.amount for g in s.giving.all()), Decimal("0")),
             "total": s.total,
         }
         for s in all_sessions.select_related("meeting_type", "location").order_by("date")
@@ -55,6 +64,12 @@ def gather_report_data(period_year, period_month, other_additions, generated_by)
 
     # The trend chart plots the main service only. Mixing meeting types on
     # one line would compare things that are not comparable.
+    # Online attendance counts toward the total. Every meeting can be
+    # hybrid now, so a report showing only the people in the room would
+    # understate the month.
+    def session_total(s):
+        return s.total + getattr(s, "online_total", 0)
+
     fw_ordered = fw_sessions.order_by("date")
     trend_labels = [s.date.strftime("%d %b") for s in fw_ordered]
     trend_values = [s.total for s in fw_ordered]
@@ -88,13 +103,34 @@ def gather_report_data(period_year, period_month, other_additions, generated_by)
         if n.challenges
     ]
 
+    # House fellowships, reported alongside the services rather than as an
+    # appendix: they are attendance, not a separate kind of thing.
+    fellowship_rows = []
+    for s in (all_sessions.filter(fellowship__isnull=False)
+              .select_related("fellowship", "led_by").order_by("date")):
+        offering = sum((g.amount for g in s.giving.all()), Decimal("0"))
+        fellowship_rows.append({
+            "date": s.date,
+            "fellowship": s.fellowship.name,
+            "led_by": s.led_by.full_name if s.led_by else "",
+            "lesson": s.lesson,
+            "men": s.men + s.online_men,
+            "women": s.women + s.online_women,
+            "youth": s.youth_boys + s.youth_girls + s.online_youth_boys + s.online_youth_girls,
+            "children": s.children_boys + s.children_girls + s.online_children_boys + s.online_children_girls,
+            "new_comers": s.new_comers,
+            "new_converts": s.new_converts,
+            "total": s.total,
+            "offering": offering,
+        })
+
     # Newcomers, which the previous report left out entirely even though
     # the church tracks it closely.
     newcomer_qs = Newcomer.objects.filter(created_at__gte=start, created_at__lte=end)
     newcomers_registered = newcomer_qs.count()
     newcomers_contacted = newcomer_qs.exclude(stage=Newcomer.Stage.NEW).count()
     newcomers_visiting = newcomer_qs.filter(
-        stage__in=[Newcomer.Stage.VISITING, Newcomer.Stage.INTEGRATED],
+        stage__in=[Newcomer.Stage.ATTENDING, Newcomer.Stage.MEMBER],
     ).count()
     open_followups = MemberFollowUpTask.objects.filter(done=False).count()
 
@@ -107,7 +143,7 @@ def gather_report_data(period_year, period_month, other_additions, generated_by)
             "registered": row["n"],
             "contacted": same_source.exclude(stage=Newcomer.Stage.NEW).count(),
             "returned": same_source.filter(
-                stage__in=[Newcomer.Stage.VISITING, Newcomer.Stage.INTEGRATED]).count(),
+                stage__in=[Newcomer.Stage.ATTENDING, Newcomer.Stage.MEMBER]).count(),
         })
 
     goals = []
@@ -134,6 +170,12 @@ def gather_report_data(period_year, period_month, other_additions, generated_by)
         "newcomers_visiting": newcomers_visiting,
         "open_followups": open_followups,
         "newcomer_rows": newcomer_rows,
+        "fellowship_rows": fellowship_rows,
+        "attendance_average": round(sum(a["total"] for a in attendance_rows) / len(attendance_rows), 1) if attendance_rows else 0,
+        "attendance_highest": max((a["total"] for a in attendance_rows), default=0),
+        "attendance_lowest": min((a["total"] for a in attendance_rows), default=0),
+        "new_comers_total": sum(a.get("new_comers", 0) for a in attendance_rows),
+        "new_converts_total": sum(a.get("new_converts", 0) for a in attendance_rows),
         "by_fund": by_fund,
         "by_category": by_category,
         "testimonies": testimonies,

@@ -3,7 +3,7 @@ import type { Newcomer, NewcomerStage } from '../../types/newcomers';
 import { Badge } from '../ui/Badge';
 
 const STAGES: [NewcomerStage, string][] = [
-  ['new', 'New'], ['contacted', 'Contacted'], ['visiting', 'Visiting'], ['integrated', 'Integrated'],
+  ['new', 'New'], ['contacted', 'Contacted'], ['attending', 'Attending'], ['member', 'Member'],
 ];
 
 interface KanbanBoardProps {
@@ -58,13 +58,13 @@ export function KanbanBoard({ newcomers, onCardClick, onDropToStage }: KanbanBoa
                     >
                       {n.assigned_to_name ? n.assigned_to_name.charAt(0) : '?'}
                     </span>
-                    {key === 'integrated' ? (
-                      <Badge color="green">Integrated</Badge>
+                    {key === 'member' ? (
+                      <Badge color="green">Member</Badge>
                     ) : (
                       <Badge color={urgencyBadgeColor(n.urgency)}>{n.days_in_stage}d in stage</Badge>
                     )}
                   </div>
-                  {key !== 'integrated' && (
+                  {key !== 'member' && (
                     <div className={`ktask${!openTasksExist ? ' overdue' : ''}`}>
                       {openTasksExist ? `${n.open_tasks_count} open task${n.open_tasks_count > 1 ? 's' : ''}` : 'No follow-up task set'}
                     </div>

@@ -1,4 +1,22 @@
+export type MeetingAudience = 'everyone' | 'workers' | 'leadership';
+
+export const AUDIENCES: { key: MeetingAudience; label: string; note: string }[] = [
+  { key: 'everyone', label: 'Everyone', note: 'All members are expected' },
+  { key: 'workers', label: 'Workers', note: 'Workers only, not Workers in Training' },
+  { key: 'leadership', label: 'Leadership', note: 'Members ticked as a leader' },
+];
+
+export interface Fellowship {
+  id: number;
+  name: string;
+  area: string;
+  is_active: boolean;
+  session_count: number;
+}
+
 export interface MeetingType {
+  /** Who is expected, and so who is followed up when absent. */
+  audience: MeetingAudience;
   id: string;
   name: string;
   day: string;
@@ -28,6 +46,25 @@ export interface AttendanceSessionMember {
 }
 
 export interface AttendanceSession {
+  /** Online attendance, counted separately. Any meeting can be hybrid,
+   *  and a total showing only the room understates the month. */
+  online_men: number;
+  online_women: number;
+  online_youth_boys: number;
+  online_youth_girls: number;
+  online_children_boys: number;
+  online_children_girls: number;
+  online_total: number;
+  in_person_total: number;
+  /** How many were new tonight, which is a different question from who. */
+  new_comers: number;
+  new_converts: number;
+  /** Only used when the meeting is a house fellowship. */
+  fellowship: number | null;
+  fellowship_name: string | null;
+  led_by: number | null;
+  led_by_name: string | null;
+  lesson: string;
   id: number;
   meeting_type: string;
   meeting_type_name: string;
@@ -53,6 +90,16 @@ export interface AttendanceStats {
 }
 
 export interface RecordAttendancePayload {
+  online_men?: number;
+  online_women?: number;
+  online_youth_boys?: number;
+  online_youth_girls?: number;
+  online_children_boys?: number;
+  online_children_girls?: number;
+  new_comers?: number;
+  new_converts?: number;
+  led_by?: number | null;
+  lesson?: string;
   men: number;
   women: number;
   youth_boys: number;

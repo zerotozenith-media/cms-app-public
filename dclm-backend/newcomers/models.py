@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 
 
 class NewcomerSource(models.Model):
@@ -26,8 +27,8 @@ class Newcomer(models.Model):
     class Stage(models.TextChoices):
         NEW = "new", "New"
         CONTACTED = "contacted", "Contacted"
-        VISITING = "visiting", "Visiting"
-        INTEGRATED = "integrated", "Integrated"
+        ATTENDING = "attending", "Attending"
+        MEMBER = "member", "Member"
         NOT_INTERESTED = "not-interested", "Not Interested"
 
     class Gender(models.TextChoices):
@@ -195,3 +196,41 @@ class PublicRegistrationAttempt(models.Model):
     def __str__(self):
         status = "OK" if self.successful else f"FAILED ({self.reason})"
         return f"{self.timestamp} , {self.ip_address} , {status}"
+
+
+class NewcomerContactAttempt(models.Model):
+    """
+    A contact that did not reach the person.
+
+    A completed task records what was discussed, so it only exists when
+    someone actually got through. Without this, three unanswered calls
+    leave no trace and the record flatters the work that was done: it
+    looks like nobody tried.
+    """
+    class Method(models.TextChoices):
+        PHONE_CALL = "Phone call", "Phone call"
+        WHATSAPP = "WhatsApp", "WhatsApp"
+        TEXT = "Text message", "Text message"
+        SOCIAL_MESSAGE = "Social media message", "Social media message"
+        EMAIL = "Email", "Email"
+        HOME_VISIT = "Home visit", "Home visit"
+
+    newcomer = models.ForeignKey(
+        "newcomers.Newcomer", on_delete=models.CASCADE, related_name="contact_attempts",
+    )
+    date = models.DateField(default=timezone.localdate)
+    method = models.CharField(max_length=30, choices=Method.choices)
+    note = models.CharField(
+        max_length=300, blank=True, default="",
+        help_text="Anything worth knowing, for example whether a message was left.",
+    )
+    by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="newcomer_contact_attempts",
+    )
+
+    class Meta:
+        ordering = ["-date", "-id"]
+
+    def __str__(self):
+        return f"{self.newcomer}: {self.method} on {self.date}"

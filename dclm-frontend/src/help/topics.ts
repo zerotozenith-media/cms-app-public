@@ -45,7 +45,7 @@ export const HELP_TOPICS: Record<string, HelpTopic> = {
   },
   newcomerStages: {
     title: 'Pipeline stages',
-    body: 'New means just registered and not yet contacted. Contacted means someone has reached out. Visiting means they are attending but not yet settled. Integrated means they are part of the church family. Drag a card between columns to move someone along.',
+    body: 'New means registered and nobody has reached them yet. Contacted means someone has spoken to them. Attending means they have come to a service at least once, which check-in confirms. Member means they are on the member roll. Drag a card between columns, or use the dropdown on each card, which is the only way on a phone.',
   },
   qrForm: {
     title: 'QR form vs manual entry',

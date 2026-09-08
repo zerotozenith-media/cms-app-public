@@ -1,6 +1,8 @@
+from django.utils import timezone
+from django.http import HttpResponse
 from django.core.files.base import ContentFile
 from rest_framework import viewsets, filters, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 
 from accounts.audit import log_audit
@@ -125,3 +127,43 @@ class ReportViewSet(viewsets.ModelViewSet):
             f"{len(pdf_bytes)} bytes", instance=report,
         )
         return Response(ReportSerializer(report).data, status=status.HTTP_201_CREATED)
+
+
+class _ReportsModulePermission(ModulePermission):
+    """ModulePermission reads `module` off the view. A function view has
+    no class to hang that on, so this names it explicitly."""
+    def has_permission(self, request, view):
+        view.module = "reports"
+        return super().has_permission(request, view)
+
+
+@api_view(["GET"])
+@permission_classes([_ReportsModulePermission])
+def monthly_spreadsheet(request):
+    """
+    The month's figures as a formatted spreadsheet.
+
+    The PDF is the report. This exists for whoever combines several
+    locations and would otherwise retype the numbers out of a document.
+    """
+    year = int(request.query_params.get("year", timezone.localdate().year))
+    month = int(request.query_params.get("month", timezone.localdate().month))
+
+    from reports.pdf import gather_report_data
+    from reports.spreadsheet import build_spreadsheet
+
+    ctx = gather_report_data(year, month, "", request.user)
+    ctx["church_name"] = "Deeper Life Bible Church"
+    ctx["location_name"] = "Bahrain"
+
+    data = build_spreadsheet(ctx)
+    log_audit(request.user, "Exported", "Report", ctx["period_label"],
+              "Monthly figures as a spreadsheet")
+
+    resp = HttpResponse(
+        data,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    resp["Content-Disposition"] = (
+        f'attachment; filename="DCLM-Bahrain-{year}-{month:02d}.xlsx"')
+    return resp

@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { DATE_RANGES, rangeBounds, type DateRangeKey } from '../../lib/dateRanges';
+import { useFellowships, useCreateFellowship, useDeleteFellowship } from '../../api/attendance';
+import { AUDIENCES } from '../../types/attendance';
 import { useNavigate } from 'react-router-dom';
 import { useMeetingTypes, useAttendanceStats, useSessions, useRecentFilledSessions, useDeleteSession } from '../../api/attendance';
 import { useDashboardSummary } from '../../api/dashboard';
@@ -13,6 +16,29 @@ export function AttendanceListPage() {
   const [meetingFilter, setMeetingFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [ordering, setOrdering] = useState('-date');
+  const [audienceFilter, setAudienceFilter] = useState('all');
+  const [rangeFilter, setRangeFilter] = useState<DateRangeKey>('all');
+  const [checkedInFilter, setCheckedInFilter] = useState('all');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const { data: fellowships } = useFellowships();
+  const createFellowship = useCreateFellowship();
+  const deleteFellowship = useDeleteFellowship();
+
+  async function addFellowship() {
+    const name = prompt('Name of the fellowship, for example HCF Youth');
+    if (!name) return;
+    const area = prompt('Which area does it meet in?') || '';
+    await createFellowship.mutateAsync({ name, area });
+  }
+
+  async function removeFellowship(id: number, name: string, sessions: number) {
+    if (sessions) {
+      alert(`${name} has ${sessions} session(s) recorded. Those records would lose what they belong to, so it cannot be removed.`);
+      return;
+    }
+    if (!confirm(`Remove ${name}?`)) return;
+    await deleteFellowship.mutateAsync(id);
+  }
   const [page, setPage] = useState(1);
   const pageSize = 8;
 
@@ -23,6 +49,10 @@ export function AttendanceListPage() {
   const { data: sessions, isLoading } = useSessions({
     meeting_type: meetingFilter !== 'all' ? meetingFilter : undefined,
     status: statusFilter !== 'all' ? statusFilter : undefined,
+    audience: audienceFilter !== 'all' ? audienceFilter : undefined,
+    date_from: rangeBounds(rangeFilter)?.[0],
+    date_to: rangeBounds(rangeFilter)?.[1],
+    checked_in: checkedInFilter !== 'all' ? checkedInFilter : undefined,
     ordering,
     page,
     page_size: pageSize,
@@ -63,21 +93,52 @@ export function AttendanceListPage() {
       <div className="card section-gap">
         <div className="toolbar">
           <h3 style={{ flex: 'none' }}>All sessions</h3>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <select className="selectbox" value={meetingFilter} onChange={(e) => { setMeetingFilter(e.target.value); setPage(1); }}>
-              <option value="all">All meetings</option>
-              {(meetingTypes ?? []).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
-            <select className="selectbox" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
-              <option value="all">All statuses</option>
-              <option value="filled">Filled</option>
-              <option value="pending">Pending</option>
-            </select>
-            <select className="selectbox" value={ordering} onChange={(e) => setOrdering(e.target.value)}>
-              <option value="-date">Sort: Newest first</option>
-              <option value="date">Sort: Oldest first</option>
-              <option value="-total_computed">Sort: Highest total</option>
-            </select>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flex: 1, justifyContent: 'flex-end' }}>
+            {/* Collapsed on a phone: six stacked dropdowns pushed the table
+                more than a screen down, so the data comes first. */}
+            <button className="filter-toggle" onClick={() => setFiltersOpen(!filtersOpen)}>
+              <span>Filters</span><span>{filtersOpen ? 'Hide' : 'Show'}</span>
+            </button>
+            <div className={`filter-panel${filtersOpen ? ' open' : ''}`}>
+              <label className="sr-only" htmlFor="att-meeting">Meeting</label>
+              <select id="att-meeting" className="selectbox" value={meetingFilter}
+                onChange={(e) => { setMeetingFilter(e.target.value); setPage(1); }}>
+                <option value="all">All meetings</option>
+                {(meetingTypes ?? []).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+              <label className="sr-only" htmlFor="att-audience">Who it is for</label>
+              <select id="att-audience" className="selectbox" value={audienceFilter}
+                onChange={(e) => { setAudienceFilter(e.target.value); setPage(1); }}>
+                <option value="all">All audiences</option>
+                {AUDIENCES.map((a) => <option key={a.key} value={a.key}>{a.label}</option>)}
+              </select>
+              <label className="sr-only" htmlFor="att-range">Date range</label>
+              <select id="att-range" className="selectbox" value={rangeFilter}
+                onChange={(e) => { setRangeFilter(e.target.value as DateRangeKey); setPage(1); }}>
+                {DATE_RANGES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
+              </select>
+              <label className="sr-only" htmlFor="att-checkedin">Headcount or check-in</label>
+              <select id="att-checkedin" className="selectbox" value={checkedInFilter}
+                onChange={(e) => { setCheckedInFilter(e.target.value); setPage(1); }}>
+                <option value="all">Headcount or check-in</option>
+                <option value="yes">Checked in by name</option>
+                <option value="no">Headcount only</option>
+              </select>
+              <label className="sr-only" htmlFor="att-status">Status</label>
+              <select id="att-status" className="selectbox" value={statusFilter}
+                onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
+                <option value="all">All statuses</option>
+                <option value="filled">Filled</option>
+                <option value="pending">Pending</option>
+              </select>
+              <label className="sr-only" htmlFor="att-sort">Sort</label>
+              <select id="att-sort" className="selectbox" value={ordering}
+                onChange={(e) => setOrdering(e.target.value)}>
+                <option value="-date">Sort: Newest first</option>
+                <option value="date">Sort: Oldest first</option>
+                <option value="-total_computed">Sort: Highest total</option>
+              </select>
+            </div>
             <a className="btn sm" onClick={() => navigate('/attendance/new')}>
               <Icon name="plus" size={15} /> New session
             </a>
@@ -142,6 +203,42 @@ export function AttendanceListPage() {
         <div className="muted" style={{ fontSize: '.8rem', marginTop: 8 }}>
           Recurring sessions above are generated automatically each week from this schedule. Manage meeting types in Admin.
         </div>
+      </div>
+
+      <div className="card section-gap">
+        <div className="toolbar">
+          <h3 style={{ flex: 'none' }}>House fellowships</h3>
+          <button className="btn sm outline" onClick={addFellowship}>
+            <Icon name="plus" size={15} /> Add a fellowship
+          </button>
+        </div>
+        <div className="muted" style={{ fontSize: '.8rem', marginBottom: 10 }}>
+          Several fellowships meet on the same evening, so a session belongs to a fellowship as
+          well as a date. The list is configurable because the number changes.
+        </div>
+        <table className="cardtable">
+          <thead>
+            <tr><th>Fellowship</th><th>Area</th><th>Sessions recorded</th><th /></tr>
+          </thead>
+          <tbody>
+            {(fellowships ?? []).map((f) => (
+              <tr key={f.id}>
+                <td data-label="Fellowship"><b>{f.name}</b></td>
+                <td data-label="Area">{f.area || '–'}</td>
+                <td data-label="Sessions recorded">{f.session_count}</td>
+                <td className="td-actions">
+                  <button className="icon-btn" title="Remove"
+                    onClick={() => removeFellowship(f.id, f.name, f.session_count)}>
+                    <Icon name="trash" size={14} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {!(fellowships ?? []).length && (
+              <tr><td colSpan={4} className="empty">No fellowships set up yet.</td></tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </>
   );

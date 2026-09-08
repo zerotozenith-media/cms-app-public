@@ -4,6 +4,7 @@ import { useSession, useDeleteSession, useRecordSession, useMeetingTypes } from 
 import { apiClient } from '../../api/client';
 import type { Member, PaginatedResponse } from '../../types/members';
 import { Badge } from '../../components/ui/Badge';
+import { useMembers } from '../../api/members';
 import { Icon } from '../../components/ui/Icon';
 
 const DETAILED_FIELDS: [keyof typeof EMPTY_COUNTS, string][] = [
@@ -29,7 +30,18 @@ export function SessionRecordPage() {
   const deleteSession = useDeleteSession();
   const recordSession = useRecordSession(sessionId);
 
+  // Only Workers lead a fellowship, so the list is scoped to them.
+  const { data: workerPage } = useMembers({ category: 'Worker' });
+  const workers = workerPage?.results;
   const [counts, setCounts] = useState(EMPTY_COUNTS);
+  // Online attendance, kept separate. Any meeting can be hybrid and a
+  // total showing only the room understates the month.
+  const [online, setOnline] = useState(EMPTY_COUNTS);
+  const [onlineOpen, setOnlineOpen] = useState(false);
+  const [newComers, setNewComers] = useState(0);
+  const [newConverts, setNewConverts] = useState(0);
+  const [ledBy, setLedBy] = useState<number | ''>('');
+  const [lesson, setLesson] = useState('');
   const [trackNamed, setTrackNamed] = useState(false);
   const [attendeeIds, setAttendeeIds] = useState<Set<number>>(new Set());
   const [selectedNames, setSelectedNames] = useState<Map<number, string>>(new Map());
@@ -68,7 +80,10 @@ export function SessionRecordPage() {
   const meetingType = meetingTypes.find((m) => m.id === session.meeting_type);
   const fields = meetingType?.detail_level === 'simple' ? SIMPLE_FIELDS : DETAILED_FIELDS;
 
-  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  const inPerson = Object.values(counts).reduce((a, b) => a + b, 0);
+  const onlineCount = Object.values(online).reduce((a, b) => a + b, 0);
+  const total = inPerson + onlineCount;
+  const isFellowship = !!session?.fellowship;
 
   function toggleAttendee(member: Member) {
     const next = new Set(attendeeIds);
@@ -94,6 +109,11 @@ export function SessionRecordPage() {
     e.preventDefault();
     await recordSession.mutateAsync({
       ...counts,
+      online_men: online.men, online_women: online.women,
+      online_youth_boys: online.youth_boys, online_youth_girls: online.youth_girls,
+      online_children_boys: online.children_boys, online_children_girls: online.children_girls,
+      new_comers: newComers, new_converts: newConverts,
+      ...(isFellowship ? { led_by: ledBy === '' ? null : ledBy, lesson } : {}),
       track_named: trackNamed,
       attendee_ids: Array.from(attendeeIds),
     });
@@ -106,7 +126,10 @@ export function SessionRecordPage() {
       <div className="card" style={{ maxWidth: 560, margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <h3 style={{ fontSize: '1.1rem' }}>{session.meeting_type_name} · {session.date}</h3>
+            <h3 style={{ fontSize: '1.1rem' }}>
+              {session.meeting_type_name}
+              {session.fellowship_name ? ` · ${session.fellowship_name}` : ''} · {session.date}
+            </h3>
             <div className="muted" style={{ marginBottom: 16 }}>{session.location} · {session.mode.replace('-', ' ')}</div>
           </div>
           <button className="icon-btn" title="Delete session" onClick={handleDelete}>
@@ -115,6 +138,10 @@ export function SessionRecordPage() {
         </div>
 
         <form onSubmit={handleSubmit}>
+          <div className="followup-guide">
+            <div className="followup-guide-title"><Icon name="users" size={14} /> In person</div>
+            <div className="followup-guide-note">Everyone physically in the room.</div>
+          </div>
           {fields.map(([key, label]) => (
             <div className="field" key={key}>
               <label htmlFor={`session-count-${key}`}>{label}</label>
@@ -125,9 +152,80 @@ export function SessionRecordPage() {
               />
             </div>
           ))}
+
+          <button type="button" className="followup-guide"
+            style={{ width: '100%', textAlign: 'left', cursor: 'pointer', border: 0 }}
+            onClick={() => setOnlineOpen(!onlineOpen)}>
+            <div className="followup-guide-title">
+              <Icon name="grid" size={14} /> Joining online
+              <span className="muted" style={{ fontWeight: 400, fontSize: '.78rem', marginLeft: 6 }}>
+                {onlineOpen || onlineCount ? '' : '(tap to add)'}
+              </span>
+            </div>
+            <div className="followup-guide-note">Leave blank when nobody joined remotely.</div>
+          </button>
+          {(onlineOpen || onlineCount > 0) && fields.map(([key, label]) => (
+            <div className="field" key={`online-${key}`}>
+              <label htmlFor={`session-online-${key}`}>{label} online</label>
+              <input
+                id={`session-online-${key}`}
+                type="number" min={0} value={online[key]}
+                onChange={(e) => setOnline({ ...online, [key]: Number(e.target.value) || 0 })}
+              />
+            </div>
+          ))}
+
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderTop: '1px solid var(--line)', marginTop: 6, fontWeight: 800 }}>
-            <span>Total</span><span>{total}</span>
+            <span>Total{onlineCount > 0 && (
+              <span className="muted" style={{ fontWeight: 400, fontSize: '.8rem', marginLeft: 8 }}>
+                {inPerson} in person, {onlineCount} online
+              </span>
+            )}</span>
+            <span>{total}</span>
           </div>
+
+          <div className="form-row">
+            <div className="field">
+              <label htmlFor="session-new-comers">New comers</label>
+              <input id="session-new-comers" type="number" min={0} value={newComers}
+                onChange={(e) => setNewComers(Number(e.target.value) || 0)} />
+              <div className="field-hint">Present for the first time.</div>
+            </div>
+            <div className="field">
+              <label htmlFor="session-new-converts">New converts</label>
+              <input id="session-new-converts" type="number" min={0} value={newConverts}
+                onChange={(e) => setNewConverts(Number(e.target.value) || 0)} />
+              <div className="field-hint">Gave their life to Christ here.</div>
+            </div>
+          </div>
+
+          {isFellowship && (
+            <>
+              <div className="followup-guide">
+                <div className="followup-guide-title"><Icon name="users" size={14} /> This fellowship meeting</div>
+                <div className="followup-guide-note">
+                  Recorded per meeting, since who leads changes week to week.
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="field">
+                  <label htmlFor="session-led-by">Led by</label>
+                  <select id="session-led-by" value={ledBy}
+                    onChange={(e) => setLedBy(e.target.value === '' ? '' : Number(e.target.value))}>
+                    <option value="">Not recorded</option>
+                    {(workers ?? []).map((m) => (
+                      <option key={m.id} value={m.id}>{m.first_name} {m.surname}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="session-lesson">Lesson studied</label>
+                  <input id="session-lesson" value={lesson}
+                    onChange={(e) => setLesson(e.target.value)} placeholder="e.g. BTB 15" />
+                </div>
+              </div>
+            </>
+          )}
 
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '14px 0', fontSize: '.85rem' }}>
             <input type="checkbox" checked={trackNamed} onChange={(e) => setTrackNamed(e.target.checked)} style={{ width: 16, height: 16 }} />

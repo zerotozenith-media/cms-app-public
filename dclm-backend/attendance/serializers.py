@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from members.models import Member
-from .models import MeetingType, AttendanceSession, AttendanceSessionMember
+from .models import Fellowship, MeetingType, AttendanceSession, AttendanceSessionMember
 
 
 class MeetingTypeSerializer(serializers.ModelSerializer):
@@ -21,7 +21,11 @@ class AttendanceSessionMemberSerializer(serializers.ModelSerializer):
 
 class AttendanceSessionSerializer(serializers.ModelSerializer):
     total = serializers.ReadOnlyField()
+    online_total = serializers.ReadOnlyField()
+    in_person_total = serializers.ReadOnlyField()
     meeting_type_name = serializers.CharField(source="meeting_type.name", read_only=True)
+    fellowship_name = serializers.CharField(source="fellowship.name", read_only=True, default=None)
+    led_by_name = serializers.CharField(source="led_by.full_name", read_only=True, default=None)
     attendees = AttendanceSessionMemberSerializer(many=True, read_only=True)
 
     class Meta:
@@ -30,6 +34,10 @@ class AttendanceSessionSerializer(serializers.ModelSerializer):
             "id", "meeting_type", "meeting_type_name", "date", "location", "mode", "status",
             "track_named", "men", "women", "youth_boys", "youth_girls",
             "children_boys", "children_girls", "total", "attendees",
+        "online_men", "online_women", "online_youth_boys", "online_youth_girls",
+        "online_children_boys", "online_children_girls", "online_total",
+        "in_person_total", "new_comers", "new_converts",
+        "fellowship", "fellowship_name", "led_by", "led_by_name", "lesson",
         ]
         read_only_fields = ["id", "status"]
         # status is deliberately read-only here too , the only correct way
@@ -66,6 +74,23 @@ class RecordAttendanceSerializer(serializers.Serializer):
     youth_girls = serializers.IntegerField(min_value=0, default=0)
     children_boys = serializers.IntegerField(min_value=0, default=0)
     children_girls = serializers.IntegerField(min_value=0, default=0)
+
+    # Online attendance, kept separate from the counts above. Any meeting
+    # can be hybrid and recording only the room understates the month.
+    online_men = serializers.IntegerField(min_value=0, default=0)
+    online_women = serializers.IntegerField(min_value=0, default=0)
+    online_youth_boys = serializers.IntegerField(min_value=0, default=0)
+    online_youth_girls = serializers.IntegerField(min_value=0, default=0)
+    online_children_boys = serializers.IntegerField(min_value=0, default=0)
+    online_children_girls = serializers.IntegerField(min_value=0, default=0)
+
+    new_comers = serializers.IntegerField(min_value=0, default=0)
+    new_converts = serializers.IntegerField(min_value=0, default=0)
+
+    # Only meaningful for a house fellowship.
+    led_by = serializers.IntegerField(required=False, allow_null=True, default=None)
+    lesson = serializers.CharField(required=False, allow_blank=True, default="")
+
     track_named = serializers.BooleanField(default=False)
     attendee_ids = serializers.ListField(
         child=serializers.IntegerField(), required=False, default=list,
@@ -78,3 +103,14 @@ class RecordAttendanceSerializer(serializers.Serializer):
         if missing:
             raise serializers.ValidationError(f"Unknown member id(s): {sorted(missing)}")
         return value
+
+
+class FellowshipSerializer(serializers.ModelSerializer):
+    session_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Fellowship
+        fields = ["id", "name", "area", "is_active", "session_count"]
+
+    def get_session_count(self, obj):
+        return obj.sessions.count()

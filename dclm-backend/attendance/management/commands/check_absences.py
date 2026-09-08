@@ -26,7 +26,7 @@ from django.core.management.base import BaseCommand
 from django.db.models import Q
 from django.utils import timezone
 
-from attendance.models import AttendanceSession
+from attendance.models import AttendanceSession, MeetingType
 from members.models import Member, MemberFollowUpTask
 
 HOURS_AFTER_START = 3
@@ -64,7 +64,17 @@ class Command(BaseCommand):
         ))
 
     def _process_session(self, session):
+        # Only chase the people who were actually expected. Without this,
+        # a workers meeting marked for absence follow-up would create a
+        # task for every general member who was never invited, and the
+        # follow-up list would become noise workers learn to ignore.
         roster = Member.objects.filter(location=session.location)
+        audience = getattr(session.meeting_type, "audience", MeetingType.Audience.EVERYONE)
+        if audience == MeetingType.Audience.WORKERS:
+            roster = roster.filter(category=Member.Category.WORKER)
+        elif audience == MeetingType.Audience.LEADERSHIP:
+            roster = roster.filter(is_leader=True)
+
         checked_in_ids = set(session.attendees.values_list("member_id", flat=True))
         absentees = roster.exclude(id__in=checked_in_ids)
 

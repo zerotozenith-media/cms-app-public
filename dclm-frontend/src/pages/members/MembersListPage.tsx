@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMembers, useMemberStats, useDeleteMember } from '../../api/members';
+import { useHouseholds, useMembers, useMemberStats, useDeleteMember } from '../../api/members';
 import { StatRow, type StatItem } from '../../components/ui/StatRow';
 import {
   useFollowUpStats, useEligibleShepherds,
@@ -31,6 +31,10 @@ export function MembersListPage() {
   const [previewMode, setPreviewMode] = useState<null | 'unassigned' | 'everyone'>(null);
   const [selected, setSelected] = useState<number[]>([]);
   const [bulkShepherd, setBulkShepherd] = useState('');
+  const [shepherdFilter, setShepherdFilter] = useState('all');
+  const [householdFilter, setHouseholdFilter] = useState('all');
+  const [leaderFilter, setLeaderFilter] = useState('all');
+  const { data: households } = useHouseholds();
 
   const { data: shepherds } = useEligibleShepherds();
   const preview = useAssignmentPreview(previewMode === 'everyone', previewMode !== null);
@@ -43,6 +47,9 @@ export function MembersListPage() {
   const { data, isLoading } = useMembers({
     search: query || undefined,
     category: category !== 'all' ? category : undefined,
+    shepherd: shepherdFilter !== 'all' ? shepherdFilter : undefined,
+    household: householdFilter !== 'all' ? householdFilter : undefined,
+    is_leader: leaderFilter === 'yes' ? 'true' : undefined,
     ordering,
     page,
   });
@@ -105,6 +112,26 @@ export function MembersListPage() {
               <option value="General Member">General Member</option>
               <option value="Worker in Training">Worker in Training</option>
               <option value="Worker">Worker</option>
+            </select>
+            <label className="sr-only" htmlFor="mem-shepherd">Shepherd</label>
+            <select id="mem-shepherd" className="selectbox" value={shepherdFilter}
+              onChange={(e) => { setShepherdFilter(e.target.value); setPage(1); }}>
+              <option value="all">All shepherds</option>
+              <option value="none">No shepherd</option>
+              {(shepherds ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+            <label className="sr-only" htmlFor="mem-household">Household</label>
+            <select id="mem-household" className="selectbox" value={householdFilter}
+              onChange={(e) => { setHouseholdFilter(e.target.value); setPage(1); }}>
+              <option value="all">All households</option>
+              <option value="none">No household</option>
+              {(households ?? []).map((h: any) => <option key={h.id} value={h.id}>{h.name}</option>)}
+            </select>
+            <label className="sr-only" htmlFor="mem-leader">Leaders</label>
+            <select id="mem-leader" className="selectbox" value={leaderFilter}
+              onChange={(e) => { setLeaderFilter(e.target.value); setPage(1); }}>
+              <option value="all">Leaders and members</option>
+              <option value="yes">Leaders only</option>
             </select>
             <select className="selectbox" value={ordering} onChange={(e) => setOrdering(e.target.value)}>
               <option value="surname,first_name">Sort: Name A-Z</option>

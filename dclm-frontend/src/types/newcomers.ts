@@ -1,4 +1,4 @@
-export type NewcomerStage = 'new' | 'contacted' | 'visiting' | 'integrated' | 'not-interested';
+export type NewcomerStage = 'new' | 'contacted' | 'attending' | 'member' | 'not-interested';
 
 export interface MilestoneStatus {
   milestone_type_id: number;

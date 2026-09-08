@@ -21,6 +21,10 @@ export interface Member {
   category: MemberCategory;
   location: string;
   joined_date: string;
+  /** Expected at leadership meetings. Independent of category, because a
+   *  leader is a Worker who also leads. */
+  is_leader: boolean;
+  from_newcomer: number | null;
   household: number | null;
   household_name: string | null;
   category_history: MemberCategoryHistoryEntry[];
@@ -50,6 +54,11 @@ export interface PaginatedResponse<T> {
 export interface MemberListParams {
   search?: string;
   category?: string;
+  /** A user id, or "none" to find members with nobody assigned. */
+  shepherd?: string;
+  /** A household id, or "none" for members not linked to one. */
+  household?: string;
+  is_leader?: string;
   ordering?: string;
   page?: number;
 }

@@ -178,6 +178,49 @@ longer sign in.
 Members, tick the boxes next to the people to move, choose a shepherd
 from the bar that appears, press Assign.
 
+### Saying who each meeting is for
+
+**Admin, Meeting Types.** Every meeting is Everyone, Workers or
+Leadership. This decides who is followed up when absent, so a general
+member is never asked why they missed a workers meeting.
+
+Workers in Training count as general members. Leadership is a separate
+tick on the member record, because a leader is a Worker who also leads.
+
+### Recording who joined online
+
+Every attendance form has a "Joining online" section under the in-person
+counts. It stays closed until you tap it, so it is not extra typing when
+nobody joined remotely. The total shows both, split.
+
+### House fellowships
+
+Fellowships are set up under Attendance, below the meeting schedule. Add
+or remove them as the church grows.
+
+When you record a fellowship meeting the form also asks who led it and
+which lesson was studied. The leader is recorded per meeting, because it
+changes week to week.
+
+### The monthly spreadsheet
+
+Reports has a Spreadsheet button beside Generate report. It downloads the
+month's figures as a formatted workbook, for anyone who needs to combine
+several locations. The PDF remains the report itself.
+
+### Adding someone to the member roll
+
+**Newcomers, open a person.** The readiness panel shows whether they are
+proposed: the Salvation milestone recorded, and at least half the Friday
+services attended over six months.
+
+The system never promotes anyone by itself. You confirm, and you can add
+anyone at any time regardless of the rule, which covers someone
+relocating from another church.
+
+Their newcomer record is kept and linked, so their whole follow-up
+history stays with them and their card remains on the board under Member.
+
 ### Tracking which adverts actually work
 
 **Online Enquiries, Outreach.** Only visible to roles with the outreach

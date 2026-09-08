@@ -60,8 +60,21 @@ class MemberViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
         if category:
             qs = qs.filter(category=category)
         household = self.request.query_params.get("household")
-        if household:
+        if household == "none":
+            qs = qs.filter(household__isnull=True)
+        elif household:
             qs = qs.filter(household_id=household)
+
+        # "No shepherd" is the one that matters: the stat card shows that
+        # count, but there was no way to get from the number to the people.
+        shepherd = self.request.query_params.get("shepherd")
+        if shepherd == "none":
+            qs = qs.filter(assigned_to__isnull=True)
+        elif shepherd:
+            qs = qs.filter(assigned_to_id=shepherd)
+
+        if self.request.query_params.get("is_leader") == "true":
+            qs = qs.filter(is_leader=True)
         # Phase 4.1 fix: total_given was a per-object live .aggregate()
         # call in the serializer , correct, but O(n) queries for a list
         # of n members. Measured against the real ~42-member seed data:

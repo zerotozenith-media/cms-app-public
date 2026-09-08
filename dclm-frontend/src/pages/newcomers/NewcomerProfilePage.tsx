@@ -3,20 +3,23 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   useNewcomer, useUpdateNewcomer, useDeleteNewcomer, useChangeStage, useSetMilestone,
   useCreateTask, useDeleteTask, useCompleteNewcomerTask, useNewcomerSources, useNewcomerTasks,
+  useNewcomerReadiness, useNewcomerJourney, useMakeMember, useLogAttempt, ATTEMPT_METHODS,
 } from '../../api/newcomers';
+import { ReadinessCards } from '../../components/journey/ReadinessCards';
+import { JourneyTimeline } from '../../components/journey/JourneyTimeline';
 import { Badge } from '../../components/ui/Badge';
 import { Icon } from '../../components/ui/Icon';
 import { FollowUpCompletionForm } from '../../components/followup/FollowUpCompletionForm';
 import { CompletedFollowUpLog } from '../../components/followup/CompletedFollowUpLog';
 
 function stageBadgeColor(stage: string): 'blue' | 'green' | 'gray' {
-  if (stage === 'integrated') return 'green';
+  if (stage === 'member') return 'green';
   if (stage === 'not-interested') return 'gray';
   return 'blue';
 }
 function stageLabel(stage: string): string {
   const map: Record<string, string> = {
-    new: 'New', contacted: 'Contacted', visiting: 'Visiting', integrated: 'Integrated', 'not-interested': 'Not Interested',
+    new: 'New', contacted: 'Contacted', attending: 'Attending', member: 'Member', 'not-interested': 'Not Interested',
   };
   return map[stage] ?? stage;
 }
@@ -35,6 +38,21 @@ export function NewcomerProfilePage() {
   const setMilestone = useSetMilestone(newcomerId);
   const createTask = useCreateTask(newcomerId);
   const deleteTask = useDeleteTask(newcomerId);
+  const { data: readiness } = useNewcomerReadiness(newcomerId);
+  const { data: journey } = useNewcomerJourney(newcomerId);
+  const makeMember = useMakeMember(newcomerId);
+  const logAttempt = useLogAttempt(newcomerId);
+  const [attemptMethod, setAttemptMethod] = useState(ATTEMPT_METHODS[0] as string);
+  const [attemptNote, setAttemptNote] = useState('');
+
+  async function handleMakeMember() {
+    if (!n) return;
+    if (!confirm(
+      `Add ${n.name} to the member roll?\n\n` +
+      'Their follow-up history stays with them, and their card remains on the board under Member.'
+    )) return;
+    await makeMember.mutateAsync();
+  }
 
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState('');
@@ -80,6 +98,78 @@ export function NewcomerProfilePage() {
   return (
     <>
       <a className="backlink" onClick={() => navigate('/newcomers')}>← Back to pipeline</a>
+
+      {n.stage === 'member' ? (
+        <div className="ready-banner member-banner">
+          <Icon name="check" size={17} />
+          <b>{n.name} is on the member roll.</b>
+          <span className="muted">Their card stays on the board under Member.</span>
+        </div>
+      ) : readiness?.ready ? (
+        <div className="ready-banner">
+          <Icon name="check" size={17} />
+          <b>Ready for membership.</b> Both conditions are met, so this is proposed for you to confirm.
+          <button className="btn sm" style={{ marginLeft: 'auto' }}
+            onClick={handleMakeMember} disabled={makeMember.isPending}>Make a member</button>
+        </div>
+      ) : null}
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="toolbar" style={{ marginBottom: 12 }}>
+          <h3 style={{ flex: 'none' }}>Membership readiness</h3>
+          {n.stage !== 'member' && (
+            <button className="btn sm outline" onClick={handleMakeMember} disabled={makeMember.isPending}>
+              <Icon name="check" size={14} /> Make a member now
+            </button>
+          )}
+        </div>
+        {readiness && <ReadinessCards r={readiness} />}
+        <div className="muted" style={{ fontSize: '.8rem' }}>
+          A newcomer is proposed once the Salvation milestone is recorded and they have attended at
+          least half the Friday services over six months. An administrator always confirms, and can
+          add anyone at any time regardless, for example someone relocating from another church.
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="toolbar" style={{ marginBottom: 4 }}>
+          <h3 style={{ flex: 'none' }}>Journey</h3>
+        </div>
+        <div className="muted" style={{ fontSize: '.8rem', marginBottom: 10 }}>
+          Every contact, including attempts that did not reach them.
+        </div>
+        <JourneyTimeline events={journey ?? []} />
+
+        <div className="form-card section-gap">
+          <div className="muted" style={{ fontSize: '.8rem', marginBottom: 8 }}>
+            Tried and could not reach them? Record it, so the history does not look as though
+            nobody tried.
+          </div>
+          <div className="form-row">
+            <div className="field">
+              <label htmlFor="attempt-method">How you tried</label>
+              <select id="attempt-method" value={attemptMethod}
+                onChange={(e) => setAttemptMethod(e.target.value)}>
+                {ATTEMPT_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="attempt-note">Note</label>
+              <input id="attempt-note" value={attemptNote}
+                onChange={(e) => setAttemptNote(e.target.value)}
+                placeholder="e.g. left a voice note" />
+            </div>
+          </div>
+          <button className="btn sm outline" disabled={logAttempt.isPending}
+            onClick={async () => {
+              await logAttempt.mutateAsync({ method: attemptMethod, note: attemptNote });
+              setAttemptNote('');
+            }}>
+            <Icon name="plus" size={14} /> Log the attempt
+          </button>
+        </div>
+      </div>
+
       <div className="grid g2">
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -140,7 +230,7 @@ export function NewcomerProfilePage() {
                   <select id="nc-reactivate" className="selectbox" value={reactivateTarget} onChange={(e) => setReactivateTarget(e.target.value)}>
                     <option value="new">New</option>
                     <option value="contacted">Contacted</option>
-                    <option value="visiting">Visiting</option>
+                    <option value="attending">Attending</option>
                   </select>
                   <button className="btn sm" onClick={reactivate} disabled={changeStage.isPending}>Reactivate</button>
                 </div>

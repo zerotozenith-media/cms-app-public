@@ -8,13 +8,13 @@ import { Badge } from '../../components/ui/Badge';
 import type { Newcomer, NewcomerStage } from '../../types/newcomers';
 
 function stageBadgeColor(stage: NewcomerStage): 'blue' | 'green' | 'gray' {
-  if (stage === 'integrated') return 'green';
+  if (stage === 'member') return 'green';
   if (stage === 'not-interested') return 'gray';
   return 'blue';
 }
 function stageLabel(stage: NewcomerStage): string {
   const map: Record<NewcomerStage, string> = {
-    new: 'New', contacted: 'Contacted', visiting: 'Visiting', integrated: 'Integrated', 'not-interested': 'Not Interested',
+    new: 'New', contacted: 'Contacted', attending: 'Attending', member: 'Member', 'not-interested': 'Not Interested',
   };
   return map[stage];
 }
@@ -49,7 +49,7 @@ export function NewcomersListPage() {
   const thisMonthPrefix = new Date().toISOString().slice(0, 7);
   const newThisMonth = (allNewcomers ?? []).filter((n) => n.created_at.slice(0, 7) === thisMonthPrefix).length;
   const overdueCount = active.filter((n) => n.open_tasks_count > 0 && n.urgency === 'red').length;
-  const unassignedCount = active.filter((n) => !n.assigned_to_name && n.stage !== 'integrated').length;
+  const unassignedCount = active.filter((n) => !n.assigned_to_name && n.stage !== 'member').length;
 
   const stats: StatItem[] = [
     { icon: 'users', color: 'blue', label: 'In the pipeline', value: active.length },
@@ -93,8 +93,8 @@ export function NewcomersListPage() {
               <option value="all">All stages</option>
               <option value="new">New</option>
               <option value="contacted">Contacted</option>
-              <option value="visiting">Visiting</option>
-              <option value="integrated">Integrated</option>
+              <option value="attending">Attending</option>
+              <option value="member">Member</option>
               <option value="not-interested">Not Interested</option>
             </select>
             <select className="selectbox" value={sort} onChange={(e) => setSort(e.target.value)}>

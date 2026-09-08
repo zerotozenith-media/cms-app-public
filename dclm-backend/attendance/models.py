@@ -3,6 +3,11 @@ from django.utils import timezone
 
 
 class MeetingType(models.Model):
+    class Audience(models.TextChoices):
+        EVERYONE = "everyone", "Everyone"
+        WORKERS = "workers", "Workers"
+        LEADERSHIP = "leadership", "Leadership"
+
     class Frequency(models.TextChoices):
         WEEKLY = "weekly", "Weekly"
         OCCASIONAL = "occasional", "Occasional"
@@ -36,6 +41,37 @@ class MeetingType(models.Model):
                    "confirmed design decision, defaults off except where explicitly enabled.",
     )
 
+    # Who is expected. Without this, switching absence follow-up on for a
+    # workers meeting would create a task for every general member who was
+    # never expected there, and workers would learn to ignore the list.
+    audience = models.CharField(
+        max_length=20, choices=Audience.choices, default=Audience.EVERYONE,
+        help_text="Who is expected at this meeting, and so who is followed up when absent.",
+    )
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class Fellowship(models.Model):
+    """
+    A house caring fellowship.
+
+    Kept as a configurable list rather than a fixed number, because the
+    number changes: the church runs two today, one for the women and one
+    for the men, and adding a third should be an administrator's job.
+
+    The leader is NOT held here. It is recorded per session, since it
+    changes week to week, and fixing it here would silently rewrite
+    history every time somebody stood in.
+    """
+    name = models.CharField(max_length=100, unique=True)
+    area = models.CharField(max_length=100, blank=True, default="")
+    is_active = models.BooleanField(default=True)
+
     class Meta:
         ordering = ["name"]
 
@@ -68,6 +104,33 @@ class AttendanceSession(models.Model):
     children_boys = models.PositiveIntegerField(default=0)
     children_girls = models.PositiveIntegerField(default=0)
 
+    # Online attendance, counted separately rather than folded into the
+    # figures above. Any meeting can be hybrid, and a report showing only
+    # the people in the room would understate the month.
+    online_men = models.PositiveIntegerField(default=0)
+    online_women = models.PositiveIntegerField(default=0)
+    online_youth_boys = models.PositiveIntegerField(default=0)
+    online_youth_girls = models.PositiveIntegerField(default=0)
+    online_children_boys = models.PositiveIntegerField(default=0)
+    online_children_girls = models.PositiveIntegerField(default=0)
+
+    # A headcount of who was new, which answers a different question from
+    # the newcomer records: how many were new tonight, rather than who.
+    new_comers = models.PositiveIntegerField(default=0)
+    new_converts = models.PositiveIntegerField(
+        default=0, help_text="Gave their life to Christ at this meeting.")
+
+    # Only used when the meeting is a house fellowship.
+    fellowship = models.ForeignKey(
+        "attendance.Fellowship", on_delete=models.PROTECT,
+        related_name="sessions", null=True, blank=True)
+    led_by = models.ForeignKey(
+        "members.Member", on_delete=models.SET_NULL,
+        related_name="led_sessions", null=True, blank=True)
+    lesson = models.CharField(
+        max_length=60, blank=True, default="",
+        help_text='Which study was covered, for example "BTB 15".')
+
     class Meta:
         ordering = ["-date"]
 
@@ -75,11 +138,20 @@ class AttendanceSession(models.Model):
         return f"{self.meeting_type} , {self.date}"
 
     @property
+    def online_total(self):
+        return (self.online_men + self.online_women
+                + self.online_youth_boys + self.online_youth_girls
+                + self.online_children_boys + self.online_children_girls)
+
+    @property
+    def in_person_total(self):
+        return (self.men + self.women + self.youth_boys + self.youth_girls
+                + self.children_boys + self.children_girls)
+
+    @property
     def total(self):
-        return (
-            self.men + self.women + self.youth_boys
-            + self.youth_girls + self.children_boys + self.children_girls
-        )
+        """Everyone present, in the room and online."""
+        return self.in_person_total + self.online_total
 
 
 class AttendanceSessionMember(models.Model):
@@ -94,8 +166,16 @@ class AttendanceSessionMember(models.Model):
     session = models.ForeignKey(
         "attendance.AttendanceSession", on_delete=models.CASCADE, related_name="attendees"
     )
+    # Exactly one of member or newcomer is set. A newcomer who is
+    # attending is a real person in the room, and the membership rule
+    # cannot work without knowing when they came.
     member = models.ForeignKey(
-        "members.Member", on_delete=models.CASCADE, related_name="attendance_records"
+        "members.Member", on_delete=models.CASCADE, related_name="attendance_records",
+        null=True, blank=True,
+    )
+    newcomer = models.ForeignKey(
+        "newcomers.Newcomer", on_delete=models.CASCADE, related_name="attendances",
+        null=True, blank=True,
     )
     mode = models.CharField(
         max_length=20, choices=Mode.choices, default=Mode.IN_PERSON,
@@ -105,7 +185,14 @@ class AttendanceSessionMember(models.Model):
     checked_in_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
-        unique_together = ("session", "member")
+        # Two separate pairs rather than one across three columns: a row
+        # holds a member or a newcomer, never both, and NULL would defeat
+        # a combined constraint.
+        unique_together = [("session", "member"), ("session", "newcomer")]
+
+    @property
+    def person(self):
+        return self.member or self.newcomer
 
     def __str__(self):
-        return f"{self.member} @ {self.session}"
+        return f"{self.person} @ {self.session}"

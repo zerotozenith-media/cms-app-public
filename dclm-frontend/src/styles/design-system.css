@@ -51,7 +51,10 @@
   .g4{grid-template-columns:repeat(4,1fr)}
   .g3{grid-template-columns:repeat(3,1fr)}
   .g2{grid-template-columns:repeat(2,1fr)}
-  @media (max-width:1000px){.g4{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(2,1fr)}}
+  /* Based on the content area, not the window. The sidebar takes about
+     200px, so a 1024px window leaves roughly 820px to lay out in. */
+  @media (max-width:1240px){.g4{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(2,1fr)}}
+  @media (max-width:1240px){.grid.g2{grid-template-columns:1fr}}
   .card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px}
   .card h3{font-size:.95rem;color:var(--blue-deep)}
   .kpi .label{font-size:.78rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
@@ -311,6 +314,42 @@
   .help-link{text-align:left;background:var(--sky-2);border:1px solid var(--line);border-radius:9px;padding:.6rem .8rem;font-weight:700;font-size:.86rem;color:var(--blue-deep);cursor:pointer}
   .help-link:hover{background:var(--sky);border-color:var(--blue)}
 
+  /* ---- Membership readiness and the journey ---- */
+  .readycards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:18px}
+  .rc{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px}
+  .rc-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;font-size:.74rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+  .rc-body{display:flex;align-items:center;gap:13px}
+  .rc-value{font-size:1.35rem;font-weight:800;color:var(--blue-deep);line-height:1.1}
+  .rc-value.muted{color:var(--muted)}
+  .rc-sub{font-size:.75rem;color:var(--muted);margin-top:2px}
+  .rc-badge{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none}
+  .rc-badge.yes{background:var(--green-bg);color:var(--green)}
+  .rc-badge.no{background:var(--sky-2);border:1px solid var(--line);color:var(--muted)}
+  .rc-foot{margin-top:11px;padding-top:9px;border-top:1px solid var(--line);font-size:.75rem;color:var(--muted);display:flex;align-items:center;gap:5px}
+  .rc-foot.ok{color:var(--green)}
+  .ready-banner{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--green-bg);border:1px solid var(--green);border-radius:10px;padding:11px 14px;margin-bottom:16px;font-size:.87rem;color:var(--ink)}
+  .member-banner{background:var(--sky);border-color:var(--blue)}
+  .jt{position:relative;padding-left:26px;margin-top:6px}
+  .jt:before{content:"";position:absolute;left:7px;top:8px;bottom:8px;width:2px;background:var(--line)}
+  .jt-item{position:relative;margin-bottom:17px}
+  .jt-item:last-child{margin-bottom:0}
+  .jt-dot{position:absolute;left:-26px;top:3px;width:16px;height:16px;border-radius:50%;border:2px solid #fff;background:var(--muted)}
+  .jt-dot.blue{background:var(--blue)}
+  .jt-dot.green{background:var(--green)}
+  .jt-dot.amber{background:var(--amber)}
+  .jt-dot.plain{background:#fff;border:2px solid var(--line);box-shadow:inset 0 0 0 2px var(--sky)}
+  /* A contact that did not reach the person still belongs in the record. */
+  .jt-dot.attempt{background:#fff;border:2px dashed var(--muted)}
+  .jt-title{font-size:.87rem;font-weight:700;color:var(--blue-deep)}
+  .jt-meta{font-weight:400;color:var(--muted);font-size:.8rem}
+  .jt-detail{font-size:.82rem;color:var(--muted);margin-top:2px}
+  .jt-log{background:var(--sky-2);border-radius:8px;padding:9px 11px;margin-top:6px;font-size:.82rem;line-height:1.6}
+  .jt-log span{color:var(--muted);display:inline-block;min-width:86px}
+
+  /* ---- Filters ---- */
+  .filter-toggle{display:none}
+  .filter-panel{display:flex;gap:8px;flex-wrap:wrap}
+
   /* ---- Mobile-first overrides ---- */
   @media (max-width:620px){
     body{font-size:15px}
@@ -321,6 +360,30 @@
     /* Keep the tap target and counter usable on a narrow screen: the
        mode button drops onto its own line rather than squeezing the name. */
     .checkin-row{flex-wrap:wrap;padding:12px 6px}
+    /* Tap targets. 34px is below the 44px guideline, and a leader
+       filtering a list while standing in a service will miss. */
+    .selectbox,select{min-height:44px;font-size:.9rem;max-width:100%}
+    .menu-btn{min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center}
+    .nav-item{min-height:44px}
+    .icon-btn{min-width:40px;min-height:40px}
+    .tab,.btn{min-height:40px}
+    .kstage-select{min-height:44px}
+    /* The help marker stays small on purpose: it sits inline in a
+       heading, so a 44px circle would look like a mistake. Padding
+       widens the tappable area instead. */
+    /* Do not pad this: it sits inline inside a heading and padding
+       spills the tap area over the words beside it. A slightly larger
+       circle with more margin gives the thumb room without overlapping. */
+    .help-mark{width:20px;height:20px;margin-left:8px;font-size:.72rem}
+    .side-close{min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center}
+    /* Several filters stacked pushed the table more than a screen down,
+       so they collapse behind one row and the data comes first. */
+    .filter-toggle{display:flex;align-items:center;justify-content:space-between;width:100%;
+      min-height:44px;padding:.55rem .85rem;border:1px solid var(--line);background:var(--sky-2);
+      border-radius:9px;font-weight:700;color:var(--blue-deep);font-size:.88rem;cursor:pointer}
+    .filter-panel{display:none;flex-direction:column;gap:8px;margin-top:8px;width:100%}
+    .filter-panel.open{display:flex}
+    .filter-panel .selectbox{width:100%}
     /* The 230px sidebar has no room on a phone. A horizontal scroll
        strip was tried first but only one section was visible with
        nothing showing it scrolled, so the rest were effectively hidden.

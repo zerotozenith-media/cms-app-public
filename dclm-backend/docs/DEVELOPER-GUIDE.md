@@ -140,7 +140,7 @@ dclm-frontend/         React 18 + TypeScript + Vite
   src/styles/          design-system.css holds every shared class
 ```
 
-39 models, 56 registered routes.
+42 models, 56 registered routes.
 
 ### Data flow
 
@@ -405,6 +405,89 @@ the actual control.
 
 Cost per newcomer is `None` until someone converts. Reporting zero would
 read as free.
+
+### Who a meeting is for
+
+`MeetingType.audience` is Everyone, Workers or Leadership. It is not
+only a filter: `check_absences` uses it to decide who to chase. Without
+it, switching absence follow-up on for a workers meeting created a task
+for every general member who was never expected there.
+
+Workers in Training count as general members. Leadership is a flag on
+`Member`, not a category, so a leader who steps down stays a Worker
+instead of appearing in their history to have been demoted.
+
+### Online attendance
+
+Every meeting can be hybrid. `AttendanceSession` carries the room counts
+and a matching set of `online_*` counts, and `total` means both together.
+Because every screen reads that property, changing its meaning fixed the
+dashboard, the charts and the report at once.
+
+Kept as the same categories twice rather than one total plus an "of
+which online" box: that phrasing is ambiguous when typing and somebody
+eventually double-counts.
+
+### House fellowships
+
+A fellowship is a meeting type, not a separate part of the system, so it
+inherits the filters, check-in and reporting rather than having each
+rebuilt. Two things make it different: several meet the same evening, so
+a session carries a `fellowship`; and it records `led_by` and `lesson`.
+
+The leader is on the session, not the fellowship, because it changes week
+to week. Holding it on the fellowship would rewrite history every time
+somebody stood in.
+
+`Fellowship` is a configurable list. Deleting one that has sessions is
+refused, since those records would lose what they belong to.
+
+### A fellowship's offering
+
+Giving has an optional `session`. Recording amounts on the session as
+well would put the same money in two places, and they would disagree the
+first time somebody corrected one of them.
+
+`Giving.remitted_to` records where the money was sent, which the monthly
+report has to state and the system previously could not.
+
+### The spreadsheet
+
+`reports/spreadsheet.py` builds a formatted workbook: three sheets,
+fit-to-page, frozen headers, and totals as live formulas so a recipient
+can add a row. The PDF is the report; this exists for whoever combines
+several locations.
+
+Its URL is declared before the router in `reports/urls.py`, because the
+router's `reports/<pk>/` route would otherwise match "spreadsheet" as a
+report id and return 404.
+
+### Becoming a member
+
+`newcomers/membership.py` holds the rule: the Salvation milestone plus
+at least half the Friday services over six months since their first
+attendance. It only ever proposes; `make-member` is what actually adds
+someone, and an administrator can call it for anyone regardless.
+
+`Member.from_newcomer` links the two. The newcomer record is kept rather
+than deleted, so the follow-up history stays reachable and the church can
+still see how they arrived.
+
+**Newcomers can be checked in.** `AttendanceSessionMember` takes a member
+or a newcomer, exactly one of the two. This was necessary rather than
+optional: without recording when a newcomer attends, the rule above can
+never be computed.
+
+`newcomers/journey.py` merges stage changes, completed follow-ups,
+contact attempts, milestones and the day they joined into one ordered
+history.
+
+### Contacts that did not land
+
+`NewcomerContactAttempt` records a call nobody answered. Completing a
+task requires the four outcome fields because somebody was actually
+spoken to; an unanswered call has no outcome but still belongs in the
+record, or three failed attempts look like nobody tried.
 
 ### Notifications
 

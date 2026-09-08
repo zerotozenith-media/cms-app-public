@@ -63,6 +63,12 @@ class GivingViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+        date_from = self.request.query_params.get("date_from")
+        if date_from:
+            qs = qs.filter(date__gte=date_from)
+        date_to = self.request.query_params.get("date_to")
+        if date_to:
+            qs = qs.filter(date__lte=date_to)
         project = self.request.query_params.get("project")
         fund = self.request.query_params.get("fund")
         method = self.request.query_params.get("method")
@@ -98,6 +104,12 @@ class ExpenseViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+        date_from = self.request.query_params.get("date_from")
+        if date_from:
+            qs = qs.filter(date__gte=date_from)
+        date_to = self.request.query_params.get("date_to")
+        if date_to:
+            qs = qs.filter(date__lte=date_to)
         project = self.request.query_params.get("project")
         category = self.request.query_params.get("category")
         if project:

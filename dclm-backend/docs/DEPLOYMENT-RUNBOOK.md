@@ -567,3 +567,62 @@ sudo tail -50 /var/log/nginx/error.log      # web server
 | Login works but every request then fails | `CORS_ALLOWED_ORIGINS` or `DJANGO_ALLOWED_HOSTS` does not match the real domain |
 | Receipts upload but will not open | nginx is not serving `/media/`, or storage is misconfigured |
 | Site unreachable after a certificate change | HSTS is remembered by browsers; fix the certificate rather than reverting to HTTP |
+
+
+## Scheduled jobs
+
+Four commands have to run on a schedule. **Until `check_absences` runs,
+no follow-up task is ever created**, and the church will conclude the
+feature does not work.
+
+App Service has no cron, so this needs setting up explicitly. Three ways,
+cheapest first.
+
+### GitHub Actions, recommended
+
+Costs nothing and needs no Azure resources. The repository is already on
+GitHub, and a scheduled workflow calls the app.
+
+Everything needed is in `deploy/github-actions/`, with its own README.
+Roughly: copy the workflow into `.github/workflows/`, set a shared secret
+on both the App Service and the repository, then run it once by hand from
+the Actions tab to confirm.
+
+Two things to know: GitHub's scheduler can be several minutes late, which
+matters for none of these; and scheduled workflows are disabled after 60
+days of no repository activity, with an email first.
+
+### WebJobs
+
+If you would rather keep everything inside Azure and the app is on a plan
+with **Always On** enabled:
+
+```bash
+az webapp config show --name <app> --resource-group <rg> --query alwaysOn
+```
+
+If that returns `true`, use `deploy/webjobs/`. Four folders, each a
+triggered WebJob. Nothing extra to deploy.
+
+If it returns `false`, do not use WebJobs. They only run while the app is
+awake, so without Always On they fire erratically or not at all, which is
+worse than no schedule because it looks like it works.
+
+### Azure Functions
+
+`deploy/azure-function/` exists for completeness. The executions fall
+inside the free grant at this volume, but a Function App requires a
+Storage Account, so it is not free. Prefer GitHub Actions unless there is
+a reason to keep the scheduling inside Azure.
+
+### Confirming any of them works
+
+Every scheduled run is written to the audit log, so **Admin, Audit Log**
+shows them in the app rather than only in a console somebody has to
+remember to open. A day after setting this up there should be entries. If
+there are none, it is not running.
+
+### The backup
+
+None of the above backs up the database. That still needs arranging, and
+it is the one job whose absence cannot be recovered from.

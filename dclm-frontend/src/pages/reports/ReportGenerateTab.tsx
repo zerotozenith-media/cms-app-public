@@ -1,3 +1,4 @@
+import { downloadMonthlySpreadsheet } from '../../api/attendance';
 import { useState } from 'react';
 import { useReports, useGenerateReport, useDeleteReport } from '../../api/reports';
 import { Icon } from '../../components/ui/Icon';
@@ -12,6 +13,7 @@ export function ReportGenerateTab() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
   const [otherAdditions, setOtherAdditions] = useState('');
+  const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { data: reports } = useReports();
   const generateReport = useGenerateReport();
@@ -65,6 +67,18 @@ export function ReportGenerateTab() {
             />
           </div>
           {error && <p style={{ color: 'var(--red)', fontSize: '.85rem', margin: '4px 0 10px' }}>{error}</p>}
+          <span className="report-actions">
+          <button className="btn outline" type="button" disabled={downloading}
+            onClick={async () => {
+              // The PDF is the report; this is for whoever combines several
+              // locations and would otherwise retype the figures out of it.
+              setDownloading(true);
+              try { await downloadMonthlySpreadsheet(year, month); }
+              finally { setDownloading(false); }
+            }}>
+            {downloading ? 'Preparing…' : 'Spreadsheet'}
+          </button>
+          </span>
           <button className="btn red" type="submit" disabled={generateReport.isPending}>
             {generateReport.isPending ? 'Generating…' : 'Generate report'}
           </button>

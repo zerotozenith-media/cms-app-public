@@ -170,7 +170,7 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
       steps: [
         'Go to the Pipeline tab.',
         'Drag their card from one column to the next as things progress.',
-        'New means not yet contacted. Contacted means someone reached out. Visiting means attending but not settled. Integrated means part of the family.',
+        'New means not yet contacted. Contacted means someone reached out. Attending means they have come at least once. Member means they are on the member roll.',
       ],
     },
     {
@@ -281,7 +281,9 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
 
   newcomers: [
     { h: 'Two ways someone is registered', p: 'They scan the QR code and fill the form on their own phone, or a worker types in a paper card using Manual Entry. Both collect the same information and both land in the same pipeline.' },
-    { h: 'The pipeline', p: 'New means registered but not yet contacted. Contacted means someone has reached out. Visiting means attending but not yet settled. Integrated means part of the church family. Drag a card between columns to move someone along.' },
+    { h: 'The pipeline', p: 'New means registered and nobody has reached them yet. Contacted means someone has spoken to them. Attending means they have come to a service at least once. Member means they are on the member roll. Drag a card between columns, or use the dropdown on each card, which is the only way on a phone.' },
+    { h: 'Becoming a member', p: 'A newcomer is proposed for membership once the Salvation milestone is recorded and they have attended at least half the Friday services over six months. The system only proposes it. An administrator confirms, and can add anyone at any time regardless, for example someone relocating from another church. Dropping a card on the Member column asks you to confirm first.' },
+    { h: 'Who each meeting is for', p: 'Every meeting is marked Everyone, Workers or Leadership. This decides who is followed up when absent, so a general member is never asked why they missed a workers meeting. Leadership is a tick on the member record rather than a category, because a leader is a Worker who also leads.' },
     { h: 'Automatic tasks on registration', p: 'If someone ticks that they would like a visit, want to know more, or want salvation information, the matching tasks are created straight away for whoever is assigned to them. Salvation requests are given a shorter deadline.' },
     { h: 'Not interested', p: 'Marking someone Not Interested takes them out of the active pipeline without deleting them, and records the reason. They can be reactivated later.' },
   ],

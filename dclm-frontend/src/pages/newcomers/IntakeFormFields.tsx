@@ -1,5 +1,4 @@
 import { useMeetingTypes } from '../../api/attendance';
-import { usePublicMeetingTypes } from '../../api/newcomers';
 
 export interface IntakeFormValues {
   /** Split in the form because people fill a paper slip that way, but
@@ -36,9 +35,6 @@ interface IntakeFormFieldsProps {
   /** A form-unique prefix for field ids, so two instances of this
    * component on the same page (unlikely, but possible) never collide. */
   idPrefix?: string;
-  /** True on the public registration page, where the visitor is not
-   *  signed in and the protected meeting-types endpoint returns nothing. */
-  isPublic?: boolean;
 }
 
 /**
@@ -54,12 +50,8 @@ interface IntakeFormFieldsProps {
  * unassociated label. A real accessibility gap, not just a testing
  * inconvenience , a screen reader would have had the same problem.
  */
-export function IntakeFormFields({ values, onChange, idPrefix = 'intake', isPublic = false }: IntakeFormFieldsProps) {
-  // The same fields serve the staff form and the public one. A visitor is
-  // not signed in, so the protected endpoint returns nothing for them.
-  const staffMeetingTypes = useMeetingTypes({ enabled: !isPublic });
-  const publicMeetingTypes = usePublicMeetingTypes({ enabled: isPublic });
-  const meetingTypes = isPublic ? publicMeetingTypes.data : staffMeetingTypes.data;
+export function IntakeFormFields({ values, onChange, idPrefix = 'intake' }: IntakeFormFieldsProps) {
+  const { data: meetingTypes } = useMeetingTypes();
   const fid = (name: string) => `${idPrefix}-${name}`;
 
   function set<K extends keyof IntakeFormValues>(key: K, value: IntakeFormValues[K]) {

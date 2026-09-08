@@ -26,6 +26,8 @@ export function useFinanceSummary() {
 }
 
 interface GivingListParams {
+  date_from?: string;
+  date_to?: string;
   fund?: string; method?: string; ordering?: string; page?: number; page_size?: number;
 }
 export function useGivingList(params: GivingListParams) {
@@ -36,6 +38,8 @@ export function useGivingList(params: GivingListParams) {
 }
 
 interface ExpenseListParams {
+  date_from?: string;
+  date_to?: string;
   category?: string; ordering?: string; page?: number; page_size?: number;
 }
 export function useExpenseList(params: ExpenseListParams) {

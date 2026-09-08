@@ -7,12 +7,11 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from attendance.models import MeetingType
-from accounts.clientip import get_client_ip
 from accounts.audit import log_audit
 from accounts.permissions import ModulePermission, LocationScopedQuerySetMixin
 from .intake import match_invited_by_member, create_auto_tasks
 from .models import (
+    NewcomerContactAttempt,
     NewcomerSource, MilestoneType, Newcomer, NewcomerStatusHistory,
     NewcomerMilestone, NewcomerTask, FollowUpUrgencySetting, PublicRegistrationAttempt,
 )
@@ -69,6 +68,82 @@ class NewcomerViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
         name = instance.name
         log_audit(self.request.user, "Deleted", "Newcomer", name)
         instance.delete()
+
+    @action(detail=True, methods=["get"])
+    def journey(self, request, pk=None):
+        """The whole history in order, for the travel map on the profile."""
+        from .journey import build_journey
+        return Response(build_journey(self.get_object()))
+
+    @action(detail=True, methods=["get"])
+    def readiness(self, request, pk=None):
+        """Whether this person is proposed for membership, and the working
+        behind it. An administrator seeing only a verdict would ask why."""
+        from .membership import readiness as compute
+        return Response(compute(self.get_object()))
+
+    @action(detail=True, methods=["post"], url_path="log-attempt")
+    def log_attempt(self, request, pk=None):
+        """
+        Record a contact that did not reach the person.
+
+        Separate from completing a task, which requires the four outcome
+        fields because someone was actually spoken to. An unanswered call
+        has no outcome to record, but still belongs in the history.
+        """
+        newcomer = self.get_object()
+        method = request.data.get("method")
+        if method not in dict(NewcomerContactAttempt.Method.choices):
+            return Response({"method": "Choose how you tried to reach them."}, status=400)
+        attempt = NewcomerContactAttempt.objects.create(
+            newcomer=newcomer, method=method,
+            note=request.data.get("note", ""), by=request.user,
+        )
+        log_audit(request.user, "Logged contact attempt", "Newcomer", newcomer.name,
+                  f"{method}, no reply", instance=newcomer)
+        return Response({"id": attempt.id, "date": attempt.date, "method": attempt.method}, status=201)
+
+    @action(detail=True, methods=["post"], url_path="make-member")
+    def make_member(self, request, pk=None):
+        """
+        Add this newcomer to the member roll.
+
+        The newcomer record is kept and linked rather than deleted, so
+        their whole follow-up history stays reachable and the church can
+        still see how they first arrived. Their card stays on the board
+        under Member instead of disappearing.
+        """
+        from members.models import Member
+        newcomer = self.get_object()
+
+        if getattr(newcomer, "became_member", None):
+            return Response(
+                {"detail": f"{newcomer.name} is already on the member roll."}, status=400)
+
+        parts = newcomer.name.strip().split()
+        first = parts[0] if parts else newcomer.name
+        surname = " ".join(parts[1:]) if len(parts) > 1 else ""
+
+        with transaction.atomic():
+            member = Member.objects.create(
+                surname=surname or first, first_name=first,
+                phone=newcomer.phone, email=newcomer.email,
+                location=newcomer.location,
+                joined_date=timezone.localdate(),
+                category=Member.Category.GENERAL,
+                from_newcomer=newcomer,
+            )
+            newcomer.stage = Newcomer.Stage.MEMBER
+            newcomer.stage_since = timezone.localdate()
+            newcomer.save(update_fields=["stage", "stage_since"])
+            NewcomerStatusHistory.objects.create(
+                newcomer=newcomer, stage=Newcomer.Stage.MEMBER,
+                note="Added to the member roll", date=timezone.localdate(),
+            )
+
+        log_audit(request.user, "Made a member", "Newcomer", newcomer.name,
+                  "Added to the member roll", instance=newcomer)
+        return Response({"member_id": member.id, "name": member.full_name}, status=201)
 
     @action(detail=True, methods=["post"], url_path="change-stage")
     def change_stage(self, request, pk=None):
@@ -210,30 +285,10 @@ GENERIC_REGISTRATION_ERROR = {"detail": "We couldn't process your submission. Pl
 
 
 def _get_client_ip(request):
-    # Kept as a thin alias so the call sites below read unchanged. The
-    # rule itself lives in accounts.clientip, because login logs an
-    # address too and both were getting it wrong in the same way.
-    return get_client_ip(request)
-
-
-@api_view(["GET"])
-@permission_classes([AllowAny])
-def public_meeting_types(request):
-    """
-    The meeting list for the public registration form.
-
-    The visitor filling that form is not signed in, so it cannot use the
-    normal meeting-types endpoint, which is behind the attendance
-    permission. Without this the "which meeting did you attend" dropdown
-    is simply empty and the visitor cannot answer the question.
-
-    Returns only what the form needs, id and name, rather than the full
-    record with attendance targets and absence settings.
-    """
-    return Response([
-        {"id": mt.id, "name": mt.name}
-        for mt in MeetingType.objects.all().order_by("name")
-    ])
+    forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR", "0.0.0.0")
 
 
 @api_view(["POST"])

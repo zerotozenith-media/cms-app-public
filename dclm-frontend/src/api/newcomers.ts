@@ -210,21 +210,76 @@ export function useAllNewcomerTasks(params: { done?: boolean; ordering?: string 
   });
 }
 
-/**
- * Meeting types for the public registration form.
- *
- * The normal meeting-types endpoint sits behind the attendance
- * permission, so a visitor filling the public form gets nothing back and
- * the dropdown is empty. This reads the open endpoint instead.
- */
-export function usePublicMeetingTypes(options: { enabled?: boolean } = {}) {
+export interface JourneyEvent {
+  date: string;
+  kind: 'registered' | 'stage' | 'contact' | 'attempt' | 'milestone' | 'member';
+  title: string;
+  detail?: string;
+  by?: string;
+  method?: string;
+  log?: { goal: string; scripture: string; root_cause: string; next_step: string };
+}
+
+export interface Readiness {
+  first_attended: string | null;
+  services_held: number;
+  services_attended: number;
+  attendance_percent: number;
+  months_attending: number;
+  has_salvation: boolean;
+  attendance_met: boolean;
+  time_met: boolean;
+  ready: boolean;
+  min_percent: number;
+  window_months: number;
+}
+
+/** The whole history in order, for the travel map on the profile. */
+export function useNewcomerJourney(id: number | undefined) {
   return useQuery({
-    enabled: options.enabled ?? true,
-    queryKey: ['public-meeting-types'],
-    queryFn: async () => {
-      const resp = await axios.get<{ id: string; name: string }[]>(
-        `${API_BASE_URL}/public/meeting-types/`);
-      return resp.data;
+    queryKey: ['newcomer-journey', id],
+    enabled: id !== undefined,
+    queryFn: async () => (await apiClient.get<JourneyEvent[]>(`/newcomers/${id}/journey/`)).data,
+  });
+}
+
+/** Whether they are proposed for membership, and the working behind it. */
+export function useNewcomerReadiness(id: number | undefined) {
+  return useQuery({
+    queryKey: ['newcomer-readiness', id],
+    enabled: id !== undefined,
+    queryFn: async () => (await apiClient.get<Readiness>(`/newcomers/${id}/readiness/`)).data,
+  });
+}
+
+export function useMakeMember(id: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () =>
+      (await apiClient.post(`/newcomers/${id}/make-member/`)).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['newcomer', id] });
+      qc.invalidateQueries({ queryKey: ['newcomer-journey', id] });
+      qc.invalidateQueries({ queryKey: ['newcomers'] });
+      qc.invalidateQueries({ queryKey: ['members'] });
     },
   });
 }
+
+/** A contact that did not reach them. Separate from completing a task,
+ *  which requires an outcome because someone was actually spoken to. */
+export function useLogAttempt(id: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { method: string; note?: string }) =>
+      (await apiClient.post(`/newcomers/${id}/log-attempt/`, payload)).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['newcomer-journey', id] });
+    },
+  });
+}
+
+export const ATTEMPT_METHODS = [
+  'Phone call', 'WhatsApp', 'Text message',
+  'Social media message', 'Email', 'Home visit',
+] as const;

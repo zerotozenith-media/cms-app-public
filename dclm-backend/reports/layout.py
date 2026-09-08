@@ -460,15 +460,38 @@ def build_report_pdf(ctx):
         # Workers Meeting" overflows a fixed cell and collides with the
         # column beside it.
         story.append(data_table(
-            ["Date", "Meeting", "Location", "Men", "Women", "Youth", "Children", "Total"],
+            ["Date", "Meeting", "In person", "Online", "New comers", "New converts", "Total"],
             [[str(r["date"]), Paragraph(r["meeting"], S["Cell"]),
-              Paragraph(r["location"], S["Cell"]), str(r["men"]), str(r["women"]),
-              str(r["youth"]), str(r["children"]), str(r["total"])]
+              str(r["total"] - r.get("online", 0)), str(r.get("online", 0)),
+              str(r.get("new_comers", 0)), str(r.get("new_converts", 0)), str(r["total"])]
              for r in ctx["attendance_rows"]],
-            [2.3 * cm, 4.3 * cm, 2.1 * cm, 1.2 * cm, 1.4 * cm, 1.3 * cm, 1.6 * cm, 1.3 * cm],
-            aligns={3: "CENTER", 4: "CENTER", 5: "CENTER", 6: "CENTER", 7: "CENTER"}))
+            [2.3 * cm, 5.1 * cm, 2.0 * cm, 1.6 * cm, 2.1 * cm, 2.2 * cm, 1.3 * cm],
+            aligns={2: "CENTER", 3: "CENTER", 4: "CENTER", 5: "CENTER", 6: "CENTER"}))
     else:
         story.append(Paragraph("No filled sessions recorded this period.", S["Muted"]))
+
+    # Attendance summary and the fellowships, inside section 2 rather than
+    # as an appendix: they are attendance, not a separate kind of thing.
+    story.append(Spacer(1, 10))
+    story.append(kpi_row([
+        ("Average", str(ctx.get("attendance_average", 0)), "#082C69"),
+        ("Highest", str(ctx.get("attendance_highest", 0)), "#082C69"),
+        ("New comers", str(ctx.get("new_comers_total", 0)), "#082C69"),
+        ("New converts", str(ctx.get("new_converts_total", 0)),
+         "#1E9E64" if ctx.get("new_converts_total") else "#5A667C"),
+    ], W))
+
+    if ctx.get("fellowship_rows"):
+        story.append(Spacer(1, 12))
+        story.append(Paragraph("House caring fellowships", S["H2"]))
+        story.append(data_table(
+            ["Date", "Fellowship", "Led by", "Lesson", "New", "Total", "Offering"],
+            [[str(f["date"]), Paragraph(f["fellowship"], S["Cell"]),
+              Paragraph(f["led_by"], S["Cell"]), f["lesson"],
+              str(f["new_comers"]), str(f["total"]), f"{float(f['offering']):,.3f}"]
+             for f in ctx["fellowship_rows"]],
+            [2.3 * cm, 3.0 * cm, 3.6 * cm, 2.0 * cm, 1.2 * cm, 1.4 * cm, 2.6 * cm],
+            aligns={4: "CENTER", 5: "CENTER", 6: "RIGHT"}))
 
     # ---- 3. finance ----
     story.append(heading("3. Finance", W))

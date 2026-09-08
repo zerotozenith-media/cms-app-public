@@ -124,6 +124,8 @@ class Command(BaseCommand):
                 self._seed_testimonies_and_notes(services, departments, members)
                 self._seed_shepherds_and_followup(bahrain, members)
                 self._seed_enquiries(members)
+                self._seed_leaders_and_newcomer_attendance(members)
+                self._seed_fellowships_and_hybrid(members)
         finally:
             post_save.connect(audit_on_save)
             post_delete.connect(audit_on_delete)
@@ -154,25 +156,12 @@ class Command(BaseCommand):
     def _seed_roles_and_users(self, bahrain, others):
         admin_role, _ = Role.objects.get_or_create(name="Administrator")
         coord_role, _ = Role.objects.get_or_create(name="Location Coordinator")
-        # The two roles must differ in WHICH MODULES they can see, not only
-        # in what they may edit. Previously can_view was True for every
-        # module on both, so a Location Coordinator could open Admin,
-        # Finance and Outreach. That is wrong on its own, and it also made
-        # the permission tests impossible to run, since no role existed
-        # that lacked finance or outreach.
-        #
-        # "outreach" governs campaign and spend data. The administrator has
-        # it so the demo screen is reachable; a real church grants it only
-        # to whoever runs the advertising.
-        ROLE_MODULES = {
-            admin_role.id: ["members", "attendance", "newcomers", "finance",
-                            "goals", "reports", "outreach", "admin"],
-            # A coordinator runs services and people at their location. No
-            # money, no user accounts, no advertising spend.
-            coord_role.id: ["members", "attendance", "newcomers", "reports"],
-        }
         for role, full in [(admin_role, True), (coord_role, False)]:
-            for module in ROLE_MODULES[role.id]:
+            # "outreach" governs campaign and spend data. Included here so
+            # the demo administrator can actually see the Outreach screen;
+            # a real church grants it only to whoever runs the advertising.
+            for module in ["members", "attendance", "newcomers", "finance",
+                           "goals", "reports", "outreach", "admin"]:
                 RolePermission.objects.get_or_create(
                     role=role, module=module,
                     defaults={
@@ -212,10 +201,23 @@ class Command(BaseCommand):
                  counts_for_absence=True, start_time=datetime.time(18, 0)),
             dict(id="mon-bs", name="Monday Bible Study", day="Monday",
                  frequency="weekly", detail_level="detailed", monthly_target=25),
+            dict(id="tue-leadership", name="Tuesday Leadership Development", day="Tuesday",
+                 frequency="weekly", detail_level="simple", monthly_target=None,
+                 audience="leadership"),
+            dict(id="wed-rev", name="Wednesday Revival and Evangelism Training", day="Wednesday",
+                 frequency="weekly", detail_level="detailed", monthly_target=None),
+            dict(id="fri-house", name="Friday House Caring Fellowship", day="Friday",
+                 frequency="weekly", detail_level="detailed", monthly_target=None),
             dict(id="sat-workers", name="Saturday Workers Meeting", day="Saturday",
-                 frequency="weekly", detail_level="simple", monthly_target=15),
-            dict(id="gck", name="General Church Konferencia", day="",
+                 frequency="weekly", detail_level="simple", monthly_target=15,
+                 audience="workers"),
+            # Occasional meetings have no fixed day, so nothing recurring is
+            # generated; a session is created when one is actually held.
+            dict(id="gck", name="Global Crusade with Kumuyi (GCK)", day="",
                  frequency="occasional", detail_level="detailed", monthly_target=None),
+            dict(id="min-renewal", name="Ministerial Renewal", day="",
+                 frequency="occasional", detail_level="simple", monthly_target=None,
+                 audience="leadership"),
         ]
         meeting_types = {}
         for spec in specs:
@@ -227,10 +229,11 @@ class Command(BaseCommand):
     # --- Attendance history ---
 
     def _seed_attendance_history(self, meeting_types, bahrain, others):
-        weekday_map = {"Friday": 4, "Monday": 0, "Saturday": 5}
+        weekday_map = {"Monday": 0, "Tuesday": 1, "Wednesday": 2, "Friday": 4, "Saturday": 5}
         count = 0
         for mt_id, base_total, growth in [
             ("fri-worship", 34, 10), ("mon-bs", 16, 6), ("sat-workers", 9, 3),
+            ("wed-rev", 12, 4), ("fri-house", 14, 5), ("tue-leadership", 7, 2),
         ]:
             mt = meeting_types[mt_id]
             weekday = weekday_map[mt.day]
@@ -371,9 +374,14 @@ class Command(BaseCommand):
         source_names = ["Church website", "Walk-in", "Invited by a member", "Social media",
                          "Church website (QR self-registration)"]
         sources = {n: NewcomerSource.objects.get_or_create(name=n)[0] for n in source_names}
-        salvation, _ = MilestoneType.objects.get_or_create(name="Salvation")
-        baptism, _ = MilestoneType.objects.get_or_create(name="Water Baptism")
-        for stage, amber, red in [("new", 3, 6), ("contacted", 5, 10), ("visiting", 15, 30)]:
+        # The two classes are milestones rather than pipeline stages,
+        # because they can be taken in either order.
+        for name in ["Salvation", "Baptism Class", "Water Baptism",
+                     "Discipleship Class", "Holy Ghost Baptism", "Sanctification"]:
+            MilestoneType.objects.get_or_create(name=name)
+        salvation = MilestoneType.objects.get(name="Salvation")
+        baptism = MilestoneType.objects.get(name="Water Baptism")
+        for stage, amber, red in [("new", 3, 6), ("contacted", 5, 10), ("attending", 15, 30)]:
             FollowUpUrgencySetting.objects.get_or_create(
                 stage=stage, defaults={"amber_days": amber, "red_days": red},
             )
@@ -389,20 +397,20 @@ class Command(BaseCommand):
             age_days = (TODAY - created).days
 
             # Older contacts have realistically resolved; only recent ones are still "active".
-            # The chance of staying unresolved in "visiting" must fall sharply with age ,
+            # The chance of staying unresolved in "attending" must fall sharply with age ,
             # nobody stays in active follow-up limbo for years without resolving one way
             # or the other, so a flat probability regardless of age (the first version of
-            # this) produced newcomers "visiting" for 500+ days, which looked like stale
+            # this) produced newcomers "attending" for 500+ days, which looked like stale
             # data, not a believable pipeline.
             if age_days > 240:
-                stage = RNG.choices(["integrated", "not-interested"], weights=[55, 45])[0]
+                stage = RNG.choices(["member", "not-interested"], weights=[55, 45])[0]
             elif age_days > 60:
                 stage = RNG.choices(
-                    ["integrated", "not-interested", "visiting"],
+                    ["member", "not-interested", "attending"],
                     weights=[40, 30, max(2, 30 - (age_days - 60) // 6)],
                 )[0]
             elif age_days > 21:
-                stage = RNG.choices(["visiting", "contacted", "integrated"], weights=[40, 35, 25])[0]
+                stage = RNG.choices(["attending", "contacted", "member"], weights=[40, 35, 25])[0]
             else:
                 stage = RNG.choices(["new", "contacted"], weights=[60, 40])[0]
 
@@ -420,8 +428,8 @@ class Command(BaseCommand):
             # Walk the newcomer through a realistic stage history to the resolved stage
             stage_path = {
                 "new": ["new"], "contacted": ["new", "contacted"],
-                "visiting": ["new", "contacted", "visiting"],
-                "integrated": ["new", "contacted", "visiting", "integrated"],
+                "attending": ["new", "contacted", "attending"],
+                "member": ["new", "contacted", "attending", "member"],
                 "not-interested": ["new", "contacted", "not-interested"],
             }[stage]
             cursor = created
@@ -437,7 +445,7 @@ class Command(BaseCommand):
                 ])
             n.save()
 
-            if stage == "integrated":
+            if stage == "member":
                 NewcomerMilestone.objects.create(
                     newcomer=n, milestone_type=salvation,
                     achieved_date=rand_date(created, cursor),
@@ -449,7 +457,7 @@ class Command(BaseCommand):
                     )
 
             # Mark some auto-created tasks done, realistically, for resolved/older newcomers
-            if stage in ("integrated", "not-interested", "visiting"):
+            if stage in ("member", "not-interested", "attending"):
                 for task in n.tasks.all():
                     if RNG.random() > 0.25:
                         task.done = True
@@ -461,7 +469,9 @@ class Command(BaseCommand):
     # --- Finance config ---
 
     def _seed_finance_config(self):
-        fund_names = ["Tithe", "Offering", "Missions", "Building"]
+        # Pledge and Charity come from the Zonal reporting the church
+        # actually does; the system had no way to record either.
+        fund_names = ["Tithe", "Offering", "Missions", "Building", "Pledge", "Charity"]
         funds = {n: Fund.objects.get_or_create(name=n)[0] for n in fund_names}
         method_names = ["Cash", "Online Transfer"]
         methods = {n: PaymentMethod.objects.get_or_create(name=n)[0] for n in method_names}
@@ -726,7 +736,7 @@ class Command(BaseCommand):
                     name=enquiry.name, source=nc_source, location=enquiry.assigned_to.location
                     if enquiry.assigned_to and enquiry.assigned_to.location
                     else Location.objects.get(id="bahrain"),
-                    stage="visiting", created_at=enquiry.received_at,
+                    stage="attending", created_at=enquiry.received_at,
                     stage_since=TODAY, phone=enquiry.phone, email=enquiry.email,
                 )
                 enquiry.converted_newcomer = newcomer
@@ -752,3 +762,122 @@ class Command(BaseCommand):
             f"Seeded {created} online enquiries across {len(campaigns)} campaign(s)."
         )
         return created
+
+    def _seed_leaders_and_newcomer_attendance(self, members):
+        """
+        Leaders, newcomer attendance, and a few contact attempts.
+
+        Newcomer attendance matters most: the membership rule measures
+        what share of Friday services someone came to, and without any
+        records it can never propose anybody, which would look like the
+        feature was broken.
+        """
+        from attendance.models import AttendanceSession, AttendanceSessionMember
+        from newcomers.models import Newcomer, NewcomerContactAttempt, NewcomerMilestone, MilestoneType
+
+        # Leadership is a subset of Workers, never a general member.
+        workers = [m for m in members if m.category == Member.Category.WORKER]
+        for worker in workers[:2]:
+            worker.is_leader = True
+            worker.save(update_fields=["is_leader"])
+
+        fridays = list(AttendanceSession.objects
+                       .filter(meeting_type_id="fri-worship", status="filled")
+                       .order_by("-date")[:26])
+        if not fridays:
+            return
+
+        salvation, _ = MilestoneType.objects.get_or_create(name="Salvation")
+        attending = list(Newcomer.objects.filter(
+            stage__in=[Newcomer.Stage.ATTENDING, Newcomer.Stage.CONTACTED])[:6])
+
+        checked = 0
+        for i, newcomer in enumerate(attending):
+            # A spread of consistency, so the readiness screen shows
+            # someone ready, someone close, and someone well short.
+            share = [0.75, 0.62, 0.30, 0.55, 0.15, 0.85][i % 6]
+            for session in fridays[:int(len(fridays) * share)]:
+                AttendanceSessionMember.objects.get_or_create(
+                    session=session, newcomer=newcomer,
+                    defaults={"mode": "in-person"},
+                )
+                checked += 1
+            if share >= 0.6:
+                NewcomerMilestone.objects.get_or_create(
+                    newcomer=newcomer, milestone_type=salvation,
+                    defaults={"achieved_date": fridays[-1].date},
+                )
+
+        attempts = 0
+        for newcomer in attending[:3]:
+            for method, note in [("Phone call", "Left a voice note"),
+                                 ("Text message", "No reply after two days")]:
+                NewcomerContactAttempt.objects.create(
+                    newcomer=newcomer, method=method, note=note,
+                    date=TODAY - datetime.timedelta(days=RNG.randint(5, 40)),
+                )
+                attempts += 1
+
+        self.stdout.write(
+            f"Marked {min(2, len(workers))} leader(s), recorded {checked} newcomer "
+            f"attendance(s) and {attempts} contact attempt(s)."
+        )
+
+    def _seed_fellowships_and_hybrid(self, members):
+        """
+        Fellowships, their weekly sessions, and some online attendance.
+
+        Without a hybrid session in the data nobody would see that the
+        online figures exist at all, and the split on screen would look
+        like a column that never fills in.
+        """
+        from attendance.models import AttendanceSession, Fellowship, MeetingType
+        from finance.models import Fund, Giving, PaymentMethod
+
+        women, _ = Fellowship.objects.get_or_create(name="HCF Women", defaults={"area": "Riffa"})
+        men, _ = Fellowship.objects.get_or_create(name="HCF Men", defaults={"area": "Manama"})
+
+        workers = [m for m in members if m.category == Member.Category.WORKER]
+        if not workers:
+            return
+
+        # The house fellowship sessions already generated get assigned to a
+        # fellowship, alternating, and a leader recorded per meeting since
+        # that is what changes week to week.
+        house = list(AttendanceSession.objects.filter(
+            meeting_type_id="fri-house").order_by("-date")[:24])
+        cash, _ = PaymentMethod.objects.get_or_create(name="Cash")
+        tithe, _ = Fund.objects.get_or_create(name="Tithe")
+
+        for i, s in enumerate(house):
+            s.fellowship = women if i % 2 == 0 else men
+            s.led_by = workers[i % len(workers)]
+            s.lesson = f"BTB {10 + (i // 2)}"
+            s.new_comers = RNG.choice([0, 0, 1, 2])
+            s.new_converts = RNG.choice([0, 0, 0, 1])
+            s.save()
+            # The offering is a giving record linked to the session, not
+            # amounts copied onto it, so the money exists in one place.
+            if s.status == "filled" and not s.giving.exists():
+                Giving.objects.create(
+                    date=s.date, fund=tithe, method=cash,
+                    amount=Decimal(str(RNG.randint(60, 260))),
+                    location=s.location, session=s, remitted_to="retained",
+                )
+
+        # A few hybrid Friday services, so the online split is visible.
+        fridays = AttendanceSession.objects.filter(
+            meeting_type_id="fri-worship", status="filled").order_by("-date")[:8]
+        for s in fridays:
+            s.online_men = RNG.randint(3, 9)
+            s.online_women = RNG.randint(4, 12)
+            s.online_youth_boys = RNG.randint(0, 3)
+            s.online_youth_girls = RNG.randint(0, 3)
+            s.new_comers = RNG.choice([0, 1, 2, 3])
+            s.new_converts = RNG.choice([0, 0, 1])
+            s.save()
+
+        self.stdout.write(
+            f"Seeded 2 fellowship(s), {len(house)} fellowship session(s) "
+            f"and {len(fridays)} hybrid service(s)."
+        )

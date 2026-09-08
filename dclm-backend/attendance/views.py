@@ -1,13 +1,14 @@
 from django.db import transaction
 from rest_framework import viewsets, filters
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from accounts.audit import log_audit
 from accounts.permissions import ModulePermission, LocationScopedQuerySetMixin
-from .models import MeetingType, AttendanceSession, AttendanceSessionMember
+from .models import Fellowship, MeetingType, AttendanceSession, AttendanceSessionMember
 from .serializers import (
-    MeetingTypeSerializer, AttendanceSessionSerializer, AttendanceSessionMemberSerializer, RecordAttendanceSerializer,
+    FellowshipSerializer, MeetingTypeSerializer, AttendanceSessionSerializer, AttendanceSessionMemberSerializer, RecordAttendanceSerializer,
 )
 
 
@@ -46,6 +47,28 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
         status_param = self.request.query_params.get("status")
         if status_param:
             qs = qs.filter(status=status_param)
+
+        # Who the meeting was for. Lets a leader look only at workers
+        # meetings without wading through every Friday service.
+        audience = self.request.query_params.get("audience")
+        if audience:
+            qs = qs.filter(meeting_type__audience=audience)
+
+        date_from = self.request.query_params.get("date_from")
+        if date_from:
+            qs = qs.filter(date__gte=date_from)
+        date_to = self.request.query_params.get("date_to")
+        if date_to:
+            qs = qs.filter(date__lte=date_to)
+
+        # Sessions where nobody was ticked off by name are exactly the ones
+        # where absence follow-up silently did not happen, so being able to
+        # find them matters more than it looks.
+        checked_in = self.request.query_params.get("checked_in")
+        if checked_in == "yes":
+            qs = qs.filter(attendees__isnull=False).distinct()
+        elif checked_in == "no":
+            qs = qs.filter(attendees__isnull=True)
         # total is a Python property, not a DB field , sorting "by total"
         # client-side would only reorder the current page, not the true
         # global order. Annotated here so ?ordering=total_computed sorts
@@ -111,15 +134,23 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
                 )
 
         with transaction.atomic():
-            for field in ["men", "women", "youth_boys", "youth_girls", "children_boys", "children_girls"]:
+            for field in ["men", "women", "youth_boys", "youth_girls",
+                          "children_boys", "children_girls",
+                          "online_men", "online_women", "online_youth_boys",
+                          "online_youth_girls", "online_children_boys",
+                          "online_children_girls", "new_comers", "new_converts"]:
                 setattr(session, field, data[field])
+            if session.fellowship_id:
+                session.lesson = data.get("lesson", "")
+                if data.get("led_by"):
+                    session.led_by_id = data["led_by"]
             session.status = AttendanceSession.Status.FILLED
             session.track_named = data["track_named"]
 
             log_audit(
                 request.user, "Recorded attendance", "Attendance Session",
                 f"{session.meeting_type.name} , {session.date}",
-                f"Total {sum(data[f] for f in ['men','women','youth_boys','youth_girls','children_boys','children_girls'])}",
+                f"Total {sum(data[f] for f in ['men','women','youth_boys','youth_girls','children_boys','children_girls','online_men','online_women','online_youth_boys','online_youth_girls','online_children_boys','online_children_girls'])}",
                 instance=session,
             )
             session.save()
@@ -192,3 +223,26 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
         return Response({
             "attendees": AttendanceSessionMemberSerializer(fresh_attendees, many=True).data,
         })
+
+
+class FellowshipViewSet(viewsets.ModelViewSet):
+    """
+    The house fellowships. Configurable because the number changes as the
+    church grows, rather than fixed in the software.
+    """
+    module = "attendance"
+    permission_classes = [ModulePermission]
+    queryset = Fellowship.objects.all()
+    serializer_class = FellowshipSerializer
+
+    def perform_destroy(self, instance):
+        # PROTECT on the session link already prevents this at the database
+        # level, but the message it raises means nothing to a church
+        # administrator.
+        if instance.sessions.exists():
+            raise ValidationError({
+                "detail": f"{instance.name} has {instance.sessions.count()} session(s) "
+                          "recorded. Those records would lose what they belong to."
+            })
+        log_audit(self.request.user, "Deleted", "Fellowship", instance.name, "")
+        instance.delete()

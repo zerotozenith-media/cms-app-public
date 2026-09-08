@@ -74,6 +74,26 @@ class Giving(models.Model):
         "members.Member", on_delete=models.SET_NULL, null=True, blank=True, related_name="giving_entries"
     )
 
+    # Which meeting this was collected at, where that is known. Recording
+    # a fellowship's offering as amounts on the session too would put the
+    # same money in two places, and they would disagree the first time
+    # somebody corrected one of them.
+    session = models.ForeignKey(
+        "attendance.AttendanceSession", on_delete=models.SET_NULL,
+        related_name="giving", null=True, blank=True)
+
+    # Where the money was sent. The system knew which fund it went into
+    # but not where it went afterwards, which the monthly report has to
+    # state.
+    REMIT_CHOICES = [
+        ("retained", "Retained in location account"),
+        ("dubai", "DLBC account, Dubai"),
+        ("lagos", "DLBC account, Lagos"),
+        ("qatar", "DLBC account, Qatar"),
+    ]
+    remitted_to = models.CharField(
+        max_length=20, choices=REMIT_CHOICES, default="retained")
+
     class Meta:
         ordering = ["-date"]
         verbose_name_plural = "Giving"

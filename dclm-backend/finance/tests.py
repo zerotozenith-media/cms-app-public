@@ -1,4 +1,6 @@
 import datetime
+
+from django.utils import timezone
 from decimal import Decimal
 
 from rest_framework import status
@@ -190,13 +192,20 @@ class FinanceSummaryTestCase(APITestCase):
         self.method = PaymentMethod.objects.create(name="Cash")
         self.rent = ExpenseCategory.objects.create(name="Rent")
 
-        Giving.objects.create(date=datetime.date(2026, 8, 7), fund=self.tithe, method=self.method,
+        # Relative to today, not fixed dates. Pinned to August, these tests
+        # passed all through August and then failed on the first of
+        # September for no reason connected to the code.
+        today = timezone.localdate()
+        this_month = today.replace(day=7) if today.day >= 7 else today
+        last_month = (today.replace(day=1) - datetime.timedelta(days=1))
+
+        Giving.objects.create(date=this_month, fund=self.tithe, method=self.method,
             amount=Decimal("850.000"), location=self.bahrain)
-        Giving.objects.create(date=datetime.date(2026, 8, 7), fund=self.tithe, method=self.method,
+        Giving.objects.create(date=this_month, fund=self.tithe, method=self.method,
             amount=Decimal("300.000"), location=self.others)
-        Giving.objects.create(date=datetime.date(2026, 7, 1), fund=self.tithe, method=self.method,
-            amount=Decimal("500.000"), location=self.bahrain)  # last month, must not count in "this month"
-        Expense.objects.create(date=datetime.date(2026, 8, 5), category=self.rent,
+        Giving.objects.create(date=last_month, fund=self.tithe, method=self.method,
+            amount=Decimal("500.000"), location=self.bahrain)  # must not count in "this month"
+        Expense.objects.create(date=this_month, category=self.rent,
             amount=Decimal("400.000"), location=self.bahrain)
 
     def auth(self, user):

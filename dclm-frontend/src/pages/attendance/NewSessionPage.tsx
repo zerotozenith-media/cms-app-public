@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMeetingTypes, useCreateSession } from '../../api/attendance';
+import { useFellowships, useMeetingTypes, useCreateSession } from '../../api/attendance';
 import { useLocations } from '../../api/locations';
 import { Button } from '../../components/ui/Button';
 
@@ -13,6 +13,11 @@ export function NewSessionPage() {
   const createSession = useCreateSession();
 
   const [meetingType, setMeetingType] = useState('');
+  const [fellowship, setFellowship] = useState<number | ''>('');
+  const { data: fellowships } = useFellowships();
+  // Several fellowships meet the same evening, so the date alone does
+  // not say which session this is.
+  const isFellowship = meetingType === 'fri-house';
   const [date, setDate] = useState(today);
   const [location, setLocation] = useState('');
   const [mode, setMode] = useState('in-person');
@@ -22,7 +27,10 @@ export function NewSessionPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const created = await createSession.mutateAsync({ meeting_type: meetingType, date, location, mode });
+    const created = await createSession.mutateAsync({
+      meeting_type: meetingType, date, location, mode,
+      ...(isFellowship && fellowship !== '' ? { fellowship } : {}),
+    });
     navigate(`/attendance/${created.id}`);
   }
 
@@ -44,6 +52,20 @@ export function NewSessionPage() {
             </select>
           </div>
           <div className="form-row">
+          {isFellowship && (
+            <div className="field">
+              <label htmlFor="session-fellowship">Which fellowship</label>
+              <select id="session-fellowship" value={fellowship}
+                onChange={(e) => setFellowship(e.target.value ? Number(e.target.value) : '')}>
+                <option value="">Choose one</option>
+                {(fellowships ?? []).map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+              </select>
+              <div className="field-hint">
+                Two fellowships meet the same evening, so the date alone does not identify this one.
+              </div>
+            </div>
+          )}
+
             <div className="field">
               <label htmlFor="session-date">Date</label>
               <input id="session-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />

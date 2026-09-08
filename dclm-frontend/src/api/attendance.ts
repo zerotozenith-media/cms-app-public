@@ -3,12 +3,11 @@ import { apiClient } from './client';
 import type { PaginatedResponse } from '../types/members';
 import type {
   MeetingType, AttendanceSession, AttendanceStats, RecordAttendancePayload,
-  AttendanceSessionMember, CheckInMode,
+  AttendanceSessionMember, CheckInMode, Fellowship,
 } from '../types/attendance';
 
-export function useMeetingTypes(options: { enabled?: boolean } = {}) {
+export function useMeetingTypes() {
   return useQuery({
-    enabled: options.enabled ?? true,
     queryKey: ['meeting-types'],
     queryFn: async () => {
       const resp = await apiClient.get<PaginatedResponse<MeetingType> | MeetingType[]>('/meeting-types/');
@@ -44,6 +43,13 @@ export function useAttendanceStats() {
 interface SessionListParams {
   meeting_type?: string;
   status?: string;
+  /** Who the meeting was for: everyone, workers or leadership. */
+  audience?: string;
+  date_from?: string;
+  date_to?: string;
+  /** "no" finds services where nobody was ticked off by name, which is
+   *  exactly where absence follow-up silently did not happen. */
+  checked_in?: string;
   ordering?: string;
   page?: number;
   page_size?: number;
@@ -85,7 +91,11 @@ export function useSession(id: number | undefined) {
 export function useCreateSession() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: { meeting_type: string; date: string; location: string; mode: string }) => {
+    mutationFn: async (payload: {
+      meeting_type: string; date: string; location: string; mode: string;
+      /** Only for a house fellowship, since several meet the same evening. */
+      fellowship?: number;
+    }) => {
       const resp = await apiClient.post<AttendanceSession>('/attendance-sessions/', payload);
       return resp.data;
     },
@@ -170,4 +180,44 @@ export function useSetCheckInMode(sessionId: number) {
       )).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['session', sessionId] }),
   });
+}
+
+/** The house fellowships. Configurable, because the number changes. */
+export function useFellowships() {
+  return useQuery({
+    queryKey: ['fellowships'],
+    queryFn: async () =>
+      (await apiClient.get<PaginatedResponse<Fellowship>>('/fellowships/')).data.results,
+  });
+}
+
+export function useCreateFellowship() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { name: string; area?: string }) =>
+      (await apiClient.post('/fellowships/', payload)).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['fellowships'] }),
+  });
+}
+
+export function useDeleteFellowship() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => (await apiClient.delete(`/fellowships/${id}/`)).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['fellowships'] }),
+  });
+}
+
+/** The month's figures as a formatted spreadsheet, for whoever combines
+ *  several locations and would otherwise retype them out of the PDF. */
+export async function downloadMonthlySpreadsheet(year: number, month: number) {
+  const resp = await apiClient.get('/reports/spreadsheet/', {
+    params: { year, month }, responseType: 'blob',
+  });
+  const url = URL.createObjectURL(resp.data as Blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `DCLM-Bahrain-${year}-${String(month).padStart(2, '0')}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
 }

@@ -61,6 +61,20 @@ class Member(models.Model):
                    "if they miss a tracked service. Same pattern as Newcomer.assigned_to.",
     )
 
+    # Leadership is a role someone holds, not a rung above Worker. Kept
+    # as a flag so a leader who steps down stays a Worker rather than
+    # appearing in their category history to have been demoted.
+    is_leader = models.BooleanField(
+        default=False,
+        help_text="Expected at leadership meetings. Independent of category.",
+    )
+    # Set when a newcomer is added to the member roll, so their whole
+    # follow-up history stays reachable from the member record.
+    from_newcomer = models.OneToOneField(
+        "newcomers.Newcomer", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="became_member",
+    )
+
     class Meta:
         ordering = ["surname", "first_name"]
 

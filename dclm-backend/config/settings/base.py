@@ -1,3 +1,4 @@
+import os
 """
 Base settings shared by every environment (local, staging, production).
 Environment-specific files (local.py / production.py) import * from here
@@ -129,3 +130,10 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="DCLM Bahrain <noreply@dc
 # Used to build links in emails. Without it the emails still send, they
 # just carry no "open your list" button.
 APP_BASE_URL = env("APP_BASE_URL", default="")
+
+
+# Shared secret for the scheduled-task endpoint, which exists because
+# Azure App Service has no cron. Empty by default: the endpoint refuses
+# everything when this is unset, so a deployment that forgets it fails
+# loudly instead of quietly accepting anyone.
+TASK_SECRET = os.environ.get("DCLM_TASK_SECRET", "")

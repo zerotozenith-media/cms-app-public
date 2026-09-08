@@ -1,0 +1,84 @@
+# Scheduled jobs, run from GitHub rather than Azure.
+#
+# Copy this to .github/workflows/scheduled-tasks.yml in your repository.
+#
+# Why here rather than Azure: App Service has no cron. WebJobs need
+# Always On, which needs a paid tier. Azure Functions needs a Storage
+# Account. GitHub already runs the repository and scheduled workflows
+# cost nothing on the plans a church would be on.
+#
+# Set two repository secrets (Settings, Secrets and variables, Actions):
+#   DCLM_BASE_URL     https://your-app.azurewebsites.net
+#   DCLM_TASK_SECRET  the same value set on the App Service
+#
+# Generate the secret with:
+#   python -c "import secrets; print(secrets.token_urlsafe(48))"
+
+name: Scheduled tasks
+
+on:
+  schedule:
+    # Times are UTC. Bahrain is UTC+3, so 04:00 UTC is 07:00 locally.
+    - cron: "0 * * * *"      # hourly, absence check
+    - cron: "0 23 * * *"     # 02:00 Bahrain, generate next week's sessions
+    - cron: "0 4 * * *"      # 07:00 Bahrain, follow-up digests
+    - cron: "30 4 * * 1"     # 07:30 Bahrain on Mondays, leadership summary
+  workflow_dispatch:
+    # So the jobs can be run by hand from the Actions tab, which is how
+    # you confirm the setup works without waiting for the next hour.
+    inputs:
+      command:
+        description: "Which command to run"
+        required: true
+        default: check_absences
+        type: choice
+        options:
+          - check_absences
+          - generate_recurring_sessions
+          - send_followup_digests
+          - send_leadership_summary
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Work out which commands this run should do
+        id: pick
+        run: |
+          # A workflow sees which schedule triggered it, so one file can
+          # carry all four rather than four near-identical files.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "commands=${{ inputs.command }}" >> "$GITHUB_OUTPUT"
+          else
+            case "${{ github.event.schedule }}" in
+              "0 * * * *")   echo "commands=check_absences" >> "$GITHUB_OUTPUT" ;;
+              "0 23 * * *")  echo "commands=generate_recurring_sessions" >> "$GITHUB_OUTPUT" ;;
+              "0 4 * * *")   echo "commands=send_followup_digests" >> "$GITHUB_OUTPUT" ;;
+              "30 4 * * 1")  echo "commands=send_leadership_summary" >> "$GITHUB_OUTPUT" ;;
+              *)             echo "commands=" >> "$GITHUB_OUTPUT" ;;
+            esac
+          fi
+
+      - name: Run it
+        if: steps.pick.outputs.commands != ''
+        run: |
+          set -euo pipefail
+          COMMAND="${{ steps.pick.outputs.commands }}"
+          echo "Running $COMMAND"
+
+          # -f makes curl exit non-zero on an HTTP error, so a failure
+          # shows as a failed run rather than a green tick over nothing.
+          HTTP=$(curl -sS -o /tmp/out.json -w "%{http_code}" \
+            -X POST "${{ secrets.DCLM_BASE_URL }}/api/tasks/run/" \
+            -H "Content-Type: application/json" \
+            -H "X-Task-Secret: ${{ secrets.DCLM_TASK_SECRET }}" \
+            -d "{\"command\": \"$COMMAND\"}" \
+            --max-time 300)
+
+          cat /tmp/out.json
+          echo
+
+          if [ "$HTTP" != "200" ]; then
+            echo "::error::$COMMAND failed with HTTP $HTTP"
+            exit 1
+          fi
