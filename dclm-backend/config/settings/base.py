@@ -137,3 +137,28 @@ APP_BASE_URL = env("APP_BASE_URL", default="")
 # everything when this is unset, so a deployment that forgets it fails
 # loudly instead of quietly accepting anyone.
 TASK_SECRET = os.environ.get("DCLM_TASK_SECRET", "")
+
+# ---- Logging ----
+# With DEBUG=False, Django's default logging only emails admins on
+# unhandled exceptions — nothing reaches stdout, so gunicorn's log (and
+# therefore Azure Log stream) shows the request line but never the
+# traceback. This sends request-level exceptions to the console too,
+# so they show up in Log stream without needing DEBUG=True.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {"class": "logging.StreamHandler"},
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+    "loggers": {
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}
