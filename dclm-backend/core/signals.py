@@ -22,7 +22,10 @@ TRACKED_APP_LABELS = {
 # Excluded even though they're in a tracked app: AuditLog would log itself
 # into infinite recursion, and LoginAttempt is already its own dedicated
 # security log (Batch 1.4), with login/logout already explicitly audited.
-EXCLUDED_MODELS = {"accounts.auditlog", "accounts.loginattempt"}
+EXCLUDED_MODELS = {"accounts.auditlog", "accounts.loginattempt",
+                   # Rewritten wholesale on each edit, and summed up in the
+                   # remittance's own entry with the before and after totals.
+                   "finance.remittanceline"}
 
 
 def _should_track(sender):
@@ -38,12 +41,13 @@ def audit_on_save(sender, instance, created, **kwargs):
     if was_explicitly_logged(model_label, instance.pk):
         return  # a specific, hand-written entry already covered this exact save
 
-    from accounts.audit import log_audit
-    log_audit(
+    from accounts.audit import log_automatic
+    log_automatic(
         user=get_current_user(),
         action="Created" if created else "Updated",
         entity_type=sender._meta.verbose_name.title(),
         entity_name=str(instance),
+        model_label=model_label, pk=instance.pk,
     )
 
 
@@ -51,10 +55,11 @@ def audit_on_save(sender, instance, created, **kwargs):
 def audit_on_delete(sender, instance, **kwargs):
     if not _should_track(sender):
         return
-    from accounts.audit import log_audit
-    log_audit(
+    from accounts.audit import log_automatic
+    log_automatic(
         user=get_current_user(),
         action="Deleted",
         entity_type=sender._meta.verbose_name.title(),
         entity_name=str(instance),
+        model_label=f"{sender._meta.app_label}.{sender._meta.model_name}", pk=instance.pk,
     )

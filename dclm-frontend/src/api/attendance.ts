@@ -194,7 +194,7 @@ export function useFellowships() {
 export function useCreateFellowship() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: { name: string; area?: string }) =>
+    mutationFn: async (payload: { name: string; area?: string; location?: string | null }) =>
       (await apiClient.post('/fellowships/', payload)).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['fellowships'] }),
   });
@@ -210,14 +210,32 @@ export function useDeleteFellowship() {
 
 /** The month's figures as a formatted spreadsheet, for whoever combines
  *  several locations and would otherwise retype them out of the PDF. */
-export async function downloadMonthlySpreadsheet(year: number, month: number) {
+export async function downloadMonthlySpreadsheet(year: number, month: number, location?: string) {
   const resp = await apiClient.get('/reports/spreadsheet/', {
-    params: { year, month }, responseType: 'blob',
+    params: { year, month, ...(location ? { location } : {}) }, responseType: 'blob',
   });
   const url = URL.createObjectURL(resp.data as Blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `DCLM-Bahrain-${year}-${String(month).padStart(2, '0')}.xlsx`;
+  // The server names the file after the figures it actually sent, which
+  // for somebody limited to one location is theirs, whatever was asked.
+  const disposition = String((resp.headers as Record<string, string>)['content-disposition'] ?? '');
+  const named = /filename="?([^"]+)"?/.exec(disposition)?.[1];
+  a.download = named || `DCLM-${location || 'all-locations'}-${year}-${String(month).padStart(2, '0')}.xlsx`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+/** Changing one field on a meeting type: who it is for, or whether it
+ *  collects an offering. Both are rules the church sets, not a developer. */
+export function useUpdateMeetingType() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...patch }: { id: string } & Partial<MeetingType>) =>
+      (await apiClient.patch<MeetingType>(`/meeting-types/${id}/`, patch)).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['meeting-types'] });
+      qc.invalidateQueries({ queryKey: ['sessions'] });
+    },
+  });
 }

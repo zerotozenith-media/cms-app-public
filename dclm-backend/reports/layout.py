@@ -294,6 +294,10 @@ def draw_cover(canvas, doc, ctx):
     canvas.setFont("Helvetica", 14)
     canvas.setFillColor(colors.HexColor("#9DB4D8"))
     canvas.drawCentredString(w / 2, h - 12.95 * cm, ctx["period_label"].upper())
+    # What the figures cover, so a single location's report is never read
+    # as the whole church's.
+    canvas.setFont("Helvetica", 10)
+    canvas.drawCentredString(w / 2, h - 13.7 * cm, ctx.get("scope_label", "All locations"))
 
     # ---- the month at a glance ----
     canvas.setFillColor(MUTED)

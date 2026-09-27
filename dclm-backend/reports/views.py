@@ -69,7 +69,7 @@ class WeeklyNoteViewSet(viewsets.ModelViewSet):
         instance = serializer.save()
         log_audit(
             self.request.user, "Submitted", "Weekly Note",
-            f"{instance.department.name} , {instance.week_label}", instance=instance,
+            f"{instance.department.name} · {instance.week_label}", instance=instance,
         )
 
 
@@ -87,6 +87,10 @@ class ReportViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+        # A location-limited person sees their own location's reports only.
+        user = self.request.user
+        if not user.is_superuser and user.location_id:
+            qs = qs.filter(location_id=user.location_id)
         year = self.request.query_params.get("year")
         if year:
             qs = qs.filter(period_year=year)
@@ -108,19 +112,25 @@ class ReportViewSet(viewsets.ModelViewSet):
         year = serializer.validated_data["period_year"]
         other_additions = serializer.validated_data["other_additions"]
 
-        if Report.objects.filter(period_month=month, period_year=year).exists():
+        # One location's report, or the whole church's for an administrator
+        # who does not choose one. Each can have its own month.
+        location = report_location(request)
+        scope = location.name if location else "the whole church"
+        if Report.objects.filter(period_month=month, period_year=year, location=location).exists():
             return Response(
-                {"detail": f"A report for {month}/{year} already exists. Delete it first to regenerate."},
+                {"detail": f"A report for {month}/{year} for {scope} already exists. "
+                           f"Delete it first to regenerate."},
                 status=status.HTTP_409_CONFLICT,
             )
 
-        pdf_bytes = render_report_pdf(year, month, other_additions, request.user)
+        pdf_bytes = render_report_pdf(year, month, other_additions, request.user, location)
 
         report = Report.objects.create(
             period_month=month, period_year=year, generated_by=request.user,
-            other_additions=other_additions,
+            other_additions=other_additions, location=location,
         )
-        report.pdf_file.save(f"report-{year}-{month:02d}.pdf", ContentFile(pdf_bytes), save=True)
+        slug = (location.id if location else "all")
+        report.pdf_file.save(f"report-{year}-{month:02d}-{slug}.pdf", ContentFile(pdf_bytes), save=True)
 
         log_audit(
             request.user, "Generated", "Report", f"{month}/{year}",
@@ -152,9 +162,11 @@ def monthly_spreadsheet(request):
     from reports.pdf import gather_report_data
     from reports.spreadsheet import build_spreadsheet
 
-    ctx = gather_report_data(year, month, "", request.user)
+    location = report_location(request)
+    ctx = gather_report_data(year, month, "", request.user, location)
     ctx["church_name"] = "Deeper Life Bible Church"
-    ctx["location_name"] = "Bahrain"
+    # It said Bahrain even when the figures were the whole church's.
+    ctx["location_name"] = location.name if location else "All locations"
 
     data = build_spreadsheet(ctx)
     log_audit(request.user, "Exported", "Report", ctx["period_label"],
@@ -165,5 +177,20 @@ def monthly_spreadsheet(request):
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
     resp["Content-Disposition"] = (
-        f'attachment; filename="DCLM-Bahrain-{year}-{month:02d}.xlsx"')
+        f'attachment; filename="DCLM-{(location.name if location else "All-locations").replace(" ", "-")}-{year}-{month:02d}.xlsx"')
     return resp
+
+def report_location(request):
+    """
+    Whose figures a report covers. Somebody limited to one location always
+    gets their own. Anybody else chooses a location with "location", or
+    gets the whole church when they do not.
+    """
+    from core.models import Location
+    user = request.user
+    if not user.is_superuser and user.location_id:
+        return user.location
+    wanted = (request.data.get("location") if hasattr(request, "data") and hasattr(request.data, "get") else None) \
+        or request.query_params.get("location")
+    return Location.objects.filter(id=wanted).first() if wanted else None
+

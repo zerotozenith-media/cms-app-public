@@ -34,7 +34,7 @@ class Testimony(models.Model):
 
     def __str__(self):
         who = "Anonymous" if self.is_anonymous else (self.member_name or "Unknown")
-        return f"{who} , {self.date}"
+        return f"{who} · {self.date}"
 
 
 class WeeklyNote(models.Model):
@@ -49,7 +49,7 @@ class WeeklyNote(models.Model):
         ordering = ["-week_start"]
 
     def __str__(self):
-        return f"{self.department} , {self.week_label}"
+        return f"{self.department} · {self.week_label}"
 
 
 class Report(models.Model):
@@ -59,6 +59,11 @@ class Report(models.Model):
     """
     period_month = models.PositiveSmallIntegerField()
     period_year = models.PositiveSmallIntegerField()
+    # One location's report, or the whole church's when blank.
+    location = models.ForeignKey(
+        "core.Location", on_delete=models.PROTECT, related_name="reports",
+        null=True, blank=True,
+    )
     generated_by = models.ForeignKey("accounts.User", on_delete=models.PROTECT, related_name="reports_generated")
     generated_at = models.DateTimeField(auto_now_add=True)
     other_additions = models.TextField(blank=True, default="")
@@ -70,7 +75,9 @@ class Report(models.Model):
 
     class Meta:
         ordering = ["-period_year", "-period_month"]
-        unique_together = ("period_month", "period_year")
+        # Uniqueness per month and scope is checked when generating, since a
+        # blank location (the whole church) is not treated as equal to
+        # itself by a database constraint.
 
     def __str__(self):
         return f"Report {self.period_month}/{self.period_year}"

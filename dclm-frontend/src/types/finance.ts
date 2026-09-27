@@ -7,6 +7,7 @@ export interface Project {
   name: string;
   description: string;
   location: string;
+  location_name: string;
   target_amount: number;
   target_date: string | null;
   status: 'Active' | 'Completed' | 'Archived';

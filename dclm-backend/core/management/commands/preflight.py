@@ -50,6 +50,7 @@ class Command(BaseCommand):
         self.check_accounts()
         self.check_scheduled_jobs()
         self.check_meeting_setup()
+        self.check_version_11()
         self.check_email()
         self.check_backups()
 
@@ -158,41 +159,68 @@ class Command(BaseCommand):
             self.ok(f"{count} active account(s)")
 
     def check_scheduled_jobs(self):
-        """The single most common reason the system looks broken while
-        being entirely functional."""
+        """
+        The single most common reason the system looks broken while being
+        entirely functional.
+
+        Judged by evidence rather than by a crontab. On Azure App Service the
+        jobs are started from outside, by GitHub Actions or an Azure Function
+        calling /api/tasks/run/, and every such run is written to the audit
+        log. This used to look only for a crontab, so a site whose jobs ran
+        perfectly from GitHub was told they were not scheduled.
+        """
+        from datetime import timedelta
+        from django.utils import timezone
+        from accounts.models import AuditLog
+
+        out = ""
         crontab = shutil.which("crontab")
-        if not crontab:
-            self.warn(
-                "cannot check the schedule, crontab not found",
-                "If you schedule jobs another way, confirm check_absences and "
-                "generate_recurring_sessions both run.",
-            )
-            return
-        try:
-            out = subprocess.run([crontab, "-l"], capture_output=True, text=True, timeout=10).stdout
-        except Exception:
-            out = ""
+        if crontab:
+            try:
+                out = subprocess.run([crontab, "-l"], capture_output=True, text=True, timeout=10).stdout
+            except Exception:
+                out = ""
 
-        if "check_absences" in out:
-            self.ok("absence check is scheduled")
-        else:
-            self.bad(
-                "the absence check is not scheduled",
-                "Without it no follow-up task is ever created and the feature looks "
-                "broken. See deploy/crontab.example.",
-            )
+        now = timezone.now()
 
-        if "generate_recurring_sessions" in out:
-            self.ok("weekly session creation is scheduled")
-        else:
-            self.bad(
-                "weekly session creation is not scheduled",
-                "Without it no attendance sessions appear each week. "
-                "See deploy/crontab.example.",
-            )
+        def age(ts):
+            hours = (now - ts).total_seconds() / 3600
+            return f"{int(hours * 60)} minutes" if hours < 1 else (
+                f"{int(hours)} hours" if hours < 48 else f"{int(hours // 24)} days")
 
-        if "send_followup_digests" in out:
-            self.ok("shepherd digests are scheduled")
+        jobs = [
+            ("check_absences", "the absence check", "hourly", timedelta(hours=3),
+             "Without it no follow-up task is ever created and the feature looks broken."),
+            ("generate_recurring_sessions", "weekly session creation", "daily", timedelta(hours=50),
+             "Without it no attendance sessions appear each week."),
+        ]
+        for command, label, how_often, allowed, consequence in jobs:
+            if command in out:
+                self.ok(f"{label} is scheduled on this server")
+                continue
+            runs = AuditLog.objects.filter(action="Scheduled task", entity_name=command)
+            latest = runs.first()
+            good = runs.exclude(details__startswith="Failed").first()
+            if latest and latest.details.startswith("Failed"):
+                self.bad(f"{label} failed the last time it ran, {age(latest.timestamp)} ago",
+                         f"{latest.details[:200]} {consequence}")
+            elif good and now - good.timestamp <= allowed:
+                self.ok(f"{label} runs from an outside scheduler, last {age(good.timestamp)} ago")
+            elif good:
+                self.bad(f"{label} last ran {age(good.timestamp)} ago, but should run {how_often}",
+                         "Check the scheduler that calls /api/tasks/run/: the GitHub Actions "
+                         "workflow may be paused or disabled, or the Azure Function stopped. "
+                         f"{consequence}")
+            else:
+                self.bad(f"{label} has never run",
+                         "Nothing has called it. Set up one scheduler from deploy/: the GitHub "
+                         "Actions workflow, the Azure Function, or crontab.example on a server. "
+                         f"{consequence}")
+
+        for command, label in [("send_followup_digests", "shepherd digests"),
+                               ("send_leadership_summary", "the leadership summary")]:
+            if command in out or AuditLog.objects.filter(action="Scheduled task", entity_name=command).exists():
+                self.ok(f"{label} are scheduled" if command.endswith("s") else f"{label} is scheduled")
 
     def check_meeting_setup(self):
         tracked = MeetingType.objects.filter(counts_for_absence=True)
@@ -215,6 +243,103 @@ class Command(BaseCommand):
         else:
             self.ok(f"{tracked.count()} meeting(s) tracked for absence, all with start times")
 
+    def check_version_11(self):
+        """
+        What the version 11 data steps could not settle on their own.
+
+        Each is reported with what a person needs to do, rather than
+        guessed at, because the right answer depends on the church.
+        """
+        from django.utils import timezone
+        from attendance.models import AttendanceSession, Fellowship
+        from members.models import Member
+        from newcomers.models import Newcomer
+
+        weekly = MeetingType.objects.filter(frequency="weekly")
+        bad_days = [m for m in weekly if m.day not in MeetingType.WEEKDAYS]
+        if bad_days:
+            self.bad(
+                "weekly meeting with a day the system cannot read: "
+                + ", ".join(f"{m.name} ({m.day or 'blank'})" for m in bad_days),
+                "No sessions are created for these. Choose the day in the Day column, "
+                "in Admin, Meeting Types and Households.",
+            )
+        else:
+            self.ok(f"every weekly meeting has a readable day ({weekly.count()})")
+
+        unlinked = Fellowship.objects.filter(is_active=True, meeting_type__isnull=True)
+        if unlinked.exists():
+            self.bad(
+                "house fellowship not linked to a meeting: "
+                + ", ".join(f.name for f in unlinked),
+                "It gets no weekly session of its own. Set its meeting in Django admin, "
+                "or re-add it in Admin, Meeting Types and Households.",
+            )
+        elif Fellowship.objects.filter(is_active=True).exists():
+            self.ok("house fellowships and where they meet: " + ", ".join(
+                f"{f.name} ({f.location.name if f.location else 'every location'})"
+                for f in Fellowship.objects.filter(is_active=True).select_related("location")
+                .order_by("name")))
+
+        collecting = MeetingType.objects.filter(collects_offering=True)
+        if not collecting.exists():
+            self.warn(
+                "no meeting is set to collect an offering",
+                "The session form will not ask for one anywhere. Tick the meetings that "
+                "collect in Admin, Meeting Types and Households.",
+            )
+        else:
+            self.ok("meetings collecting an offering: "
+                    + ", ".join(m.name for m in collecting.order_by("name")))
+
+        converted = Newcomer.objects.filter(stage=Newcomer.Stage.MEMBER)
+        missing = [n for n in converted if not Member.objects.filter(from_newcomer=n).exists()]
+        if missing:
+            self.warn(
+                f"{len(missing)} newcomer(s) shown as members have no member record",
+                "Run: python manage.py reconcile_converted_members  to see what it would "
+                "do, then again with --apply.",
+            )
+        elif converted.exists():
+            self.ok("every newcomer at the Member stage has a member record")
+
+        blank = Member.objects.filter(phone="").count()
+        if blank:
+            self.bad(
+                f"{blank} member(s) stored with an empty phone number",
+                "Run: python manage.py migrate  The version 11 migration converts these.",
+            )
+
+        # An upcoming session for a fellowship meeting, with no fellowship,
+        # at a location that now has fellowships of its own, would sit
+        # beside the per-fellowship sessions on the same evening.
+        fellowship_meetings = Fellowship.objects.filter(
+            is_active=True, meeting_type__isnull=False).values_list("meeting_type_id", flat=True)
+        with_own = set(Fellowship.objects.filter(is_active=True, location__isnull=False)
+                       .values_list("location_id", flat=True))
+        stray = AttendanceSession.objects.filter(
+            meeting_type_id__in=set(fellowship_meetings), fellowship__isnull=True,
+            location_id__in=with_own, date__gte=timezone.localdate())
+        if stray.exists():
+            self.warn(
+                f"{stray.count()} upcoming fellowship session(s) with no fellowship set: "
+                + ", ".join(f"{s.date} at {s.location.name}" for s in stray.select_related("location")[:5]),
+                "Each fellowship now gets its own session, so these would appear beside them. "
+                "Open each in Attendance and delete it with the bin at the top right of the "
+                "session card. Anything recorded on it should first be re-entered on the right "
+                "fellowship's session.",
+            )
+        leftover = AttendanceSession.objects.filter(
+            meeting_type_id__in=set(fellowship_meetings), fellowship__isnull=True,
+            status="pending", date__lt=timezone.localdate()).count()
+        if leftover:
+            self.warn(
+                f"{leftover} past fellowship session(s) with no fellowship, never filled in",
+                "Left from version 10, which made one session per Friday. They count as "
+                "not filled in on the dashboard. Delete them in Attendance if they will "
+                "never be completed.",
+            )
+
     def check_email(self):
         if not getattr(settings, "NOTIFICATIONS_ENABLED", False):
             self.warn(
@@ -232,6 +357,17 @@ class Command(BaseCommand):
             self.ok("email configured")
 
     def check_backups(self):
+        """A managed Azure database is backed up by Azure, with nothing to
+        schedule. This used to call that "no backup is scheduled"."""
+        host = (connection.settings_dict.get("HOST") or "").lower()
+        if host.endswith(".postgres.database.azure.com"):
+            self.ok("the database is on Azure Database for PostgreSQL, which backs it up automatically")
+            self.warn(
+                "check how long Azure keeps the backups",
+                "In the Azure portal, open the database server, then Backup and restore. "
+                "Pastoral records span years, so keep them as long as the plan allows.",
+            )
+            return
         crontab = shutil.which("crontab")
         out = ""
         if crontab:

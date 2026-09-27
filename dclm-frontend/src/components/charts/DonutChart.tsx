@@ -9,10 +9,13 @@ export interface DonutDatum {
 interface DonutChartProps {
   data: DonutDatum[];
   size?: number;
+  /** Off where the total is stated elsewhere. A long figure inside the
+   *  ring is clipped by it. */
+  showCentreTotal?: boolean;
 }
 
 /** Ported exactly from the demo's donutHTML() , CSS conic-gradient donut. */
-export function DonutChart({ data, size = 148 }: DonutChartProps) {
+export function DonutChart({ data, size = 148, showCentreTotal = true }: DonutChartProps) {
   const total = data.reduce((s, d) => s + d.value, 0) || 1;
   let acc = 0;
   const stops = data
@@ -28,8 +31,12 @@ export function DonutChart({ data, size = 148 }: DonutChartProps) {
     <div className="donut-block">
       <div className="donut" style={{ width: size, height: size, background: `conic-gradient(${stops})` }}>
         <div className="donut-center">
-          <b>{fmt(total)}</b>
-          <small>Total</small>
+          {showCentreTotal && (
+            <>
+              <b>{fmt(total)}</b>
+              <small>Total</small>
+            </>
+          )}
         </div>
       </div>
       <div className="legend">

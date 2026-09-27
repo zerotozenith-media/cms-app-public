@@ -1,6 +1,7 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
+from .remittance_api import RemittanceViewSet
 from .views import (
     FundViewSet, PaymentMethodViewSet, ExpenseCategoryViewSet,
     ProjectViewSet, GivingViewSet, ExpenseViewSet, FinanceSummaryView,
@@ -8,6 +9,7 @@ from .views import (
 
 router = DefaultRouter()
 router.register("funds", FundViewSet, basename="fund")
+router.register(r"remittances", RemittanceViewSet, basename="remittance")
 router.register("payment-methods", PaymentMethodViewSet, basename="payment-method")
 router.register("expense-categories", ExpenseCategoryViewSet, basename="expense-category")
 router.register("projects", ProjectViewSet, basename="project")

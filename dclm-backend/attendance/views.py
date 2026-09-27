@@ -1,3 +1,5 @@
+from accounts.permissions import require
+from django.utils import timezone
 from django.db import transaction
 from rest_framework import viewsets, filters
 from rest_framework.decorators import action
@@ -13,6 +15,9 @@ from .serializers import (
 
 
 class MeetingTypeViewSet(viewsets.ModelViewSet):
+    # Affects every location, so only an administrator covering every
+    # location may change it. See ModulePermission.
+    church_wide = True
     module = "attendance"
     permission_classes = [ModulePermission]
     queryset = MeetingType.objects.all()
@@ -82,11 +87,11 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
         instance = serializer.save()
         log_audit(
             self.request.user, "Created", "Attendance Session",
-            f"{instance.meeting_type.name} , {instance.date}", instance=instance,
+            f"{instance.meeting_type.name} · {instance.date}", instance=instance,
         )
 
     def perform_destroy(self, instance):
-        name = f"{instance.meeting_type.name} , {instance.date}"
+        name = f"{instance.meeting_type.name} · {instance.date}"
         log_audit(self.request.user, "Deleted", "Attendance Session", name)
         instance.delete()
 
@@ -112,6 +117,34 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
             "pending": base.filter(status="pending").count(),
         })
 
+    @staticmethod
+    def _record_offering(session, amounts):
+        """
+        Save what was collected at this meeting as giving linked to it.
+
+        Recorded once, not copied onto the session as well: the same
+        money in two places disagrees the first time somebody corrects
+        one of them. Rewritten wholesale each save so an amount lowered
+        to zero disappears rather than lingering.
+        """
+        from finance.models import Fund, Giving, PaymentMethod
+
+        if not session.meeting_type.collects_offering:
+            return
+        session.giving.all().delete()
+        if not amounts:
+            return
+        cash, _ = PaymentMethod.objects.get_or_create(name="Cash")
+        for fund_name, amount in amounts.items():
+            if not amount:
+                continue
+            fund = Fund.objects.filter(name__iexact=fund_name).first()
+            if not fund:
+                continue
+            Giving.objects.create(
+                date=session.date, fund=fund, method=cash, amount=amount,
+                location=session.location, session=session)
+
     @action(detail=True, methods=["post"])
     def record(self, request, pk=None):
         """
@@ -120,7 +153,15 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
         attendance is also used. No location restriction on attendee_ids,
         per the approved Batch 0.2 decision.
         """
+        require(request.user, ("attendance", "can_edit"))
         session = self.get_object()
+        # A service that has not happened yet has no attendance. Accepting
+        # it let a figure for next Friday stand as the latest service on the
+        # dashboard.
+        if session.date > timezone.localdate():
+            return Response(
+                {"detail": f"This service is on {session.date:%-d %B}. Attendance can be "
+                           f"recorded on the day or after."}, status=400)
         serializer = RecordAttendanceSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -144,12 +185,14 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
                 session.lesson = data.get("lesson", "")
                 if data.get("led_by"):
                     session.led_by_id = data["led_by"]
+
+            self._record_offering(session, data.get("offering") or {})
             session.status = AttendanceSession.Status.FILLED
             session.track_named = data["track_named"]
 
             log_audit(
                 request.user, "Recorded attendance", "Attendance Session",
-                f"{session.meeting_type.name} , {session.date}",
+                f"{session.meeting_type.name} · {session.date}",
                 f"Total {sum(data[f] for f in ['men','women','youth_boys','youth_girls','children_boys','children_girls','online_men','online_women','online_youth_boys','online_youth_girls','online_children_boys','online_children_girls'])}",
                 instance=session,
             )
@@ -190,7 +233,12 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
         independent of named attendance; this endpoint doesn't change
         that, it only manages the supplementary named list in real time.
         """
+        require(request.user, ("attendance", "can_edit"))
         session = self.get_object()
+        if session.date > timezone.localdate():
+            return Response(
+                {"detail": f"This service is on {session.date:%-d %B}. People can be checked "
+                           f"in on the day."}, status=400)
         member_id = request.data.get("member_id")
         if not member_id:
             return Response({"member_id": "This field is required."}, status=400)
@@ -234,6 +282,17 @@ class FellowshipViewSet(viewsets.ModelViewSet):
     permission_classes = [ModulePermission]
     queryset = Fellowship.objects.all()
     serializer_class = FellowshipSerializer
+
+    def get_queryset(self):
+        # Fellowships meeting at this person's location, or at every
+        # location. Qatar was shown Bahrain's fellowships, and could pick
+        # one when starting a session.
+        from django.db.models import Q
+        qs = super().get_queryset()
+        user = self.request.user
+        if not user.is_superuser and user.location_id:
+            qs = qs.filter(Q(location_id=user.location_id) | Q(location__isnull=True))
+        return qs
 
     def perform_destroy(self, instance):
         # PROTECT on the session link already prevents this at the database

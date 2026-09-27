@@ -42,14 +42,22 @@ def readiness(newcomer, today=None):
                            session__meeting_type_id=MAIN_SERVICE_ID)
                    .select_related("session")
                    .order_by("session__date"))
-    dates = [a.session.date for a in attendances]
+    dates = sorted({a.session.date for a in attendances})
     first_attended = dates[0] if dates else None
 
     if first_attended:
-        held = AttendanceSession.objects.filter(
+        # Services held at their own location, counted by date. Counting
+        # every location's service made each Friday count several times, so
+        # somebody who came every week scored 50% with two locations and
+        # could never qualify with three.
+        held_qs = AttendanceSession.objects.filter(
             meeting_type_id=MAIN_SERVICE_ID,
             date__gte=first_attended, date__lte=today,
-        ).count()
+        )
+        if newcomer.location_id:
+            held_qs = held_qs.filter(location_id=newcomer.location_id)
+        # A Friday they attended elsewhere counts too, as a service they had.
+        held = len(set(held_qs.values_list("date", flat=True)) | set(dates))
         attended = len(dates)
         months = _months_between(first_attended, today)
     else:

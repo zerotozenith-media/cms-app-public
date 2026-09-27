@@ -1,13 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { DashboardSummary } from '../types/dashboard';
+import type { DashboardSummary, DashPeriod } from '../types/dashboard';
 
-export function useDashboardSummary() {
+/** One period and one meeting for the whole page, so the cards never
+ *  disagree about which month or which meeting they describe. */
+export function useDashboardSummary(period: DashPeriod = 'this-month', meeting = 'fri-worship') {
   return useQuery({
-    queryKey: ['dashboard-summary'],
-    queryFn: async () => {
-      const resp = await apiClient.get<DashboardSummary>('/dashboard/summary/');
-      return resp.data;
-    },
+    queryKey: ['dashboard-summary', period, meeting],
+    queryFn: async () =>
+      (await apiClient.get<DashboardSummary>('/dashboard/summary/', {
+        params: { period, meeting },
+      })).data,
   });
 }

@@ -12,7 +12,7 @@ const ACTION_LABELS: Record<string, string> = { can_view: 'View', can_create: 'C
  * matching how ModulePermission on the backend fails closed for any
  * module without a row at all.
  */
-export function RolePermissionMatrix({ role }: { role: Role }) {
+export function RolePermissionMatrix({ role, readOnly = false }: { role: Role; readOnly?: boolean }) {
   const upsert = useUpsertRolePermission();
 
   function toggle(moduleName: string, action: string, checked: boolean) {
@@ -46,6 +46,7 @@ export function RolePermissionMatrix({ role }: { role: Role }) {
                     <input
                       type="checkbox"
                       checked={existing ? Boolean(existing[action as keyof typeof existing]) : false}
+                      disabled={readOnly}
                       onChange={(e) => toggle(moduleName, action, e.target.checked)}
                       style={{ width: 16, height: 16 }}
                     />

@@ -3,9 +3,15 @@ import { useServices, useTestimonies, useCreateTestimony, useUpdateTestimony, us
 import { Icon } from '../../components/ui/Icon';
 import type { Testimony } from '../../types/reports';
 
+import { useAuth } from '../../context/AuthContext';
 const today = new Date().toISOString().slice(0, 10);
 
 export function TestimoniesTab() {
+  // Controls a person cannot use are not shown.
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('reports', 'create');
+  const canEdit = hasPermission('reports', 'edit');
+  const canDelete = hasPermission('reports', 'delete');
   const { data: services } = useServices();
   const [serviceFilter, setServiceFilter] = useState('all');
   const [sort, setSort] = useState('-date');
@@ -54,7 +60,7 @@ export function TestimoniesTab() {
 
   return (
     <div className="grid g2">
-      <div className="card">
+      {(canCreate || editId) && <div className="card">
         <h3>{editId ? 'Edit testimony' : 'Submit a testimony'}</h3>
         <form onSubmit={handleSubmit}>
           <label htmlFor="testi-anon" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
@@ -80,7 +86,7 @@ export function TestimoniesTab() {
           </button>
           {editId && <button className="btn ghost" type="button" onClick={cancelEdit}>Cancel</button>}
         </form>
-      </div>
+      </div>}
 
       <div className="card">
         <div className="toolbar">
@@ -106,8 +112,8 @@ export function TestimoniesTab() {
                 </div>
               </div>
               <div className="row-actions">
-                <button className="icon-btn edit" onClick={() => startEdit(t)}><Icon name="edit" size={14} /></button>
-                <button className="icon-btn" onClick={() => handleDelete(t.id)}><Icon name="trash" size={14} /></button>
+                {canEdit && <button className="icon-btn edit" title="Edit" aria-label="Edit" onClick={() => startEdit(t)}><Icon name="edit" size={14} /></button>}
+                {canDelete && <button className="icon-btn" title="Delete" aria-label="Delete" onClick={() => handleDelete(t.id)}><Icon name="trash" size={14} /></button>}
               </div>
             </div>
           </div>

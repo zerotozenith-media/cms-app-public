@@ -44,12 +44,15 @@ class PublicRegistrationTestCase(APITestCase):
 
     # --- Auto-set fields, not client-controlled ---
 
-    def test_location_is_always_bahrain_even_if_client_tries_to_override(self):
+    def test_location_follows_the_qr_code_but_only_to_an_existing_location(self):
+        """Version 11: each location has its own QR code, so a visitor lands
+        in the pipeline of the location they attended. Version 10 always
+        used the main location. Anything unknown still goes there."""
         resp = self.client.post("/api/public/newcomer-registration/", self.valid_payload(location="others"))
         self.assertEqual(resp.status_code, 201)
-        newcomer = Newcomer.objects.latest("id")
-        self.assertEqual(newcomer.location_id, "bahrain",
-            "Location must always be Bahrain for QR registration, regardless of what the client sends.")
+        self.assertEqual(Newcomer.objects.latest("id").location_id, "others")
+        resp = self.client.post("/api/public/newcomer-registration/", self.valid_payload(location="made-up"))
+        self.assertEqual(Newcomer.objects.latest("id").location_id, "bahrain")
 
     def test_source_is_auto_tagged_as_qr_self_registration(self):
         self.client.post("/api/public/newcomer-registration/", self.valid_payload())

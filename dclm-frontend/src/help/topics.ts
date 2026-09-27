@@ -17,7 +17,7 @@ export const HELP_TOPICS: Record<string, HelpTopic> = {
   },
   autoAssign: {
     title: 'How auto-assign decides',
-    body: 'Two rules, in order. First, if someone else in the same household already has a shepherd, the same person is used so families are not split across different workers. Everyone else goes to whichever worker currently carries the fewest people. Only members in the Worker category can be shepherds. Nothing is saved until you review the proposed changes and press Apply.',
+    body: 'Two rules, in order. First, if someone else in the same household already has a shepherd, the same person is used so families are not split across different workers. Everyone else goes to whichever worker currently carries the fewest people. Only members in the Worker category can be shepherds. Nothing is saved until you review the proposed changes and press Apply. You can change or skip any row first.',
   },
   reassignEveryone: {
     title: 'Reassign everyone',
@@ -41,7 +41,7 @@ export const HELP_TOPICS: Record<string, HelpTopic> = {
   },
   locationScope: {
     title: 'Location filter',
-    body: 'Switches which location you are viewing. Users tied to a single location only ever see that one. Administrators can switch between all of them, and All locations shows everything combined.',
+    body: 'The location your account covers. Someone tied to a single location only ever sees that one. An administrator covering every location sees them all combined, shown here as All locations.',
   },
   newcomerStages: {
     title: 'Pipeline stages',
@@ -49,7 +49,7 @@ export const HELP_TOPICS: Record<string, HelpTopic> = {
   },
   qrForm: {
     title: 'QR form vs manual entry',
-    body: 'Both collect the same information and both feed the same pipeline. The QR form is what a newcomer fills in themselves on their phone. Manual entry is for a worker typing in a paper card someone filled by hand.',
+    body: 'Both collect the same information. Each location has its own QR code, so a newcomer lands in the pipeline of the location they attended. The QR form is what a newcomer fills in themselves on their phone. Manual entry is for a worker typing in a paper card someone filled by hand.',
   },
   goalTracking: {
     title: 'Manual vs auto-tracked goals',

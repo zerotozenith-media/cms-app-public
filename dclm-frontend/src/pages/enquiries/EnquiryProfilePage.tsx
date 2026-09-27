@@ -4,26 +4,33 @@ import {
   useEnquiry, useChangeEnquiryStage, useConvertEnquiry,
   useEnquiryTasks, useCreateEnquiryTask, useCompleteEnquiryTask, useDeleteEnquiryTask,
 } from '../../api/enquiries';
-import { useLocations } from '../../api/locations';
+import { useMyLocations } from '../../api/locations';
 import { Badge } from '../../components/ui/Badge';
 import { Icon } from '../../components/ui/Icon';
 import { FollowUpCompletionForm } from '../../components/followup/FollowUpCompletionForm';
 import { CompletedFollowUpLog } from '../../components/followup/CompletedFollowUpLog';
 import { ENQUIRY_STAGES } from '../../types/enquiries';
 import type { EnquiryStage } from '../../types/enquiries';
+import { useAuth } from '../../context/AuthContext';
 
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
 export function EnquiryProfilePage() {
+  // Enquiries are governed by the Newcomers permission. Controls a person
+  // cannot use are not shown.
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('newcomers', 'create');
+  const canEdit = hasPermission('newcomers', 'edit');
+  const canDelete = hasPermission('newcomers', 'delete');
   const { id } = useParams();
   const enquiryId = Number(id);
   const navigate = useNavigate();
 
   const { data: enquiry, isLoading } = useEnquiry(enquiryId);
   const { data: tasks } = useEnquiryTasks({ enquiry: enquiryId });
-  const { data: locations } = useLocations();
+  const { data: locations } = useMyLocations();
   const changeStage = useChangeEnquiryStage();
   const convert = useConvertEnquiry();
   const createTask = useCreateEnquiryTask();
@@ -78,7 +85,7 @@ export function EnquiryProfilePage() {
             Came through {enquiry.source_name} on {enquiry.received_at}
           </div>
           <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <Badge color="blue">{enquiry.stage.replace('-', ' ')}</Badge>
+            <Badge color="blue">{ENQUIRY_STAGES.find((s) => s.key === enquiry.stage)?.label ?? enquiry.stage}</Badge>
             {enquiry.converted_newcomer && <Badge color="green">Now a newcomer</Badge>}
           </div>
 
@@ -99,7 +106,7 @@ export function EnquiryProfilePage() {
             </div>
           )}
 
-          <div className="field section-gap">
+          {canEdit && <div className="field section-gap">
             <label htmlFor="enq-stage">Move to stage</label>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <select id="enq-stage" className="selectbox" value={stage || enquiry.stage}
@@ -109,14 +116,14 @@ export function EnquiryProfilePage() {
               </select>
               <button className="btn sm" onClick={handleMove} disabled={changeStage.isPending}>Move</button>
             </div>
-          </div>
+          </div>}
 
           {enquiry.converted_newcomer ? (
             <div className="help-note" style={{ marginTop: 14 }}>
               Added as a newcomer. This enquiry is kept so the church can still see they
               first came through {enquiry.source_name}.
             </div>
-          ) : (
+          ) : canCreate && canEdit && (
             <div className="field section-gap">
               <label htmlFor="enq-convert-loc">They attended, add as a newcomer</label>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -157,17 +164,22 @@ export function EnquiryProfilePage() {
                 </div>
                 <div className="followup-row-actions">
                   {t.done && <Badge color="green">Done</Badge>}
-                  <button className="btn sm outline" onClick={() => setCompletingId(isCompleting ? null : t.id)}>
-                    {t.done ? 'Edit' : 'Mark done'}
-                  </button>
-                  <button className="icon-btn" title="Delete task"
-                    onClick={() => { if (confirm('Delete this task?')) deleteTask.mutate(t.id); }}>
-                    <Icon name="trash" size={14} />
-                  </button>
+                  {canEdit && (
+                    <button className="btn sm outline" onClick={() => setCompletingId(isCompleting ? null : t.id)}>
+                      {t.done ? 'Edit' : 'Mark done'}
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button className="icon-btn" title="Delete task"
+                      onClick={() => { if (confirm('Delete this task?')) deleteTask.mutate(t.id); }}>
+                      <Icon name="trash" size={14} />
+                    </button>
+                  )}
                 </div>
                 {isCompleting && (
                   <div style={{ flexBasis: '100%' }}>
                     <FollowUpCompletionForm
+                      pastoral={false}
                       idPrefix={`enqtask-${t.id}`}
                       existing={t.done ? t : null}
                       saving={completeTask.isPending}
@@ -185,7 +197,7 @@ export function EnquiryProfilePage() {
 
           {(tasks ?? []).length === 0 && <div className="empty">No follow-up tasks yet.</div>}
 
-          <div className="form-card section-gap">
+          {canCreate && <div className="form-card section-gap">
             <div className="form-row">
               <div className="field">
                 <label htmlFor="enq-task-text">Task</label>
@@ -208,7 +220,7 @@ export function EnquiryProfilePage() {
               }}>
               <Icon name="plus" size={14} /> Add task
             </button>
-          </div>
+          </div>}
         </div>
       </div>
     </>

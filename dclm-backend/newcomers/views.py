@@ -1,3 +1,5 @@
+from accounts.permissions import require
+from core.scoping import LocationScopedMixin
 from datetime import timedelta
 
 from django.db import transaction
@@ -38,6 +40,9 @@ class MilestoneTypeViewSet(viewsets.ModelViewSet):
 
 
 class FollowUpUrgencySettingViewSet(viewsets.ModelViewSet):
+    # Affects every location, so only an administrator covering every
+    # location may change it. See ModulePermission.
+    church_wide = True
     module = "newcomers"
     permission_classes = [ModulePermission]
     queryset = FollowUpUrgencySetting.objects.all()
@@ -63,6 +68,26 @@ class NewcomerViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
         )
         log_audit(self.request.user, "Created", "Newcomer", instance.name, instance=instance)
         create_auto_tasks(instance)
+
+    def perform_update(self, serializer):
+        """
+        A newcomer moved to another location gets a shepherd there if theirs
+        cannot serve it, and their open tasks go with the new shepherd.
+        Moving them used to leave them with a shepherd at the old location.
+        """
+        before = serializer.instance.location_id
+        newcomer = serializer.save()
+        if newcomer.location_id != before and newcomer.assigned_to_id:
+            from members.assignment import eligible_shepherds, assign_on_registration
+            if newcomer.assigned_to_id not in {u.id for u in eligible_shepherds(location=newcomer.location_id)}:
+                newcomer.assigned_to = None
+                newcomer.save(update_fields=["assigned_to"])
+                assign_on_registration(newcomer)
+                # Every open task follows, not only unowned ones: the old
+                # shepherd no longer looks after them.
+                from newcomers.models import NewcomerTask
+                NewcomerTask.objects.filter(newcomer=newcomer, done=False).update(
+                    assigned_to=newcomer.assigned_to)
 
     def perform_destroy(self, instance):
         name = instance.name
@@ -113,36 +138,15 @@ class NewcomerViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
         still see how they first arrived. Their card stays on the board
         under Member instead of disappearing.
         """
-        from members.models import Member
+        require(request.user, ("newcomers", "can_edit"), ("members", "can_create"))
         newcomer = self.get_object()
-
         if getattr(newcomer, "became_member", None):
             return Response(
                 {"detail": f"{newcomer.name} is already on the member roll."}, status=400)
-
-        parts = newcomer.name.strip().split()
-        first = parts[0] if parts else newcomer.name
-        surname = " ".join(parts[1:]) if len(parts) > 1 else ""
-
-        with transaction.atomic():
-            member = Member.objects.create(
-                surname=surname or first, first_name=first,
-                phone=newcomer.phone, email=newcomer.email,
-                location=newcomer.location,
-                joined_date=timezone.localdate(),
-                category=Member.Category.GENERAL,
-                from_newcomer=newcomer,
-            )
-            newcomer.stage = Newcomer.Stage.MEMBER
-            newcomer.stage_since = timezone.localdate()
-            newcomer.save(update_fields=["stage", "stage_since"])
-            NewcomerStatusHistory.objects.create(
-                newcomer=newcomer, stage=Newcomer.Stage.MEMBER,
-                note="Added to the member roll", date=timezone.localdate(),
-            )
-
-        log_audit(request.user, "Made a member", "Newcomer", newcomer.name,
-                  "Added to the member roll", instance=newcomer)
+        try:
+            member = convert_to_member(newcomer, request.user)
+        except ConversionConflict as e:
+            return Response({"detail": str(e)}, status=400)
         return Response({"member_id": member.id, "name": member.full_name}, status=201)
 
     @action(detail=True, methods=["post"], url_path="change-stage")
@@ -155,6 +159,7 @@ class NewcomerViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
         track the full pipeline journey rather than only not-interested
         episodes.
         """
+        require(request.user, ("newcomers", "can_edit"))
         newcomer = self.get_object()
         serializer = ChangeStageSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -165,6 +170,16 @@ class NewcomerViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
 
         if to_stage == from_stage:
             return Response({"detail": f"Newcomer is already {to_stage}."}, status=400)
+
+        # Becoming a member is a conversion, not just a new label. Moving
+        # the stage alone left the person shown as a member on the board
+        # and missing from the member roll.
+        if to_stage == Newcomer.Stage.MEMBER:
+            try:
+                member = convert_to_member(newcomer, request.user)
+            except ConversionConflict as e:
+                return Response({"detail": str(e)}, status=400)
+            return Response({"member_id": member.id, "stage": "member"})
 
         with transaction.atomic():
             NewcomerStatusHistory.objects.create(
@@ -192,6 +207,7 @@ class NewcomerViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="set-milestone")
     def set_milestone(self, request, pk=None):
+        require(request.user, ("newcomers", "can_edit"))
         newcomer = self.get_object()
         serializer = SetMilestoneSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -217,7 +233,8 @@ class NewcomerViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
         return Response(NewcomerSerializer(fresh).data)
 
 
-class NewcomerTaskViewSet(viewsets.ModelViewSet):
+class NewcomerTaskViewSet(LocationScopedMixin, viewsets.ModelViewSet):
+    location_lookup = "newcomer__location_id"
     module = "newcomers"
     permission_classes = [ModulePermission]
     queryset = NewcomerTask.objects.select_related("newcomer", "assigned_to")
@@ -248,6 +265,7 @@ class NewcomerTaskViewSet(viewsets.ModelViewSet):
         task with no record of what was discussed wasn't useful to a
         leader reviewing history later.
         """
+        require(request.user, ("newcomers", "can_edit"))
         task = self.get_object()
         serializer = CompleteNewcomerTaskSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -268,7 +286,8 @@ class NewcomerTaskViewSet(viewsets.ModelViewSet):
         return Response(NewcomerTaskSerializer(task).data)
 
 
-class NewcomerStatusHistoryViewSet(viewsets.ModelViewSet):
+class NewcomerStatusHistoryViewSet(LocationScopedMixin, viewsets.ModelViewSet):
+    location_lookup = "newcomer__location_id"
     module = "newcomers"
     permission_classes = [ModulePermission]
     queryset = NewcomerStatusHistory.objects.select_related("newcomer")
@@ -342,7 +361,13 @@ def public_newcomer_registration(request):
 
     data = serializer.validated_data
     from core.models import Location
-    bahrain = Location.objects.get(id="bahrain")
+    # The location comes from the QR code the visitor scanned, so a visitor
+    # at a Qatar service lands in Qatar's pipeline. Every registration used
+    # to be filed under the main location. An unknown or missing code falls
+    # back to the main location, found by its flag rather than its name.
+    wanted = request.data.get("location") or request.query_params.get("location")
+    bahrain = (Location.objects.filter(id=wanted).first() if wanted else None) \
+        or Location.objects.filter(is_core=True).first()
     qr_source, _ = NewcomerSource.objects.get_or_create(name="Church website (QR self-registration)")
     invited_by_member = match_invited_by_member(data.get("invited_by_name"))
 
@@ -363,3 +388,77 @@ def public_newcomer_registration(request):
         PublicRegistrationAttempt.objects.create(ip_address=ip, successful=True, reason=PublicRegistrationAttempt.Reason.SUCCESS)
 
     return Response({"detail": "Thank you! Someone from our team will be in touch soon."}, status=status.HTTP_201_CREATED)
+
+class ConversionConflict(Exception):
+    """Raised when converting would put the same person on the roll twice."""
+
+
+def _shepherd_to_keep(newcomer):
+    """The newcomer's shepherd, if they are a shepherd at the newcomer's
+    location. Otherwise nobody, for auto-assign to fill properly."""
+    if not newcomer.assigned_to_id:
+        return None
+    from members.assignment import eligible_shepherds
+    ok = {u.id for u in eligible_shepherds(location=newcomer.location_id)}
+    return newcomer.assigned_to if newcomer.assigned_to_id in ok else None
+
+
+def convert_to_member(newcomer, user):
+    """
+    Put a newcomer on the member roll.
+
+    Shared by Make a member and by dragging a card to the Member column.
+    Moving the stage alone left a person shown as a member on the board
+    and missing from the member roll.
+
+    The newcomer record is kept and linked rather than deleted, so their
+    follow-up history stays reachable.
+    """
+    from members.models import Member
+    existing = getattr(newcomer, "became_member", None)
+    if existing:
+        return existing
+
+    # Phone numbers are unique on the member roll. A blank one must be
+    # stored as nothing rather than as an empty string, or the second
+    # newcomer without a phone could never become a member. A number
+    # already on the roll almost certainly means this person is there
+    # already, so that is reported rather than duplicated.
+    phone = (newcomer.phone or "").strip() or None
+    if phone:
+        clash = Member.objects.filter(phone=phone).first()
+        if clash:
+            raise ConversionConflict(
+                f"{clash.full_name} is already on the member roll with the phone number "
+                f"{phone}. If this is the same person, link them rather than adding them "
+                f"again.")
+
+    parts = newcomer.name.strip().split()
+    first = parts[0] if parts else newcomer.name
+    surname = " ".join(parts[1:]) if len(parts) > 1 else ""
+
+    with transaction.atomic():
+        member = Member.objects.create(
+            surname=surname or first, first_name=first,
+            phone=phone, email=newcomer.email,
+            location=newcomer.location,
+            joined_date=timezone.localdate(),
+            category=Member.Category.GENERAL,
+            from_newcomer=newcomer,
+            # The shepherd who followed them as a newcomer keeps them, if they
+            # can shepherd members there. They used to join with nobody, just
+            # when they most need somebody.
+            assigned_to=_shepherd_to_keep(newcomer),
+        )
+        newcomer.stage = Newcomer.Stage.MEMBER
+        newcomer.stage_since = timezone.localdate()
+        newcomer.save(update_fields=["stage", "stage_since"])
+        NewcomerStatusHistory.objects.create(
+            newcomer=newcomer, stage=Newcomer.Stage.MEMBER,
+            note="Added to the member roll", date=timezone.localdate(),
+        )
+
+    log_audit(user, "Made a member", "Newcomer", newcomer.name,
+              "Added to the member roll", instance=newcomer)
+    return member
+

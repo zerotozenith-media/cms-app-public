@@ -160,17 +160,79 @@ def build_assignment_preview(location=None, reassign_everyone=False):
 
 
 def apply_assignment_changes(changes):
-    """Commits a previously previewed set of changes. Returns how many
-    of each kind were applied."""
+    """
+    Commit a reviewed set of changes, all or nothing. Returns how many of
+    each kind were applied.
+
+    One transaction, so a failure part way can never leave half a batch
+    saved. The newcomers' open tasks move with them in the same step.
+    """
+    from django.db import transaction
+    from newcomers.models import Newcomer as NewcomerModel
+
     member_ids = {c["id"]: c["to_id"] for c in changes if c["kind"] == "member"}
     newcomer_ids = {c["id"]: c["to_id"] for c in changes if c["kind"] == "newcomer"}
 
-    applied_members = 0
-    for mid, sid in member_ids.items():
-        applied_members += Member.objects.filter(id=mid).update(assigned_to_id=sid)
+    with transaction.atomic():
+        applied_members = 0
+        for mid, sid in member_ids.items():
+            applied_members += Member.objects.filter(id=mid).update(assigned_to_id=sid)
 
-    applied_newcomers = 0
-    for nid, sid in newcomer_ids.items():
-        applied_newcomers += Newcomer.objects.filter(id=nid).update(assigned_to_id=sid)
+        applied_newcomers = 0
+        for nid, sid in newcomer_ids.items():
+            applied_newcomers += NewcomerModel.objects.filter(id=nid).update(assigned_to_id=sid)
+            # Tasks follow their person. Assigning a shepherd and leaving
+            # their open tasks unowned is how a task ends up with nobody.
+            n = NewcomerModel.objects.filter(id=nid).first()
+            if n:
+                carry_tasks_to_shepherd(n)
 
     return applied_members, applied_newcomers
+
+
+def assign_on_registration(newcomer):
+    """
+    Give a newcomer a shepherd the moment they register.
+
+    Without this, a newcomer who ticks "would like a visit" gets a task
+    with nobody's name on it. The task is visible but unowned, and auto
+    assign never picks it up afterwards because it assigns people, not
+    tasks.
+
+    Respects the setting: when an administrator turns newcomers off in
+    auto assign they are saying they want them assigned by hand, usually
+    so whoever met the person keeps them. That is a decision, not an
+    oversight, so this does nothing in that case.
+    """
+    from core.models import AppSetting
+
+    if not AppSetting.get_bool(SETTING_AUTO_ASSIGN_NEWCOMERS, default=True):
+        return None
+    if newcomer.assigned_to_id:
+        return newcomer.assigned_to
+
+    shepherds = eligible_shepherds(location=newcomer.location)
+    if not shepherds:
+        return None
+
+    chosen_id = _least_loaded(current_load(shepherds))
+    if chosen_id is None:
+        return None
+
+    newcomer.assigned_to_id = chosen_id
+    newcomer.save(update_fields=["assigned_to"])
+    return newcomer.assigned_to
+
+
+def carry_tasks_to_shepherd(newcomer):
+    """
+    Point a newcomer's open unowned tasks at whoever now shepherds them.
+
+    Assigning the person and leaving their tasks behind is how a task
+    ends up belonging to nobody: visible in the list, owned by no one,
+    and never picked up.
+    """
+    if not newcomer.assigned_to_id:
+        return 0
+    return newcomer.tasks.filter(done=False, assigned_to__isnull=True).update(
+        assigned_to=newcomer.assigned_to)

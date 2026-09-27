@@ -18,9 +18,35 @@ class MemberSerializer(serializers.ModelSerializer):
     total_given = serializers.SerializerMethodField()
     assigned_to_name = serializers.SerializerMethodField()
 
+    # How they came to the church, where that is known. The only place
+    # the journey work shows up on the member record.
+    arrived_via = serializers.SerializerMethodField()
+
+    def get_arrived_via(self, obj):
+        n = getattr(obj, "from_newcomer", None)
+        if n and n.source_id:
+            return n.source.name
+        return ""
+
+    def validate_assigned_to(self, user):
+        """
+        Only a shepherd may be assigned: a Worker with an account, at the
+        member's location. The list comes from the browser, so it is
+        checked rather than trusted.
+        """
+        if user is None:
+            return None
+        from .assignment import eligible_shepherds
+        location = getattr(self.instance, "location", None) or self.initial_data.get("location")
+        allowed = {u.id for u in eligible_shepherds(location=location)} if location else \
+            {u.id for u in eligible_shepherds()}
+        if user.id not in allowed:
+            raise serializers.ValidationError("Choose a shepherd: a Worker with an account at this location.")
+        return user
+
     class Meta:
         model = Member
-        fields = [
+        fields = ["arrived_via", 
             "id", "surname", "first_name", "other_names", "full_name",
             "gender", "date_of_birth", "phone", "email",
             "category",  # read-only below , see note

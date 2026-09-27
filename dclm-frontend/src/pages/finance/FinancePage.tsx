@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { RemittanceTab } from './RemittanceTab';
 import { DATE_RANGES, rangeBounds, type DateRangeKey } from '../../lib/dateRanges';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -6,7 +7,7 @@ import {
   useGivingList, useExpenseList, useCreateGiving, useUpdateGiving, useDeleteGiving,
   useCreateExpense, useUpdateExpense, useDeleteExpense,
 } from '../../api/finance';
-import { useLocations } from '../../api/locations';
+import { useMyLocations } from '../../api/locations';
 import { apiClient } from '../../api/client';
 import { useQuery } from '@tanstack/react-query';
 import { StatRow, type StatItem } from '../../components/ui/StatRow';
@@ -14,20 +15,24 @@ import { Pagination } from '../../components/ui/Pagination';
 import { Icon } from '../../components/ui/Icon';
 import { fmt } from '../../lib/format';
 import type { Giving, Expense } from '../../types/finance';
+import { useAuth } from '../../context/AuthContext';
 
-const today = new Date().toISOString().slice(0, 10);
 
 export function FinancePage() {
+  // Remittance is a monthly act, not a property of each entry, so it
+  // gets its own tab rather than a field on the giving form.
+  const [tab, setTab] = useState<'entries' | 'remittance'>('entries');
   const navigate = useNavigate();
   const { data: funds } = useFunds();
   const { data: methods } = usePaymentMethods();
   const { data: categories } = useExpenseCategories();
   const { data: projects } = useProjects();
-  const { data: locations } = useLocations();
+  const { data: locations } = useMyLocations();
   const { data: summary } = useFinanceSummary();
   const { data: members } = useQuery({
     queryKey: ['members-for-giving'],
-    queryFn: async () => (await apiClient.get('/members/', { params: { ordering: 'surname,first_name', page_size: 100 } })).data.results,
+    // Names only, governed by the Finance permission.
+    queryFn: async () => (await apiClient.get('/finance-roster/', { params: { page_size: 1000 } })).data.results,
   });
 
   // --- Giving list state ---
@@ -61,9 +66,9 @@ export function FinancePage() {
   // --- Giving form ---
   const [givingEditId, setGivingEditId] = useState<number | null>(null);
   const [gFund, setGFund] = useState('');
+  const [gDate, setGDate] = useState(() => new Date().toISOString().slice(0, 10));
   // Where the money was sent. The system knew which fund it went into but
   // not where it went afterwards, which the monthly report has to state.
-  const [gRemit, setGRemit] = useState('retained');
   const [gMethod, setGMethod] = useState('');
   const [gAmount, setGAmount] = useState('');
   const [gLocation, setGLocation] = useState('');
@@ -71,6 +76,11 @@ export function FinancePage() {
   const createGiving = useCreateGiving();
   const updateGiving = useUpdateGiving();
   const deleteGiving = useDeleteGiving();
+  // Controls a person cannot use are not shown.
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('finance', 'create');
+  const canEdit = hasPermission('finance', 'edit');
+  const canDelete = hasPermission('finance', 'delete');
 
   if (funds && !gFund && funds.length) setGFund(String(funds[0].id));
   if (methods && !gMethod && methods.length) setGMethod(String(methods[0].id));
@@ -78,6 +88,7 @@ export function FinancePage() {
 
   function startGivingEdit(g: Giving) {
     setGivingEditId(g.id);
+    setGDate(g.date);
     setGFund(String(g.fund));
     setGMethod(String(g.method));
     setGAmount(String(g.amount));
@@ -92,9 +103,8 @@ export function FinancePage() {
   async function handleGivingSubmit(e: React.FormEvent) {
     e.preventDefault();
     const payload = {
-      fund: Number(gFund), method: Number(gMethod), amount: gAmount, remitted_to: gRemit,
+      date: gDate, fund: Number(gFund), method: Number(gMethod), amount: gAmount,
       location: gLocation, member: gMember ? Number(gMember) : null,
-      date: today,
     };
     if (givingEditId) {
       await updateGiving.mutateAsync({ id: givingEditId, ...payload });
@@ -113,6 +123,7 @@ export function FinancePage() {
   // --- Expense form ---
   const [expenseEditId, setExpenseEditId] = useState<number | null>(null);
   const [eCategory, setECategory] = useState('');
+  const [eDate, setEDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [eAmount, setEAmount] = useState('');
   const [eDescription, setEDescription] = useState('');
   const [eReceiptFile, setEReceiptFile] = useState<File | null>(null);
@@ -126,6 +137,7 @@ export function FinancePage() {
 
   function startExpenseEdit(x: Expense) {
     setExpenseEditId(x.id);
+    setEDate(x.date);
     setECategory(String(x.category));
     setEAmount(String(x.amount));
     setEDescription(x.description);
@@ -145,7 +157,7 @@ export function FinancePage() {
     formData.append('amount', eAmount);
     formData.append('location', eLocation);
     formData.append('description', eDescription);
-    formData.append('date', today);
+    formData.append('date', eDate);
     if (eReceiptFile) formData.append('receipt_file', eReceiptFile);
     if (expenseEditId) {
       await updateExpense.mutateAsync({ id: expenseEditId, payload: formData });
@@ -172,8 +184,22 @@ export function FinancePage() {
   const givingTotalPages = givingList ? Math.max(1, Math.ceil(givingList.count / givingPageSize)) : 1;
   const expenseTotalPages = expenseList ? Math.max(1, Math.ceil(expenseList.count / expensePageSize)) : 1;
 
+  const tabs = (
+    <div className="toolbar">
+      <div className="tabs">
+        <button className={`tab${tab === 'entries' ? ' active' : ''}`}
+          onClick={() => setTab('entries')}>Giving and expenses</button>
+        <button className={`tab${tab === 'remittance' ? ' active' : ''}`}
+          onClick={() => setTab('remittance')}>Remittance</button>
+      </div>
+    </div>
+  );
+
+  if (tab === 'remittance') return <>{tabs}<RemittanceTab /></>;
+
   return (
     <>
+      {tabs}
       <StatRow stats={stats} />
 
       <div className="grid g2 section-gap">
@@ -212,24 +238,21 @@ export function FinancePage() {
         </div>
       )}
 
-      <div className="grid g2 section-gap">
+      {(canCreate || givingEditId || expenseEditId) && <div className="grid g2 section-gap">
         <div className="card">
           <h3>{givingEditId ? 'Edit giving entry' : 'Record giving'}</h3>
           <form onSubmit={handleGivingSubmit}>
             <div className="form-row">
               <div className="field">
+                <label htmlFor="g-date">Date</label>
+                <input id="g-date" type="date" value={gDate}
+                  onChange={(e) => setGDate(e.target.value)} />
+                <div className="field-hint">When it was given, not when you typed it in.</div>
+              </div>
+              <div className="field">
                 <label htmlFor="g-fund">Fund</label>
                 <select id="g-fund" value={gFund} onChange={(e) => setGFund(e.target.value)}>
                   {(funds ?? []).map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="g-remit">Remitted to</label>
-                <select id="g-remit" value={gRemit} onChange={(e) => setGRemit(e.target.value)}>
-                  <option value="retained">Retained in location account</option>
-                  <option value="dubai">DLBC account, Dubai</option>
-                  <option value="lagos">DLBC account, Lagos</option>
-                  <option value="qatar">DLBC account, Qatar</option>
                 </select>
               </div>
               <div className="field">
@@ -270,6 +293,12 @@ export function FinancePage() {
           <form onSubmit={handleExpenseSubmit}>
             <div className="form-row">
               <div className="field">
+                <label htmlFor="e-date">Date</label>
+                <input id="e-date" type="date" value={eDate}
+                  onChange={(e) => setEDate(e.target.value)} />
+                <div className="field-hint">The month it belongs to, not when you typed it in.</div>
+              </div>
+              <div className="field">
                 <label htmlFor="e-category">Category</label>
                 <select id="e-category" value={eCategory} onChange={(e) => setECategory(e.target.value)}>
                   {(categories ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -300,7 +329,7 @@ export function FinancePage() {
             {expenseEditId && <button className="btn ghost" type="button" onClick={cancelExpenseEdit}>Cancel</button>}
           </form>
         </div>
-      </div>
+      </div>}
 
       {/* Giving list */}
       <div className="card section-gap">
@@ -345,8 +374,8 @@ export function FinancePage() {
                   </td>
                   <td data-label="Amount"><b>{fmt(g.amount)}</b></td>
                   <td className="td-actions" style={{ border: 0 }}>
-                    <button className="icon-btn edit" onClick={() => startGivingEdit(g)}><Icon name="edit" size={14} /></button>
-                    <button className="icon-btn" onClick={() => handleDeleteGiving(g.id)}><Icon name="trash" size={14} /></button>
+                    {canEdit && <button className="icon-btn edit" title="Edit entry" aria-label="Edit entry" onClick={() => startGivingEdit(g)}><Icon name="edit" size={14} /></button>}
+                    {canDelete && <button className="icon-btn" title="Delete entry" aria-label="Delete entry" onClick={() => handleDeleteGiving(g.id)}><Icon name="trash" size={14} /></button>}
                   </td>
                 </tr>
               ))}
@@ -382,12 +411,15 @@ export function FinancePage() {
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table className="cardtable">
-            <thead><tr><th>Date</th><th>Category</th><th>Amount</th><th>Receipt</th><th></th></tr></thead>
+            <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th>Receipt</th><th></th></tr></thead>
             <tbody>
               {(expenseList?.results ?? []).map((x) => (
                 <tr key={x.id}>
                   <td data-label="Date">{x.date}</td>
                   <td data-label="Category">{x.category_name}</td>
+                  {/* What it was for. Without it two entries in one category
+                      could not be told apart without opening each. */}
+                  <td data-label="Description">{x.description || <span className="muted">–</span>}</td>
                   <td data-label="Amount"><b>{fmt(x.amount)}</b></td>
                   <td data-label="Receipt">
                     {x.receipt_file ? (
@@ -397,8 +429,8 @@ export function FinancePage() {
                     ) : <span className="muted">–</span>}
                   </td>
                   <td className="td-actions" style={{ border: 0 }}>
-                    <button className="icon-btn edit" onClick={() => startExpenseEdit(x)}><Icon name="edit" size={14} /></button>
-                    <button className="icon-btn" onClick={() => handleDeleteExpense(x.id)}><Icon name="trash" size={14} /></button>
+                    {canEdit && <button className="icon-btn edit" title="Edit entry" aria-label="Edit entry" onClick={() => startExpenseEdit(x)}><Icon name="edit" size={14} /></button>}
+                    {canDelete && <button className="icon-btn" title="Delete entry" aria-label="Delete entry" onClick={() => handleDeleteExpense(x.id)}><Icon name="trash" size={14} /></button>}
                   </td>
                 </tr>
               ))}

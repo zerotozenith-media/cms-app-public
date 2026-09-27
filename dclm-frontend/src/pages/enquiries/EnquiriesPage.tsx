@@ -21,6 +21,8 @@ export function EnquiriesPage() {
   // roles granted the outreach permission.
   const { hasPermission } = useAuth();
   const canSeeOutreach = hasPermission('outreach', 'view');
+  const canCreate = hasPermission('newcomers', 'create');
+  const canEdit = hasPermission('newcomers', 'edit');
   const { data: enquiries, isLoading } = useEnquiries();
   const { data: stats } = useEnquiryStats();
   const changeStage = useChangeEnquiryStage();
@@ -61,7 +63,7 @@ export function EnquiriesPage() {
       <div className="toolbar">
         <div className="tabs">
           <button className="tab active">Pipeline</button>
-          <button className="tab" onClick={() => navigate('/enquiries/new')}>Add enquiry</button>
+          {canCreate && <button className="tab" onClick={() => navigate('/enquiries/new')}>Add enquiry</button>}
           {canSeeOutreach && (
             <button className="tab" onClick={() => navigate('/enquiries/outreach')}>Outreach</button>
           )}
@@ -80,6 +82,7 @@ export function EnquiriesPage() {
           if (enquiry) move(enquiry, stage);
         }}
         onSelectStage={move}
+        canMove={canEdit}
       />
 
       <div className="muted" style={{ fontSize: '.8rem', marginTop: 10 }}>
@@ -100,9 +103,9 @@ export function EnquiriesPage() {
                 <div className="muted" style={{ fontSize: '.8rem' }}>{e.not_pursuing_note}</div>
               </div>
               <div className="followup-row-actions">
-                <button className="btn sm outline" onClick={() => move(e, 'contacted')}>
+                {canEdit && (<button className="btn sm outline" onClick={() => move(e, 'contacted')}>
                   <Icon name="check" size={14} /> Reactivate
-                </button>
+                </button>)}
               </div>
             </div>
           ))}

@@ -29,6 +29,7 @@ from .names import display_name
 
 GENERIC_ERROR = {"detail": "Invalid email or password."}
 RATE_LIMIT_WINDOW_MINUTES = 15
+LOCKED_ERROR = {"detail": f"Too many attempts. Try again in {RATE_LIMIT_WINDOW_MINUTES} minutes."}
 MAX_FAILED_PER_ACCOUNT = 5
 MAX_FAILED_PER_IP = 20
 MIN_SUBMIT_SECONDS = 1.5
@@ -64,6 +65,13 @@ class LoginView(APIView):
             LoginAttempt.objects.create(
                 email_attempted=email, ip_address=ip, successful=False, reason=reason
             )
+            # A locked account says so. Repeating "Invalid email or password"
+            # even for the right password made people think they were
+            # mistyping. The lock counts attempts per email typed, whether or
+            # not an account exists, so this reveals nothing about which
+            # addresses are real.
+            if response_status == status.HTTP_429_TOO_MANY_REQUESTS:
+                return Response(LOCKED_ERROR, status=response_status)
             return Response(GENERIC_ERROR, status=response_status)
 
         # 1. Honeypot
@@ -167,6 +175,9 @@ from .models import Role, RolePermission, AuditLog, LoginAttempt
 
 
 class RoleViewSet(viewsets.ModelViewSet):
+    # Affects every location, so only an administrator covering every
+    # location may change it. See ModulePermission.
+    church_wide = True
     module = "admin"
     permission_classes = [ModulePermission]
     queryset = Role.objects.prefetch_related("permissions")
@@ -183,10 +194,40 @@ class RoleViewSet(viewsets.ModelViewSet):
 
 
 class RolePermissionViewSet(viewsets.ModelViewSet):
+    # Affects every location, so only an administrator covering every
+    # location may change it. See ModulePermission.
+    church_wide = True
     module = "admin"
     permission_classes = [ModulePermission]
     queryset = RolePermission.objects.select_related("role")
     serializer_class = RolePermissionSerializer
+
+
+PERMISSION_FLAGS = ("can_view", "can_create", "can_edit", "can_delete")
+
+
+def is_full_administrator(actor):
+    """An all-locations account with every Admin permission. That is what an
+    administrator is, and they may assign any role."""
+    if actor.location_id or not actor.role_id:
+        return False
+    p = actor.role.permissions.filter(module="admin").first()
+    return bool(p and all(getattr(p, f) for f in PERMISSION_FLAGS))
+
+
+def role_within(actor, role):
+    """Whether every permission the role grants, the actor also has."""
+    if actor.is_superuser:
+        return True
+    if not actor.role_id:
+        return False
+    own = {p.module: p for p in actor.role.permissions.all()}
+    for p in role.permissions.all():
+        mine = own.get(p.module)
+        for flag in PERMISSION_FLAGS:
+            if getattr(p, flag) and not (mine and getattr(mine, flag)):
+                return False
+    return True
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -197,9 +238,42 @@ class UserViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter]
     search_fields = ["email", "first_name", "last_name"]
 
+    # Somebody limited to one location manages only that location's
+    # accounts. Before this, a Bahrain coordinator could list every account
+    # and create a new Administrator covering every location, then sign in
+    # as it and see everything.
+    def get_queryset(self):
+        qs = super().get_queryset()
+        actor = self.request.user
+        if not actor.is_superuser and actor.location_id:
+            qs = qs.filter(location_id=actor.location_id)
+        return qs
+
+    def _check_within_reach(self, data, instance=None):
+        from rest_framework.exceptions import PermissionDenied
+        actor = self.request.user
+        if actor.is_superuser or is_full_administrator(actor):
+            return
+        if actor.location_id:
+            location = data.get("location", getattr(instance, "location", None))
+            location_id = getattr(location, "id", location)
+            if location_id != actor.location_id:
+                raise PermissionDenied(
+                    "You can only manage accounts for your own location.")
+        role = data.get("role")
+        if role is not None and not role_within(actor, role):
+            raise PermissionDenied(
+                f"The {role.name} role can do things your own role cannot, so you "
+                f"cannot give it to anyone.")
+
     def perform_create(self, serializer):
+        self._check_within_reach(serializer.validated_data)
         instance = serializer.save()
         log_audit(self.request.user, "Created", "User", instance.email, instance=instance)
+
+    def perform_update(self, serializer):
+        self._check_within_reach(serializer.validated_data, serializer.instance)
+        serializer.save()
 
     def destroy(self, request, *args, **kwargs):
         # User.delete() raises django.core.exceptions.ValidationError for
@@ -238,6 +312,11 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+        # A location-limited account sees what that location's people did,
+        # not every location's names and actions.
+        actor = self.request.user
+        if not actor.is_superuser and actor.location_id:
+            qs = qs.filter(user__location_id=actor.location_id)
         entity_type = self.request.query_params.get("entity_type")
         if entity_type:
             qs = qs.filter(entity_type=entity_type)
@@ -256,6 +335,10 @@ class LoginAttemptViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+        actor = self.request.user
+        if not actor.is_superuser and actor.location_id:
+            emails = User.objects.filter(location_id=actor.location_id).values_list("email", flat=True)
+            qs = qs.filter(email_attempted__in=list(emails))
         successful = self.request.query_params.get("successful")
         if successful is not None:
             qs = qs.filter(successful=successful.lower() == "true")

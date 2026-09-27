@@ -242,14 +242,15 @@ class RecurringSessionGenerationTestCase(TestCase):
         session = AttendanceSession.objects.filter(meeting_type=self.weekly_mt, location=self.bahrain).first()
         self.assertGreaterEqual(session.date, timezone.localdate())
 
-    def test_unrecognized_day_value_is_skipped_not_crashed(self):
-        MeetingType.objects.create(
-            id="broken", name="Broken Meeting", day="Someday",  # not a real weekday
-            frequency="weekly", detail_level="simple",
-        )
-        # Should not raise , just skip with a warning
-        call_command("generate_recurring_sessions")
-        self.assertFalse(AttendanceSession.objects.filter(meeting_type_id="broken").exists())
+    def test_unrecognized_day_value_is_refused_at_save(self):
+        """It used to be skipped with a warning to a log nobody reads, so
+        sessions silently stopped appearing. It is now refused outright."""
+        from django.core.exceptions import ValidationError
+        with self.assertRaises(ValidationError):
+            MeetingType.objects.create(
+                id="odd-day", name="Odd", day="Someday",
+                frequency="weekly", detail_level="simple")
+
 
     def test_no_locations_does_not_crash(self):
         Location.objects.all().delete()

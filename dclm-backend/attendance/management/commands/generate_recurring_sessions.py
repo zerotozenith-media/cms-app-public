@@ -13,6 +13,7 @@ duplicate sessions.
 import datetime
 
 from django.core.management.base import BaseCommand
+from django.db import models
 from django.utils import timezone
 
 from core.models import Location
@@ -35,7 +36,7 @@ class Command(BaseCommand):
         skipped_count = 0
 
         if not locations:
-            self.stdout.write(self.style.WARNING("No locations exist yet , nothing to generate."))
+            self.stdout.write(self.style.WARNING("No locations exist yet, so nothing to generate."))
             return
 
         for mt in weekly_types:
@@ -49,18 +50,37 @@ class Command(BaseCommand):
             next_date = self._next_occurrence(today, weekday_num)
 
             for loc in locations:
-                _, was_created = AttendanceSession.objects.get_or_create(
-                    meeting_type=mt, location=loc, date=next_date,
-                    defaults={
-                        "mode": AttendanceSession.Mode.IN_PERSON,
-                        "status": AttendanceSession.Status.PENDING,
-                    },
-                )
-                if was_created:
-                    created_count += 1
-                    self.stdout.write(self.style.SUCCESS(f"Created: {mt.name} @ {loc.name} on {next_date}"))
-                else:
-                    skipped_count += 1
+                # A meeting type with fellowships needs one session per
+                # fellowship. Two fellowships meet the same evening, so a
+                # single session would leave the second one nowhere to be
+                # recorded.
+                # Only the fellowships that meet at this location. A location
+                # with none of its own keeps the single session it had before
+                # fellowships existed.
+                fellowships = [None]
+                if mt.has_fellowships:
+                    here = list(mt.fellowship_set.filter(is_active=True).filter(
+                        models.Q(location=loc) | models.Q(location__isnull=True)))
+                    fellowships = here or [None]
+
+                for fellowship in fellowships:
+                    lookup = dict(meeting_type=mt, location=loc, date=next_date)
+                    if fellowship is not None:
+                        lookup["fellowship"] = fellowship
+                    _, was_created = AttendanceSession.objects.get_or_create(
+                        **lookup,
+                        defaults={
+                            "mode": AttendanceSession.Mode.IN_PERSON,
+                            "status": AttendanceSession.Status.PENDING,
+                        },
+                    )
+                    if was_created:
+                        created_count += 1
+                        label = f" ({fellowship.name})" if fellowship else ""
+                        self.stdout.write(self.style.SUCCESS(
+                            f"Created: {mt.name}{label} @ {loc.name} on {next_date}"))
+                    else:
+                        skipped_count += 1
 
         self.stdout.write(self.style.SUCCESS(
             f"Done. Created {created_count}, skipped {skipped_count} (already existed)."

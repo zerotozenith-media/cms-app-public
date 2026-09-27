@@ -21,7 +21,9 @@ export function ProtectedRoute({ children, requiredModule }: ProtectedRouteProps
   if (isLoading) return null; // brief flash avoided , restoring session from storage
   if (!user) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   if (requiredModule && !hasPermission(requiredModule, 'view')) {
-    return <Navigate to="/" replace />;
+    // Back to the dashboard, which says why. A silent redirect left
+    // somebody following a colleague's link wondering what happened.
+    return <Navigate to="/" replace state={{ denied: location.pathname }} />;
   }
   return <>{children}</>;
 }

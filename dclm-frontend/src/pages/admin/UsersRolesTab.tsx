@@ -1,14 +1,22 @@
 import { useState } from 'react';
 import { useAdminUsers, useCreateUser, useDeleteUser, useRoles, useCreateRole, useDeleteRole } from '../../api/admin';
-import { useLocations } from '../../api/locations';
+import { useMyLocations } from '../../api/locations';
 import { RolePermissionMatrix } from '../../components/admin/RolePermissionMatrix';
 import { Badge } from '../../components/ui/Badge';
 import { Icon } from '../../components/ui/Icon';
 
+import { useAuth } from '../../context/AuthContext';
 export function UsersRolesTab() {
+  // Roles and their permissions apply to every location, so only somebody
+  // covering every location changes them. A coordinator adds accounts at
+  // their own location, with roles no more powerful than their own.
+  const { user: me, hasPermission } = useAuth();
+  const churchWide = !me?.location && hasPermission('admin', 'edit');
+  const canAddUser = hasPermission('admin', 'create');
+  const canDeleteUser = hasPermission('admin', 'delete');
   const { data: users } = useAdminUsers();
   const { data: roles } = useRoles();
-  const { data: locations } = useLocations();
+  const { data: locations } = useMyLocations();
   const createUser = useCreateUser();
   const deleteUser = useDeleteUser();
   const createRole = useCreateRole();
@@ -34,7 +42,9 @@ export function UsersRolesTab() {
     try {
       await createUser.mutateAsync({
         email, first_name: firstName, last_name: lastName, password,
-        role: Number(role), location: location || null,
+        // Someone limited to one location adds accounts there. The box showed
+        // their location but sent none, which the server refused.
+        role: Number(role), location: location || me?.location || null,
       });
       setEmail(''); setFirstName(''); setLastName(''); setPassword('');
       setShowUserForm(false);
@@ -73,9 +83,11 @@ export function UsersRolesTab() {
       <div className="card">
         <div className="toolbar" style={{ marginBottom: 10 }}>
           <h3>Users</h3>
+          {canAddUser && (
           <a className="btn sm" onClick={() => setShowUserForm(!showUserForm)}>
             <Icon name="plus" size={14} /> Add user
           </a>
+          )}
         </div>
         {showUserForm && (
           <div className="form-card editing">
@@ -102,13 +114,13 @@ export function UsersRolesTab() {
                 <div className="field">
                   <label htmlFor="user-role">Role</label>
                   <select id="user-role" value={role} onChange={(e) => setRole(e.target.value)}>
-                    {(roles ?? []).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                    {(roles ?? []).filter((r: any) => r.assignable !== false).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                   </select>
                 </div>
                 <div className="field">
                   <label htmlFor="user-location">Location</label>
-                  <select id="user-location" value={location} onChange={(e) => setLocation(e.target.value)}>
-                    <option value="">All locations</option>
+                  <select id="user-location" value={location || me?.location || ''} onChange={(e) => setLocation(e.target.value)}>
+                    {!me?.location && <option value="">All locations</option>}
                     {(locations ?? []).map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}
                   </select>
                 </div>
@@ -129,7 +141,7 @@ export function UsersRolesTab() {
                   <td data-label="Role">{u.role_name ? <Badge color="blue">{u.role_name}</Badge> : <span className="muted">–</span>}</td>
                   <td data-label="Location">{u.location_name ?? 'All locations'}</td>
                   <td className="td-actions">
-                    <button className="icon-btn" onClick={() => handleDeleteUser(u.id)}><Icon name="trash" size={14} /></button>
+                    {canDeleteUser && <button className="icon-btn" title="Delete user" aria-label="Delete user" onClick={() => handleDeleteUser(u.id)}><Icon name="trash" size={14} /></button>}
                   </td>
                 </tr>
               ))}
@@ -140,14 +152,19 @@ export function UsersRolesTab() {
 
       <div className="card">
         <h3 style={{ marginBottom: 10 }}>Roles &amp; Permissions</h3>
-        <form style={{ display: 'flex', gap: 6, marginBottom: 14 }} onSubmit={handleAddRole}>
+        {!churchWide && (
+          <p className="muted" style={{ fontSize: '.84rem', marginTop: 0 }}>
+            Roles apply to every location, so they are changed by an administrator who covers every location.
+          </p>
+        )}
+        {churchWide && <form style={{ display: 'flex', gap: 6, marginBottom: 14 }} onSubmit={handleAddRole}>
           <input
             value={newRoleName} onChange={(e) => setNewRoleName(e.target.value)} placeholder="New role name"
             style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 8, padding: '.4rem .6rem' }}
             aria-label="New role name"
           />
           <button className="btn sm" type="submit" disabled={createRole.isPending}>Add role</button>
-        </form>
+        </form>}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
           {(roles ?? []).map((r) => (
             <span key={r.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
@@ -157,14 +174,16 @@ export function UsersRolesTab() {
               >
                 {r.name}
               </button>
-              <button className="icon-btn" title="Delete role" onClick={() => handleDeleteRole(r.id)}>
-                <Icon name="trash" size={12} />
-              </button>
+              {churchWide && (
+                <button className="icon-btn" title="Delete role" onClick={() => handleDeleteRole(r.id)}>
+                  <Icon name="trash" size={12} />
+                </button>
+              )}
             </span>
           ))}
         </div>
         {selectedRole ? (
-          <RolePermissionMatrix role={selectedRole} />
+          <RolePermissionMatrix role={selectedRole} readOnly={!churchWide} />
         ) : (
           <div className="empty">Select a role above to view or edit its permissions.</div>
         )}

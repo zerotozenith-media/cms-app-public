@@ -81,6 +81,17 @@ export function useCreateLocation() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['locations'] }),
   });
 }
+/** Rename a location or change its note. The short code stays fixed,
+ *  since every record points to it. Every screen reads the new name. */
+export function useUpdateLocation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...payload }: { id: string; name: string; note: string }) =>
+      (await apiClient.patch(`/locations/${id}/`, payload)).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['locations'] }),
+  });
+}
+
 export function useDeleteLocation() {
   const qc = useQueryClient();
   return useMutation({

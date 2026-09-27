@@ -27,6 +27,7 @@ class Goal(models.Model):
         Blank/unused for manual goals.
         """
         LATEST_SESSION_TOTAL = "latest_session_total", "Latest filled session total"
+        MONTHLY_AVERAGE = "monthly_average_attendance", "Average attendance this month"
         TASK_COMPLETION_RATE = "task_completion_rate", "Follow-up task completion rate"
         TESTIMONY_COUNT = "testimony_count", "Testimony count"
         MEMBER_CATEGORY_MOVES = "member_category_moves", "Members moved to a category"

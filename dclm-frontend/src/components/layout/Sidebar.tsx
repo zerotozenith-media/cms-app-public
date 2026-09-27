@@ -51,7 +51,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             </NavLink>
           ))}
         </nav>
-        <div className="side-foot">v0.2 · real backend, Phase 3 in progress</div>
+        <div className="side-foot">DCLM Bahrain · version 11</div>
       </aside>
     </>
   );

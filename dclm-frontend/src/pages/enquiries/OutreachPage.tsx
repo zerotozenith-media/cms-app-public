@@ -5,6 +5,7 @@ import { useEnquirySources } from '../../api/enquiries';
 import { StatRow, type StatItem } from '../../components/ui/StatRow';
 import { Badge } from '../../components/ui/Badge';
 import { Icon } from '../../components/ui/Icon';
+import { useAuth } from '../../context/AuthContext';
 
 function money(v: number | null) {
   return v === null ? '–' : `BHD ${v.toFixed(2)}`;
@@ -19,6 +20,7 @@ function money(v: number | null) {
  * never turn up.
  */
 export function OutreachPage() {
+  const { hasPermission } = useAuth();
   const navigate = useNavigate();
   const { data: campaigns, isLoading } = useCampaigns();
   const { data: summary } = useCampaignSummary();
@@ -57,7 +59,7 @@ export function OutreachPage() {
       <div className="toolbar">
         <div className="tabs">
           <button className="tab" onClick={() => navigate('/enquiries')}>Pipeline</button>
-          <button className="tab" onClick={() => navigate('/enquiries/new')}>Add enquiry</button>
+          {hasPermission('newcomers', 'create') && <button className="tab" onClick={() => navigate('/enquiries/new')}>Add enquiry</button>}
           <button className="tab active">Outreach</button>
         </div>
       </div>

@@ -21,13 +21,17 @@ interface Props {
   onSave: (payload: CompleteFollowUpPayload) => void;
   onCancel: () => void;
   saving?: boolean;
+  /** Off for an online enquiry, such as replying to a message, where there
+   *  was no visit, scripture or root cause to record. Those four are then
+   *  optional. Pastoral follow-ups keep them required. */
+  pastoral?: boolean;
 }
 
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function FollowUpCompletionForm({ existing, idPrefix, onSave, onCancel, saving }: Props) {
+export function FollowUpCompletionForm({ existing, idPrefix, onSave, onCancel, saving, pastoral = true }: Props) {
   const editing = Boolean(existing);
   const [date, setDate] = useState(existing?.contact_date || today());
   const [method, setMethod] = useState<ContactMethod>(
@@ -43,10 +47,12 @@ export function FollowUpCompletionForm({ existing, idPrefix, onSave, onCancel, s
     // The API rejects a missing field anyway, but naming them here is far
     // more useful than a generic server error after the fact.
     const missing: string[] = [];
-    if (!goal.trim()) missing.push('Goal of the visit');
-    if (!scripture.trim()) missing.push('Scripture shared');
-    if (!rootCause.trim()) missing.push('Root cause');
-    if (!nextStep.trim()) missing.push('Next step agreed');
+    if (pastoral) {
+      if (!goal.trim()) missing.push('Goal of the visit');
+      if (!scripture.trim()) missing.push('Scripture shared');
+      if (!rootCause.trim()) missing.push('Root cause');
+      if (!nextStep.trim()) missing.push('Next step agreed');
+    }
     if (missing.length) {
       setError(`Please complete: ${missing.join(', ')}.`);
       return;
@@ -90,7 +96,7 @@ export function FollowUpCompletionForm({ existing, idPrefix, onSave, onCancel, s
       <div className="followup-guide">
         <div className="followup-guide-title">
           <Icon name="alert" size={14} /> A follow-up should be purposeful, not just a chat
-          <HelpMark topic="followUpFields" />
+          {pastoral && <HelpMark topic="followUpFields" />}
         </div>
         <div className="followup-guide-note">
           All four are required. They are what make this record useful to whoever reads it next.
@@ -98,7 +104,7 @@ export function FollowUpCompletionForm({ existing, idPrefix, onSave, onCancel, s
       </div>
 
       <div className="field">
-        <label htmlFor={`${idPrefix}-goal`}>Goal of the visit <span className="req">*</span></label>
+        <label htmlFor={`${idPrefix}-goal`}>{pastoral ? <>Goal of the visit <span className="req">*</span></> : 'What was it about (optional)'}</label>
         <input
           id={`${idPrefix}-goal`} value={goal} onChange={(e) => setGoal(e.target.value)}
           placeholder="What did you set out to achieve?"
@@ -106,7 +112,7 @@ export function FollowUpCompletionForm({ existing, idPrefix, onSave, onCancel, s
       </div>
 
       <div className="field">
-        <label htmlFor={`${idPrefix}-scripture`}>Scripture shared <span className="req">*</span></label>
+        <label htmlFor={`${idPrefix}-scripture`}>Scripture shared {pastoral ? <span className="req">*</span> : '(optional)'}</label>
         <input
           id={`${idPrefix}-scripture`} value={scripture} onChange={(e) => setScripture(e.target.value)}
           placeholder="Reference and why it fit, or 'None this time'"
@@ -117,7 +123,7 @@ export function FollowUpCompletionForm({ existing, idPrefix, onSave, onCancel, s
       </div>
 
       <div className="field">
-        <label htmlFor={`${idPrefix}-root`}>Root cause <span className="req">*</span></label>
+        <label htmlFor={`${idPrefix}-root`}>Root cause {pastoral ? <span className="req">*</span> : '(optional)'}</label>
         <textarea
           id={`${idPrefix}-root`} rows={2} value={rootCause} onChange={(e) => setRootCause(e.target.value)}
           placeholder="What is really behind the absence: work, health, family, discouragement, something unresolved at church?"
@@ -125,7 +131,7 @@ export function FollowUpCompletionForm({ existing, idPrefix, onSave, onCancel, s
       </div>
 
       <div className="field">
-        <label htmlFor={`${idPrefix}-next`}>Next step agreed <span className="req">*</span></label>
+        <label htmlFor={`${idPrefix}-next`}>Next step agreed {pastoral ? <span className="req">*</span> : '(optional)'}</label>
         <textarea
           id={`${idPrefix}-next`} rows={2} value={nextStep} onChange={(e) => setNextStep(e.target.value)}
           placeholder="Something concrete: what was committed, by whom, by when?"

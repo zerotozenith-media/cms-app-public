@@ -1,11 +1,13 @@
+import { useQuery } from '@tanstack/react-query';
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSession, useDeleteSession, useRecordSession, useMeetingTypes } from '../../api/attendance';
 import { apiClient } from '../../api/client';
 import type { Member, PaginatedResponse } from '../../types/members';
 import { Badge } from '../../components/ui/Badge';
-import { useMembers } from '../../api/members';
 import { Icon } from '../../components/ui/Icon';
+import { useLocationName } from '../../api/locations';
+import { useAuth } from '../../context/AuthContext';
 
 const DETAILED_FIELDS: [keyof typeof EMPTY_COUNTS, string][] = [
   ['men', 'Men'], ['women', 'Women'], ['youth_boys', 'Youth Boys'], ['youth_girls', 'Youth Girls'],
@@ -21,7 +23,10 @@ function categoryBadgeColor(cat: string): 'green' | 'amber' | 'gray' {
   return 'gray';
 }
 
+const OFFERING_FUNDS = ['Tithe', 'Offering', 'Charity', 'Pledge', 'Special'];
+
 export function SessionRecordPage() {
+  const locationName = useLocationName();
   const { id } = useParams();
   const sessionId = Number(id);
   const navigate = useNavigate();
@@ -31,7 +36,11 @@ export function SessionRecordPage() {
   const recordSession = useRecordSession(sessionId);
 
   // Only Workers lead a fellowship, so the list is scoped to them.
-  const { data: workerPage } = useMembers({ category: 'Worker' });
+  const { data: workerPage } = useQuery({
+    queryKey: ['attendance-roster', 'Worker'],
+    queryFn: async () => (await apiClient.get<PaginatedResponse<Member>>('/attendance-roster/', {
+      params: { category: 'Worker' } })).data,
+  });
   const workers = workerPage?.results;
   const [counts, setCounts] = useState(EMPTY_COUNTS);
   // Online attendance, kept separate. Any meeting can be hybrid and a
@@ -42,6 +51,9 @@ export function SessionRecordPage() {
   const [newConverts, setNewConverts] = useState(0);
   const [ledBy, setLedBy] = useState<number | ''>('');
   const [lesson, setLesson] = useState('');
+  // What was collected, by fund. Saved as giving linked to this meeting
+  // rather than as a second copy of the same money.
+  const [offering, setOffering] = useState<Record<string, string>>({});
   const [trackNamed, setTrackNamed] = useState(false);
   const [attendeeIds, setAttendeeIds] = useState<Set<number>>(new Set());
   const [selectedNames, setSelectedNames] = useState<Map<number, string>>(new Map());
@@ -67,7 +79,7 @@ export function SessionRecordPage() {
     debounceRef.current = setTimeout(async () => {
       // No location restriction , any member, from any location, can be
       // checked into any session (Batch 0.2 approved decision).
-      const resp = await apiClient.get<PaginatedResponse<Member>>('/members/', {
+      const resp = await apiClient.get<PaginatedResponse<Member>>('/attendance-roster/', {
         params: { search: search || undefined, page_size: 50 },
       });
       setSearchResults(resp.data.results);
@@ -84,6 +96,17 @@ export function SessionRecordPage() {
   const onlineCount = Object.values(online).reduce((a, b) => a + b, 0);
   const total = inPerson + onlineCount;
   const isFellowship = !!session?.fellowship;
+  const { hasPermission } = useAuth();
+  const canEdit = hasPermission('attendance', 'edit');
+  const canDelete = hasPermission('attendance', 'delete');
+  // A service that has not happened yet cannot be recorded. Said up front,
+  // rather than after somebody has typed in every count.
+  const todayIso = new Date().toLocaleDateString('en-CA');
+  const isFuture = !!session && session.date > todayIso;
+  const meeting = meetingTypes?.find((m) => m.id === session?.meeting_type);
+  const collectsOffering = !!meeting?.collects_offering;
+  const offeringTotal = OFFERING_FUNDS
+    .reduce((sum, f) => sum + Number(offering[f] || 0), 0);
 
   function toggleAttendee(member: Member) {
     const next = new Set(attendeeIds);
@@ -114,6 +137,7 @@ export function SessionRecordPage() {
       online_children_boys: online.children_boys, online_children_girls: online.children_girls,
       new_comers: newComers, new_converts: newConverts,
       ...(isFellowship ? { led_by: ledBy === '' ? null : ledBy, lesson } : {}),
+      ...(collectsOffering ? { offering } : {}),
       track_named: trackNamed,
       attendee_ids: Array.from(attendeeIds),
     });
@@ -130,14 +154,22 @@ export function SessionRecordPage() {
               {session.meeting_type_name}
               {session.fellowship_name ? ` · ${session.fellowship_name}` : ''} · {session.date}
             </h3>
-            <div className="muted" style={{ marginBottom: 16 }}>{session.location} · {session.mode.replace('-', ' ')}</div>
+            <div className="muted" style={{ marginBottom: 16 }}>{locationName(session.location)} · {session.mode === 'in-person' ? 'In person' : session.mode.replace('-', ' ')}</div>
           </div>
-          <button className="icon-btn" title="Delete session" onClick={handleDelete}>
-            <Icon name="trash" size={15} />
-          </button>
+          {canDelete && (
+            <button className="icon-btn" title="Delete session" onClick={handleDelete}>
+              <Icon name="trash" size={15} />
+            </button>
+          )}
         </div>
 
+        {!canEdit && (
+          <p className="form-note">You can view this session. Changing it needs permission to edit attendance.</p>
+        )}
         <form onSubmit={handleSubmit}>
+          {/* Read only for somebody who cannot change it: boxes they could
+              type into but never save would only mislead. */}
+          <fieldset disabled={!canEdit} className="plain-fieldset">
           <div className="followup-guide">
             <div className="followup-guide-title"><Icon name="users" size={14} /> In person</div>
             <div className="followup-guide-note">Everyone physically in the room.</div>
@@ -227,6 +259,55 @@ export function SessionRecordPage() {
             </>
           )}
 
+
+          {collectsOffering ? (
+            <>
+              <div className="followup-guide">
+                <div className="followup-guide-title">
+                  <Icon name="coin" size={14} /> Offering collected
+                </div>
+                <div className="followup-guide-note">Leave anything not collected at zero.</div>
+              </div>
+              <div className="form-row">
+                {OFFERING_FUNDS.slice(0, 2).map((f) => (
+                  <div className="field" key={f}>
+                    <label htmlFor={`off-${f}`}>{f}</label>
+                    <input id={`off-${f}`} type="number" step="0.001" min={0}
+                      value={offering[f] ?? ''} placeholder="0.000"
+                      onChange={(e) => setOffering({ ...offering, [f]: e.target.value })} />
+                  </div>
+                ))}
+              </div>
+              <div className="form-row">
+                {OFFERING_FUNDS.slice(2, 4).map((f) => (
+                  <div className="field" key={f}>
+                    <label htmlFor={`off-${f}`}>{f}</label>
+                    <input id={`off-${f}`} type="number" step="0.001" min={0}
+                      value={offering[f] ?? ''} placeholder="0.000"
+                      onChange={(e) => setOffering({ ...offering, [f]: e.target.value })} />
+                  </div>
+                ))}
+              </div>
+              <div className="field">
+                <label htmlFor="off-special">{OFFERING_FUNDS[4]}</label>
+                <input id="off-special" type="number" step="0.001" min={0}
+                  value={offering[OFFERING_FUNDS[4]] ?? ''} placeholder="0.000"
+                  onChange={(e) => setOffering({ ...offering, [OFFERING_FUNDS[4]]: e.target.value })} />
+              </div>
+              <div className="session-total">
+                <span>Offering total</span>
+                <span>{offeringTotal.toLocaleString(undefined, {
+                  minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
+              </div>
+            </>
+          ) : (
+            <div className="no-offering">
+              <Icon name="coin" size={20} />
+              <p>No offering is collected at this meeting.</p>
+              <span>Change that in Admin, Meeting Types.</span>
+            </div>
+          )}
+
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '14px 0', fontSize: '.85rem' }}>
             <input type="checkbox" checked={trackNamed} onChange={(e) => setTrackNamed(e.target.checked)} style={{ width: 16, height: 16 }} />
             Track named attendance for this session
@@ -259,9 +340,17 @@ export function SessionRecordPage() {
             </div>
           )}
 
-          <button className="btn" type="submit" disabled={recordSession.isPending}>
-            {recordSession.isPending ? 'Saving…' : 'Save session'}
-          </button>
+          {isFuture && (
+            <p className="form-note">
+              This service has not happened yet. Attendance can be recorded on the day or after.
+            </p>
+          )}
+          {canEdit && (
+            <button className="btn" type="submit" disabled={recordSession.isPending || isFuture}>
+              {recordSession.isPending ? 'Saving…' : 'Save session'}
+            </button>
+          )}
+          </fieldset>
         </form>
       </div>
     </>

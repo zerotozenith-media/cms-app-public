@@ -5,9 +5,15 @@ import {
 import { Icon } from '../../components/ui/Icon';
 import type { WeeklyNote } from '../../types/reports';
 
+import { useAuth } from '../../context/AuthContext';
 const today = new Date().toISOString().slice(0, 10);
 
 export function WeeklyNotesTab() {
+  // Controls a person cannot use are not shown.
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('reports', 'create');
+  const canEdit = hasPermission('reports', 'edit');
+  const canDelete = hasPermission('reports', 'delete');
   const { data: departments } = useDepartments();
   const [deptFilter, setDeptFilter] = useState('all');
   const [sort, setSort] = useState('-week_start');
@@ -64,7 +70,7 @@ export function WeeklyNotesTab() {
 
   return (
     <div className="grid g2">
-      <div className="card">
+      {(canCreate || editId) && <div className="card">
         <h3>{editId ? 'Edit note' : 'Submit a weekly note'}</h3>
         <form onSubmit={handleSubmit}>
           <div className="field">
@@ -100,7 +106,7 @@ export function WeeklyNotesTab() {
           </button>
           {editId && <button className="btn ghost" type="button" onClick={cancelEdit}>Cancel</button>}
         </form>
-      </div>
+      </div>}
 
       <div className="card">
         <div className="toolbar">
@@ -121,8 +127,8 @@ export function WeeklyNotesTab() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div><b>{n.department_name}</b> <span className="muted">· {n.week_label}</span></div>
               <div className="row-actions">
-                <button className="icon-btn edit" onClick={() => startEdit(n)}><Icon name="edit" size={14} /></button>
-                <button className="icon-btn" onClick={() => handleDelete(n.id)}><Icon name="trash" size={14} /></button>
+                {canEdit && <button className="icon-btn edit" title="Edit" aria-label="Edit" onClick={() => startEdit(n)}><Icon name="edit" size={14} /></button>}
+                {canDelete && <button className="icon-btn" title="Delete" aria-label="Delete" onClick={() => handleDelete(n.id)}><Icon name="trash" size={14} /></button>}
               </div>
             </div>
             <div style={{ fontSize: '.85rem', marginTop: 4 }}><b>Highlights:</b> {n.highlights}</div>

@@ -35,15 +35,17 @@ class WeeklyNoteSerializer(serializers.ModelSerializer):
 
 
 class ReportSerializer(serializers.ModelSerializer):
+    # Blank means the whole church.
+    location_name = serializers.CharField(source="location.name", read_only=True, default="")
     generated_by_name = serializers.CharField(source="generated_by.email", read_only=True)
 
     class Meta:
         model = Report
         fields = [
             "id", "period_month", "period_year", "generated_by", "generated_by_name",
-            "generated_at", "other_additions", "pdf_file",
+            "generated_at", "other_additions", "pdf_file", "location", "location_name",
         ]
-        read_only_fields = ["id", "generated_by", "generated_at", "pdf_file"]
+        read_only_fields = ["id", "generated_by", "generated_at", "pdf_file", "location"]
         # Reports are only ever created via the generate action, never a
         # plain POST , pdf_file, generated_by, and generated_at all need
         # to be set together, correctly, by that action.

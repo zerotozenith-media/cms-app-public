@@ -67,19 +67,19 @@ class DashboardSummaryTestCase(APITestCase):
 
     def test_admin_sees_fw_total_summed_across_all_locations_on_latest_date(self):
         self.auth(self.admin)
-        resp = self.client.get("/api/dashboard/summary/")
-        self.assertEqual(resp.data["friday_worship"]["total"], 102)  # 38+52+5+7, the LATEST date (Aug 7), both locations
-        self.assertEqual(resp.data["friday_worship"]["target"], 150)
+        resp = self.client.get("/api/dashboard/summary/?period=2026")
+        self.assertEqual(resp.data["attendance"]["latest"], 102)  # 38+52+5+7, the LATEST date (Aug 7), both locations
+        self.assertEqual(resp.data["attendance"]["target"], 150)
 
     def test_coordinator_sees_fw_total_only_for_their_own_location(self):
         self.auth(self.coord)
-        resp = self.client.get("/api/dashboard/summary/")
-        self.assertEqual(resp.data["friday_worship"]["total"], 90)  # 38+52 only , Bahrain's Aug 7 session
+        resp = self.client.get("/api/dashboard/summary/?period=2026")
+        self.assertEqual(resp.data["attendance"]["latest"], 90)  # 38+52 only , Bahrain's Aug 7 session
 
     def test_fw_trend_excludes_dates_outside_scope_correctly(self):
         self.auth(self.coord)
-        resp = self.client.get("/api/dashboard/summary/")
-        trend_dates = [t["date"] for t in resp.data["friday_worship"]["trend"]]
+        resp = self.client.get("/api/dashboard/summary/?period=2026")
+        trend_dates = [t["date"] for t in resp.data["attendance"]["trend"]]
         self.assertIn("2026-08-07", trend_dates)
         self.assertIn("2026-07-31", trend_dates)
 
@@ -87,31 +87,31 @@ class DashboardSummaryTestCase(APITestCase):
 
     def test_admin_sees_giving_total_across_all_locations(self):
         self.auth(self.admin)
-        resp = self.client.get("/api/dashboard/summary/")
+        resp = self.client.get("/api/dashboard/summary/?period=2026")
         self.assertEqual(resp.data["giving_total"], 1150.0)  # 850 + 300
 
     def test_coordinator_sees_giving_total_only_for_bahrain(self):
         self.auth(self.coord)
-        resp = self.client.get("/api/dashboard/summary/")
+        resp = self.client.get("/api/dashboard/summary/?period=2026")
         self.assertEqual(resp.data["giving_total"], 850.0)
 
     def test_net_total_computed_correctly(self):
         self.auth(self.coord)
-        resp = self.client.get("/api/dashboard/summary/")
+        resp = self.client.get("/api/dashboard/summary/?period=2026")
         self.assertEqual(resp.data["net_total"], 650.0)  # 850 giving - 200 expense, Bahrain only
 
     # --- Newcomers: location-scoped pipeline and follow-ups ---
 
     def test_coordinator_sees_only_their_location_newcomers_and_tasks(self):
         self.auth(self.coord)
-        resp = self.client.get("/api/dashboard/summary/")
+        resp = self.client.get("/api/dashboard/summary/?period=2026")
         self.assertEqual(resp.data["newcomers_in_pipeline"], 1)
-        self.assertEqual(len(resp.data["follow_ups_due"]), 1)
-        self.assertEqual(resp.data["follow_ups_due"][0]["newcomer_name"], "Bahrain Newcomer")
+        self.assertEqual(len(resp.data["follow_ups"]["urgent"]), 1)
+        self.assertEqual(resp.data["follow_ups"]["urgent"][0]["newcomer_name"], "Bahrain Newcomer")
 
     def test_admin_sees_all_locations_newcomers(self):
         self.auth(self.admin)
-        resp = self.client.get("/api/dashboard/summary/")
+        resp = self.client.get("/api/dashboard/summary/?period=2026")
         self.assertEqual(resp.data["newcomers_in_pipeline"], 2)
 
     # --- The important distinction: Goals stay church-wide, NEVER location-filtered ---
@@ -124,7 +124,7 @@ class DashboardSummaryTestCase(APITestCase):
         stat on this same endpoint.
         """
         self.auth(self.coord)
-        resp = self.client.get("/api/dashboard/summary/")
+        resp = self.client.get("/api/dashboard/summary/?period=2026")
         fw_goal = next(g for g in resp.data["short_term_goals"] if "Friday Worship" in g["name"])
         # The goal's own calculation is church-wide (all-time, all-location
         # latest session), so it must equal the ADMIN's fw total (102),
@@ -135,7 +135,7 @@ class DashboardSummaryTestCase(APITestCase):
     # --- Auth ---
 
     def test_unauthenticated_request_denied(self):
-        resp = self.client.get("/api/dashboard/summary/")
+        resp = self.client.get("/api/dashboard/summary/?period=2026")
         self.assertEqual(resp.status_code, 401)
 
     # --- Phase 4.3: sections are gated by real per-module permission ---
@@ -146,7 +146,7 @@ class DashboardSummaryTestCase(APITestCase):
         user = User.objects.create_user(email="members_only@test.com", password="x",
             role=members_only_role, location=self.bahrain)
         self.auth(user)
-        resp = self.client.get("/api/dashboard/summary/")
+        resp = self.client.get("/api/dashboard/summary/?period=2026")
         self.assertEqual(resp.status_code, 200, "The Dashboard itself stays open to any authenticated user.")
         self.assertFalse(resp.data["finance_access"])
         self.assertNotIn("giving_total", resp.data,
@@ -157,7 +157,7 @@ class DashboardSummaryTestCase(APITestCase):
         bare_role = Role.objects.create(name="Bare Role")
         user = User.objects.create_user(email="bare@test.com", password="x", role=bare_role, location=self.bahrain)
         self.auth(user)
-        resp = self.client.get("/api/dashboard/summary/")
+        resp = self.client.get("/api/dashboard/summary/?period=2026")
         self.assertEqual(resp.status_code, 200)
         for flag in ["attendance_access", "finance_access", "newcomers_access", "goals_access"]:
             self.assertFalse(resp.data[flag])
@@ -170,7 +170,7 @@ class DashboardSummaryTestCase(APITestCase):
         user = User.objects.create_user(email="finance_only@test.com", password="x",
             role=finance_only_role, location=self.bahrain)
         self.auth(user)
-        resp = self.client.get("/api/dashboard/summary/")
+        resp = self.client.get("/api/dashboard/summary/?period=2026")
         self.assertTrue(resp.data["finance_access"])
         self.assertIn("giving_total", resp.data)
         self.assertFalse(resp.data["attendance_access"])
@@ -180,7 +180,7 @@ class DashboardSummaryTestCase(APITestCase):
         """A superuser bypasses role checks entirely , same rule every
         other permission check in the app already follows."""
         self.auth(self.admin)
-        resp = self.client.get("/api/dashboard/summary/")
+        resp = self.client.get("/api/dashboard/summary/?period=2026")
         for flag in ["attendance_access", "finance_access", "newcomers_access", "goals_access"]:
             self.assertTrue(resp.data[flag])
 
@@ -248,3 +248,65 @@ class AppSettingsAPITestCase(APITestCase):
             AuditLog.objects.filter(entity_type="Setting", entity_name="auto_assign_newcomers").exists(),
             "Changing a church-wide setting should be traceable.",
         )
+
+
+class DashboardPeriodTestCase(APITestCase):
+    """
+    One period drives every section, so the cards cannot disagree about
+    which month they describe.
+    """
+    def setUp(self):
+        import datetime
+        from decimal import Decimal
+        from finance.models import Fund, PaymentMethod
+        self.bahrain = Location.objects.create(id="bahrain", name="Bahrain", is_core=True)
+        role = Role.objects.create(name="Administrator")
+        for m in ["members", "attendance", "newcomers", "finance",
+                  "goals", "reports", "outreach", "admin"]:
+            RolePermission.objects.create(role=role, module=m, can_view=True,
+                                          can_create=True, can_edit=True, can_delete=True)
+        self.admin = User.objects.create_user(email="p@t.com", password="x", role=role)
+        self.client.force_authenticate(user=self.admin)
+        fund = Fund.objects.create(name="Tithe")
+        cash = PaymentMethod.objects.create(name="Cash")
+        # One entry in each of two consecutive years.
+        Giving.objects.create(date=datetime.date(2025, 3, 5), fund=fund, method=cash,
+                              amount=Decimal("100"), location=self.bahrain)
+        Giving.objects.create(date=datetime.date(2026, 3, 5), fund=fund, method=cash,
+                              amount=Decimal("150"), location=self.bahrain)
+
+    def test_a_year_only_counts_that_year(self):
+        r = self.client.get("/api/dashboard/summary/?period=2025")
+        self.assertEqual(r.data["giving_total"], 100.0)
+
+    def test_the_period_is_named_in_the_response(self):
+        """So every card can say which month it is showing."""
+        r = self.client.get("/api/dashboard/summary/?period=2025")
+        self.assertEqual(r.data["period"]["label"], "2025")
+
+    def test_a_year_compares_against_the_year_before(self):
+        r = self.client.get("/api/dashboard/summary/?period=2026")
+        self.assertEqual(r.data["giving_previous"], 100.0)
+        self.assertEqual(r.data["giving_change_pct"], 50)
+
+    def test_an_empty_period_is_not_reported_as_a_fall(self):
+        """Nothing recorded is not a hundred percent drop."""
+        r = self.client.get("/api/dashboard/summary/?period=2024")
+        self.assertIsNone(r.data["giving_change_pct"])
+
+    def test_the_banner_says_so_when_nothing_is_outstanding(self):
+        """Rather than inventing an alert to fill the space."""
+        r = self.client.get("/api/dashboard/summary/")
+        self.assertIn("message", r.data["banner"])
+        if not r.data["banner"]["has_outstanding"]:
+            self.assertEqual(r.data["banner"]["message"], "Nothing needs your attention.")
+
+    def test_goals_state_their_status_in_words(self):
+        """Colour alone was blue, red, red and grey with no key."""
+        from goals.models import Goal
+        Goal.objects.create(name="Test goal", horizon=Goal.Horizon.SHORT,
+                            target=100, current=0, tracking="manual")
+        r = self.client.get("/api/dashboard/summary/")
+        g = r.data["short_term_goals"][0]
+        self.assertEqual(g["status"], "attention")
+        self.assertTrue(g["not_started"])

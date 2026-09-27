@@ -195,7 +195,7 @@ class PublicRegistrationAttempt(models.Model):
 
     def __str__(self):
         status = "OK" if self.successful else f"FAILED ({self.reason})"
-        return f"{self.timestamp} , {self.ip_address} , {status}"
+        return f"{self.timestamp} · {self.ip_address} · {status}"
 
 
 class NewcomerContactAttempt(models.Model):

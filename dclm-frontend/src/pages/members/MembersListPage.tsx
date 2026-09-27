@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useHouseholds, useMembers, useMemberStats, useDeleteMember } from '../../api/members';
 import { StatRow, type StatItem } from '../../components/ui/StatRow';
 import {
@@ -11,6 +11,8 @@ import { Pagination } from '../../components/ui/Pagination';
 import { Badge } from '../../components/ui/Badge';
 import { Icon } from '../../components/ui/Icon';
 import { HelpMark } from '../../components/ui/HelpMark';
+import { useAuth } from '../../context/AuthContext';
+import { useLocationName } from '../../api/locations';
 
 function categoryBadgeColor(cat: string): 'green' | 'amber' | 'gray' {
   if (cat === 'Worker') return 'green';
@@ -22,6 +24,13 @@ export function MembersListPage() {
   const navigate = useNavigate();
   // Shown on the tab so a leader sees what is waiting without opening it.
   const { data: followUpStats } = useFollowUpStats();
+  // Controls a person cannot use are not shown. A view-only role saw
+  // ticks, Auto-assign and delete, each leading to a refusal.
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('members', 'create');
+  const canEdit = hasPermission('members', 'edit');
+  const canDelete = hasPermission('members', 'delete');
+  const locationName = useLocationName();
   const openFollowUps = followUpStats?.open_followups ?? 0;
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('all');
@@ -41,6 +50,8 @@ export function MembersListPage() {
   const applyAssignment = useApplyAssignment();
   const bulkAssign = useBulkAssignShepherd();
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const fromPipeline = searchParams.get('from') === 'pipeline';
   const [ordering, setOrdering] = useState('surname,first_name');
   const [page, setPage] = useState(1);
 
@@ -50,6 +61,7 @@ export function MembersListPage() {
     shepherd: shepherdFilter !== 'all' ? shepherdFilter : undefined,
     household: householdFilter !== 'all' ? householdFilter : undefined,
     is_leader: leaderFilter === 'yes' ? 'true' : undefined,
+    from_pipeline: fromPipeline ? 'true' : undefined,
     ordering,
     page,
   });
@@ -139,25 +151,41 @@ export function MembersListPage() {
               <option value="joined_date">Sort: Oldest joined</option>
               <option value="category">Sort: Category</option>
             </select>
-            <a className="btn sm outline" onClick={() => setPreviewMode('unassigned')}>
-              <Icon name="users" size={15} /> Auto-assign
-            </a>
-            <HelpMark topic="autoAssign" />
-            <a className="btn sm" onClick={() => navigate('/members/new')}>
-              <Icon name="plus" size={15} /> Add member
-            </a>
+            {canEdit && (
+              <>
+                <a className="btn sm outline" onClick={() => setPreviewMode('unassigned')}>
+                  <Icon name="users" size={15} /> Auto-assign
+                </a>
+                <HelpMark topic="autoAssign" />
+              </>
+            )}
+            {canCreate && (
+              <a className="btn sm" onClick={() => navigate('/members/new')}>
+                <Icon name="plus" size={15} /> Add member
+              </a>
+            )}
           </div>
         </div>
+
+        {fromPipeline && (
+          <div className="filter-note">
+            <Icon name="users" size={14} />
+            Showing members who came through the newcomer pipeline.
+            <button className="btn sm ghost" onClick={() => setSearchParams({})}>Show everyone</button>
+          </div>
+        )}
 
         {previewMode && preview.data && preview.data.changes.length > 0 && (
           <AssignmentPreviewPanel
             changes={preview.data.changes}
+            load={preview.data.load ?? []}
             reassignEveryone={previewMode === 'everyone'}
             applying={applyAssignment.isPending}
             onCancel={() => setPreviewMode(null)}
             onSwitchToReassignEveryone={() => setPreviewMode('everyone')}
-            onApply={async () => {
-              await applyAssignment.mutateAsync(preview.data!.changes);
+            onApply={async (edits) => {
+              await applyAssignment.mutateAsync({
+                reassignEveryone: previewMode === 'everyone', ...edits });
               setPreviewMode(null);
             }}
           />
@@ -205,7 +233,7 @@ export function MembersListPage() {
           <table className="cardtable">
             <thead>
               <tr>
-                <th style={{ width: 34 }}>
+                {canEdit && <th style={{ width: 34 }}>
                   <input
                     type="checkbox"
                     aria-label="Select all on this page"
@@ -216,20 +244,21 @@ export function MembersListPage() {
                         : selected.filter((id) => !pageIds.includes(id)));
                     }}
                   />
-                </th>
+                </th>}
                 <th>Name</th>
                 <th>Category</th>
                 <th>Shepherd<HelpMark topic="shepherd" /></th>
                 <th>Household</th>
+                <th>How they came</th>
                 <th>Location</th>
                 <th>Joined</th>
-                <th></th>
+                {canDelete && <th></th>}
               </tr>
             </thead>
             <tbody>
               {(data?.results ?? []).map((m) => (
                 <tr key={m.id} className="clickable" onClick={() => navigate(`/members/${m.id}`)}>
-                  <td data-label="Select" onClick={(e) => e.stopPropagation()}>
+                  {canEdit && <td data-label="Select" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       aria-label={`Select ${m.full_name}`}
@@ -238,20 +267,23 @@ export function MembersListPage() {
                         ? selected.filter((id) => id !== m.id)
                         : [...selected, m.id])}
                     />
-                  </td>
+                  </td>}
                   <td data-label="Name"><b>{m.full_name}</b></td>
                   <td data-label="Category">
                     <Badge color={categoryBadgeColor(m.category)}>{m.category}</Badge>
                   </td>
                   <td data-label="Shepherd">{m.assigned_to_name || <span className="muted">Unassigned</span>}</td>
                   <td data-label="Household">{m.household_name || <span className="muted">–</span>}</td>
-                  <td data-label="Location">{m.location}</td>
+                  <td data-label="How they came">{m.arrived_via || <span className="muted">–</span>}</td>
+                  <td data-label="Location">{locationName(m.location)}</td>
                   <td data-label="Joined">{m.joined_date}</td>
-                  <td className="td-actions" onClick={(e) => e.stopPropagation()}>
-                    <button className="icon-btn" title="Delete member" onClick={(e) => handleDelete(e, m.id)}>
-                      <Icon name="trash" size={15} />
-                    </button>
-                  </td>
+                  {canDelete && (
+                    <td className="td-actions" onClick={(e) => e.stopPropagation()}>
+                      <button className="icon-btn" title="Delete member" onClick={(e) => handleDelete(e, m.id)}>
+                        <Icon name="trash" size={15} />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

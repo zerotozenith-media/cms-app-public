@@ -23,6 +23,8 @@ export interface WeeklyNote {
 }
 
 export interface Report {
+  location?: string | null;
+  location_name?: string;
   id: number;
   period_month: number;
   period_year: number;

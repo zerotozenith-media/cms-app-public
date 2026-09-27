@@ -34,17 +34,20 @@ def _month_bounds(year, month):
     return start, end
 
 
-def gather_report_data(period_year, period_month, other_additions, generated_by):
+def gather_report_data(period_year, period_month, other_additions, generated_by, location=None):
     start, end = _month_bounds(period_year, period_month)
     period_label = f"{calendar.month_name[period_month]} {period_year}"
+    # One location's report, or the whole church's when location is None.
+    # A location coordinator's report used to include every location.
+    here = (lambda qs, field="location": qs.filter(**{field: location})) if location else (lambda qs, field=None: qs)
 
-    fw_sessions = AttendanceSession.objects.filter(
+    fw_sessions = here(AttendanceSession.objects.filter(
         meeting_type__id="fri-worship", status="filled", date__gte=start, date__lte=end,
-    )
+    ))
     fw_total = sum(s.total for s in fw_sessions)
 
-    all_sessions = (AttendanceSession.objects
-                    .filter(status="filled", date__gte=start, date__lte=end)
+    all_sessions = (here(AttendanceSession.objects
+                    .filter(status="filled", date__gte=start, date__lte=end))
                     .prefetch_related("giving"))
     attendance_rows = [
         {
@@ -79,8 +82,8 @@ def gather_report_data(period_year, period_month, other_additions, generated_by)
     # so round half up the way people expect.
     fw_average = int(fw_total / fw_count + 0.5) if fw_count else 0
 
-    giving_qs = Giving.objects.filter(date__gte=start, date__lte=end)
-    expense_qs = Expense.objects.filter(date__gte=start, date__lte=end)
+    giving_qs = here(Giving.objects.filter(date__gte=start, date__lte=end))
+    expense_qs = here(Expense.objects.filter(date__gte=start, date__lte=end))
     income_total = giving_qs.aggregate(t=Sum("amount"))["t"] or 0
     expense_total = expense_qs.aggregate(t=Sum("amount"))["t"] or 0
 
@@ -126,13 +129,13 @@ def gather_report_data(period_year, period_month, other_additions, generated_by)
 
     # Newcomers, which the previous report left out entirely even though
     # the church tracks it closely.
-    newcomer_qs = Newcomer.objects.filter(created_at__gte=start, created_at__lte=end)
+    newcomer_qs = here(Newcomer.objects.filter(created_at__gte=start, created_at__lte=end))
     newcomers_registered = newcomer_qs.count()
     newcomers_contacted = newcomer_qs.exclude(stage=Newcomer.Stage.NEW).count()
     newcomers_visiting = newcomer_qs.filter(
         stage__in=[Newcomer.Stage.ATTENDING, Newcomer.Stage.MEMBER],
     ).count()
-    open_followups = MemberFollowUpTask.objects.filter(done=False).count()
+    open_followups = here(MemberFollowUpTask.objects.filter(done=False), "member__location").count()
 
     newcomer_rows = []
     for row in (newcomer_qs.values("source__name")
@@ -182,12 +185,13 @@ def gather_report_data(period_year, period_month, other_additions, generated_by)
         "notes": notes,
         "goals": goals,
         "other_additions": other_additions,
+        "scope_label": f"{location.name} only" if location else "All locations",
     }
 
 
-def render_report_pdf(period_year, period_month, other_additions, generated_by):
-    """Returns raw PDF bytes for the given period."""
+def render_report_pdf(period_year, period_month, other_additions, generated_by, location=None):
+    """Returns raw PDF bytes for the given period, for one location or all."""
     from reports.layout import build_report_pdf
 
-    context = gather_report_data(period_year, period_month, other_additions, generated_by)
+    context = gather_report_data(period_year, period_month, other_additions, generated_by, location)
     return build_report_pdf(context)

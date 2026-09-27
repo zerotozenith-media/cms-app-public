@@ -146,10 +146,11 @@ export function useMemberRoster(location?: string | null) {
   return useQuery({
     queryKey: ['member-roster', location ?? 'all'],
     queryFn: async () => {
-      const resp = await apiClient.get<PaginatedResponse<Member>>('/members/', {
+      // Names only, governed by the Attendance permission, so an usher
+      // without access to Members can still tick people off.
+      const resp = await apiClient.get<PaginatedResponse<Member>>('/attendance-roster/', {
         params: {
           page_size: 500,
-          ordering: 'surname,first_name',
           ...(location ? { location } : {}),
         },
       });

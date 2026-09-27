@@ -3,7 +3,7 @@ import { apiClient } from './client';
 import type { PaginatedResponse } from '../types/members';
 import type {
   MemberFollowUpTask, CompleteFollowUpPayload, FollowUpStats,
-  AssignmentPreview, AssignmentApplyResult, AssignmentChange,
+  AssignmentPreview, AssignmentApplyResult,
 } from '../types/members';
 
 /* ---- Member follow-up tasks ---- */
@@ -92,8 +92,20 @@ export function useAssignmentPreview(reassignEveryone: boolean, enabled: boolean
 export function useApplyAssignment() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (changes: AssignmentChange[]) =>
-      (await apiClient.post<AssignmentApplyResult>('/members/assign-shepherds/', { changes })).data,
+    /**
+     * The server recomputes from fresh data rather than trusting this
+     * list, so a preview left open cannot write against changed data.
+     * What it does take is the mode and the reviewer's edits. Sending the
+     * mode matters: without it, Reassign everyone applied as Fill
+     * unassigned only.
+     */
+    mutationFn: async ({ reassignEveryone, overrides, skips }: {
+      reassignEveryone: boolean;
+      overrides: { kind: string; id: number; to_id: number }[];
+      skips: { kind: string; id: number }[];
+    }) => (await apiClient.post<AssignmentApplyResult>('/members/assign-shepherds/', {
+      reassign_everyone: reassignEveryone, overrides, skips,
+    })).data,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['members'] });
       qc.invalidateQueries({ queryKey: ['newcomers'] });
@@ -124,10 +136,11 @@ export interface EligibleShepherd {
 /** Who the bulk-assign dropdown may offer. Comes from the same source
  *  the auto-assign engine uses, so the dropdown can never list someone
  *  the API would then reject. */
-export function useEligibleShepherds() {
+export function useEligibleShepherds(location?: string) {
   return useQuery({
-    queryKey: ['eligible-shepherds'],
+    queryKey: ['eligible-shepherds', location ?? ''],
     queryFn: async () =>
-      (await apiClient.get<EligibleShepherd[]>('/members/eligible-shepherds/')).data,
+      (await apiClient.get<EligibleShepherd[]>('/members/eligible-shepherds/', {
+        params: location ? { location } : {} })).data,
   });
 }

@@ -84,11 +84,11 @@ class GivingViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
         instance = serializer.save()
         log_audit(
             self.request.user, "Recorded giving", "Giving",
-            f"{instance.fund.name} , {instance.amount}", instance=instance,
+            f"{instance.fund.name} · {instance.amount}", instance=instance,
         )
 
     def perform_destroy(self, instance):
-        name = f"{instance.fund.name} , {instance.amount}"
+        name = f"{instance.fund.name} · {instance.amount}"
         log_audit(self.request.user, "Deleted", "Giving", name)
         instance.delete()
 
@@ -122,11 +122,11 @@ class ExpenseViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
         instance = serializer.save()
         log_audit(
             self.request.user, "Recorded expense", "Expense",
-            f"{instance.category.name} , {instance.amount}", instance=instance,
+            f"{instance.category.name} · {instance.amount}", instance=instance,
         )
 
     def perform_destroy(self, instance):
-        name = f"{instance.category.name} , {instance.amount}"
+        name = f"{instance.category.name} · {instance.amount}"
         log_audit(self.request.user, "Deleted", "Expense", name)
         instance.delete()
 

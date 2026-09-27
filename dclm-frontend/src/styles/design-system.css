@@ -209,7 +209,7 @@
   .empty{padding:30px;text-align:center;color:var(--muted)}
   .inline-edit-name{font-size:1.15rem;font-weight:800;border:1.5px solid var(--line);border-radius:8px;padding:.3rem .5rem;width:100%}
 
-  .kanban{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;align-items:start}
+  .kanban{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;align-items:start}
   .kcol{background:#EEF2FA;border-radius:var(--radius);padding:12px;min-height:120px}
   .kcol h4{font-size:.82rem;color:var(--blue-deep);margin-bottom:10px;display:flex;justify-content:space-between}
   .kcard{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:grab;box-shadow:0 4px 10px -6px rgba(8,44,105,.2)}
@@ -234,7 +234,7 @@
     .shell{grid-template-columns:1fr}
     .sidebar{position:fixed;left:-260px;top:0;width:250px;z-index:60;transition:left .2s ease}
     .sidebar.open{left:0}
-    .kanban{grid-template-columns:1fr 1fr}
+    .kanban{grid-template-columns:repeat(2,minmax(0,1fr))}
     .form-row,.form-row.g3{grid-template-columns:1fr}
     .g4,.g3,.g2{grid-template-columns:1fr}
     .dash-hero{flex-direction:column;align-items:flex-start;padding:26px}
@@ -374,7 +374,15 @@
     /* Do not pad this: it sits inline inside a heading and padding
        spills the tap area over the words beside it. A slightly larger
        circle with more margin gives the thumb room without overlapping. */
-    .help-mark{width:20px;height:20px;margin-left:8px;font-size:.72rem}
+    /* The circle stays small because it sits inline inside a heading,
+       where a 44px one would look like a mistake. Padding makes the tap
+       area large enough for a thumb, and the matching negative margin
+       keeps the words around it where they were. */
+    /* A compromise, and a deliberate one. The guideline asks for 44px,
+       but this sits inline inside a heading where a 44px circle looks
+       like a fault rather than a control. 30px is comfortable enough to
+       hit and still reads as a small marker beside the words. */
+    .help-mark{width:30px;height:30px;font-size:.8rem;margin-left:8px}
     .side-close{min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center}
     /* Several filters stacked pushed the table more than a screen down,
        so they collapse behind one row and the data comes first. */
@@ -422,6 +430,9 @@
     table.cardtable tr.clickable{cursor:pointer}
     table.cardtable td{display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid var(--line);padding:9px 0;font-size:.88rem;text-align:right}
     table.cardtable td:last-child{border-bottom:0}
+    /* A cell with nothing in it, such as a difference of zero, leaves no
+       blank row in the stacked layout. */
+    table.cardtable td:empty{display:none}
     table.cardtable td::before{content:attr(data-label);font-weight:700;color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;text-align:left}
     table.cardtable td.td-actions{justify-content:flex-end;border-top:1px solid var(--line);border-bottom:0;margin-top:2px;padding-top:10px;gap:8px}
     table.cardtable td.td-actions::before{content:none}
@@ -482,3 +493,226 @@
     .pr-table th{text-align:left;background:var(--sky);color:var(--blue-deep);padding:7px 10px;border:1px solid var(--line)}
     .pr-table td{padding:7px 10px;border:1px solid var(--line)}
   }
+
+/* A meeting that does not collect an offering says so, rather than
+   simply omitting the fields, which reads as something missing. */
+.no-offering{border:1px dashed var(--line);border-radius:10px;padding:16px;
+  text-align:center;margin:14px 0;color:var(--muted)}
+.no-offering p{margin:6px 0 2px;font-size:.85rem}
+.no-offering span{font-size:.78rem}
+
+/* A meeting whose day the generator cannot match produces no sessions.
+   Saying so here beats leaving somebody to notice the empty list. */
+.warn-line{display:flex;align-items:center;gap:5px;margin-top:4px;
+  font-size:.76rem;color:var(--amber)}
+.tick{display:flex;align-items:center;gap:7px;cursor:pointer;font-size:.85rem}
+.tick input{width:15px;height:15px}
+
+/* Grouped bars. The axis follows the data rather than a target, because
+   a target set for the whole congregation leaves a small meeting sitting
+   in the bottom third of the chart. */
+.gbars-plot{display:flex;gap:9px;height:185px}
+.gbars-axis{display:flex;flex-direction:column;justify-content:space-between;
+  font-size:.7rem;color:var(--muted);text-align:right;min-width:26px;padding-bottom:19px}
+.gbars-cols{flex:1;display:flex;gap:7px;align-items:flex-end;
+  border-bottom:1px solid var(--line);min-width:0}
+.gbar-group{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;min-width:0}
+.gbar-set{flex:1;display:flex;align-items:flex-end;gap:2px;width:100%;justify-content:center}
+.gbar{flex:1;max-width:16px;border-radius:3px 3px 0 0;min-height:2px}
+.gbar-label{font-size:.7rem;color:var(--muted);margin-top:5px;white-space:nowrap}
+.gbars-legend{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-top:14px;
+  padding-top:11px;border-top:1px solid var(--line);font-size:.76rem;color:var(--muted)}
+.gbars-legend .gbl{display:inline-flex;align-items:center;gap:6px}
+.gbars-legend .gbl i{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
+.chart-toggles{display:flex;gap:14px;flex-wrap:wrap;align-items:center;
+  padding:10px 0;border-top:1px solid var(--line);margin-bottom:12px}
+.chk{display:inline-flex;align-items:center;gap:6px;font-size:.83rem;cursor:pointer}
+.chk.off{opacity:.45}
+.chk input{width:15px;height:15px}
+.mini-stat{background:var(--sky-2);border-radius:9px;padding:7px 12px;flex:1 1 130px}
+.mini-stat span{display:block;font-size:.74rem;color:var(--muted)}
+.mini-stat b{font-size:1rem;color:var(--blue-deep)}
+.session-total{display:flex;justify-content:space-between;align-items:center;
+  padding:11px 0;border-top:1px solid var(--line);font-weight:800;margin:10px 0}
+
+/* ---- Dashboard ---- */
+.dash-period{margin:14px 0}
+.dash-period select{width:auto;min-width:170px}
+.card-sub{font-size:.82rem;color:var(--muted);margin:2px 0 12px}
+.stat-hint{font-size:.76rem;color:var(--muted);margin-top:2px}
+.stat-top-row{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:9px}
+
+/* Three counts answer how far behind the church is, before the list. */
+.fu-counts{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:12px}
+.fu-count{border-radius:9px;padding:8px 11px}
+.fu-count b{display:block;font-size:1.15rem;line-height:1.2}
+.fu-count span{font-size:.72rem}
+.fu-count.red{background:var(--red-bg)}
+.fu-count.red b,.fu-count.red span{color:var(--red)}
+.fu-count.amber{background:var(--amber-bg)}
+.fu-count.amber b,.fu-count.amber span{color:var(--amber)}
+.fu-count.plain{background:var(--sky-2)}
+.fu-count.plain span{color:var(--muted)}
+.fu-row{display:flex;align-items:center;gap:9px;padding:9px 0;border-top:1px solid var(--line);cursor:pointer}
+.fu-row:hover{background:var(--sky-2)}
+.fu-main{flex:1;min-width:0;display:flex;flex-direction:column}
+.fu-main b{font-size:.85rem}
+.fu-main .muted{font-size:.78rem}
+.fu-when{font-size:.78rem;color:var(--amber);white-space:nowrap}
+.fu-when.late{color:var(--red)}
+.av-sm{width:27px;height:27px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:.74rem;font-weight:800;flex:none}
+.av-sm.red{background:var(--red-bg);color:var(--red)}
+.av-sm.amber{background:var(--amber-bg);color:var(--amber)}
+.av-sm.blue{background:var(--sky);color:var(--blue)}
+.goalgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:13px}
+.goalrow{display:flex;align-items:center;gap:10px;min-width:0}
+.goal-name{font-size:.84rem}
+.quote{border-left:3px solid var(--line);padding:2px 0 2px 12px;margin-bottom:11px}
+.quote.accent{border-left-color:var(--blue)}
+.quote p{margin:0 0 3px;font-size:.85rem;line-height:1.6}
+.quote .muted{font-size:.78rem}
+.hbar-row{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.hbar-label{font-size:.82rem;min-width:88px}
+.hbar-track{flex:1;height:9px;background:var(--sky-2);border-radius:5px;overflow:hidden}
+.hbar-fill{display:block;height:9px;background:var(--blue);border-radius:5px}
+.hbar-val{font-size:.82rem;font-weight:700;min-width:26px;text-align:right}
+.hcf-foot{display:flex;justify-content:space-between;padding-top:11px;margin-top:4px;
+  border-top:1px solid var(--line);font-size:.82rem}
+
+/* Each shepherd's load now and after, so a batch sent to one worker is
+   visibly justified rather than looking like a fault. */
+.load-strip{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.load-item{background:var(--sky-2);border-radius:9px;padding:7px 11px;font-size:.78rem}
+.load-item b{display:block;font-size:.82rem;color:var(--blue-deep)}
+.load-item span{color:var(--muted)}
+.assign-to{min-width:170px}
+.row-skipped td{opacity:.55}
+
+/* Whose profile this is, first. */
+.profile-head{display:flex;justify-content:space-between;align-items:flex-start;
+  gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.profile-head-main{min-width:0}
+.profile-head-main h3{font-size:1.2rem;margin:0 0 3px}
+.profile-head-main .muted{font-size:.85rem}
+.profile-head-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+.kcol-foot{border-top:1px solid var(--line);padding-top:10px;margin-top:6px;text-align:center}
+.kcol-foot p{margin:0;font-size:.78rem;color:var(--muted)}
+.kcol-foot a{font-size:.79rem;color:var(--blue);font-weight:700;cursor:pointer}
+
+/* The board suits working through people, the table suits scanning.
+   Both read the same filters. */
+.viewtoggle{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.viewtoggle button{border:0;background:#fff;color:var(--muted);font-family:inherit;font-size:.83rem;
+  font-weight:700;padding:9px 16px;cursor:pointer;min-height:40px}
+.viewtoggle button.on{background:var(--blue);color:#fff}
+.nc-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin:12px 0 14px}
+@media (max-width:640px){
+  .viewtoggle button{min-height:44px}
+}
+
+/* A list opened already filtered says so, and can be cleared. */
+.filter-note{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--sky);
+  border-left:3px solid var(--blue);padding:8px 12px;font-size:.83rem;margin:10px 0}
+.filter-note .btn{margin-left:auto}
+
+/* A grid item sizes to its content by default, so the donut and its
+   legend side by side pushed the card past a phone screen. Letting it
+   shrink and the legend drop below fixes both. */
+.grid > *{min-width:0}
+.donut-block{flex-wrap:wrap}
+.donut-block .legend{min-width:0;flex:1 1 170px}
+
+/* A card that needs the whole row rather than half of one. */
+.card.span-all{grid-column:1 / -1}
+
+/* An input inside a table row, outside any form field, otherwise fell
+   back to the browser's thin default box. */
+.cell-input{width:100%;max-width:160px;border:1.5px solid var(--line);border-radius:9px;
+  padding:.5rem .7rem;background:var(--sky-2);font:inherit}
+.followup-guide .cell-input{max-width:none}
+
+/* Six columns with two dropdowns need about 760px. Below the width where
+   the page gives them that, each meeting becomes its own small card, as
+   on a phone, rather than squashing the dropdowns until their words are
+   hidden or scrolling the table sideways. */
+.meeting-table td{vertical-align:middle}
+@media (max-width:1180px){
+  table.meeting-table{width:100%}
+  table.meeting-table thead{display:none}
+  table.meeting-table, table.meeting-table tbody{display:block;width:100%}
+  table.meeting-table tr{display:block;border:1px solid var(--line);border-radius:12px;
+    padding:4px 14px;margin-bottom:10px;background:#fff}
+  table.meeting-table td{display:flex;justify-content:space-between;align-items:center;gap:10px;
+    border-bottom:1px solid var(--line);padding:9px 0;font-size:.88rem;text-align:right}
+  table.meeting-table td:last-child{border-bottom:0}
+  table.meeting-table td::before{content:attr(data-label);font-weight:700;color:var(--muted);
+    font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;text-align:left}
+  table.meeting-table td.td-actions{justify-content:flex-end;border-top:1px solid var(--line);
+    border-bottom:0;margin-top:2px;padding-top:10px}
+  table.meeting-table td.td-actions::before{content:none}
+  table.meeting-table .selectbox{min-width:160px}
+}
+
+/* ---- Phone fixes found by measuring text and tap sizes ---- */
+.remit-stats{grid-template-columns:repeat(3,1fr)}
+@media (max-width:640px){
+  /* Three money figures do not fit side by side on a phone. */
+  .remit-stats{grid-template-columns:1fr}
+  /* A dropdown whose options are long names goes under its label, at full
+     width, rather than being squeezed beside it and cut off. */
+  table.cardtable td.td-stack{flex-direction:column;align-items:stretch;text-align:left;gap:6px}
+  table.cardtable td.td-stack select{width:100%;min-width:0}
+  /* Back links and the remove cross on list items were far below a
+     comfortable tap size. The padding enlarges what a thumb can hit, and
+     the negative margin keeps everything around them where it was. */
+  .backlink{min-height:44px;padding:12px 0;margin:-12px 0 2px}
+  /* The cross is as tall as its chip, so wrapped rows of chips cannot
+     have overlapping tap areas. */
+  .chip{min-height:36px;margin:4px 3px;padding:0 .2rem 0 .75rem}
+  .chip button{min-height:36px;min-width:30px;padding:0 6px;margin:0;opacity:.75}
+}
+@media (max-width:380px){
+  /* Less inner padding in the stacked rows, so the dropdown gets the room. */
+  table.cardtable tr{padding-left:10px;padding-right:10px}
+  /* The narrowest phones: a little less padding and type in form boxes, so
+     a long meeting name such as Friday House Caring Fellowship still fits. */
+  .field select,.field input,table.cardtable select{padding-left:.6rem;padding-right:1.8rem;font-size:.84rem}
+  .field input{padding-right:.6rem}
+}
+.why-edited{display:inline-flex;flex-direction:column;gap:3px;align-items:flex-start}
+.why-edited .muted{font-size:.74rem}
+
+/* A plain explanation beside a form, such as why it cannot be saved yet. */
+.form-note{background:var(--sky);border-left:3px solid var(--blue);padding:9px 12px;
+  font-size:.85rem;color:var(--ink);margin:12px 0}
+
+/* A fieldset used only to switch a whole form to read only. */
+.plain-fieldset{border:0;padding:0;margin:0;min-width:0}
+
+/* Board columns may shrink below their widest control. Plain equal
+   columns could not, so at about 900px the fourth ran past the page. */
+.kcol{min-width:0}
+.kcard .kstage-select{width:100%;min-width:0;max-width:100%}
+
+/* Between 900 and 1100px the menu is still beside the page, leaving about
+   600px for four columns: too narrow for each card's stage dropdown to
+   show its words. Two columns there, as on smaller screens. */
+@media (min-width:901px) and (max-width:1100px){
+  .kanban{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+/* A goal's current figure. Big enough for a thumb on a phone. */
+.goal-input{width:76px;border:1px solid var(--line);border-radius:7px;padding:.3rem .45rem;font:inherit}
+@media (max-width:600px){ .goal-input{min-height:40px;width:88px} }
+
+/* Small in-table boxes, such as each fund's amount in the remittance form,
+   are big enough for a thumb on a phone. */
+@media (max-width:600px){ .cell-input{min-height:40px} }
+
+/* A newcomer's contact details, two or three to a row, one on a phone. */
+.contact-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 18px;font-size:.9rem}
+.contact-grid a{color:var(--blue);font-weight:600;word-break:break-all}
+@media (max-width:900px){ .contact-grid{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media (max-width:480px){ .contact-grid{grid-template-columns:1fr} }

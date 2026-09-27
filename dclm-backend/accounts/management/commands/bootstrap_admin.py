@@ -48,7 +48,7 @@ class Command(BaseCommand):
 
         # Bahrain is the core location and cannot be deleted later.
         location, created = Location.objects.get_or_create(
-            id="bahrain", defaults={"name": "Bahrain", "is_core": True},
+            id="bahrain", defaults={"name": "Bahrain HQ", "is_core": True},
         )
         if created:
             self.stdout.write("    ok Bahrain location created")

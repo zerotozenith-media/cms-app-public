@@ -142,6 +142,11 @@ class SessionOfferingTestCase(Base):
         self.assertEqual(s.giving.count(), 1)
         self.assertEqual(sum(g.amount for g in s.giving.all()), 120)
 
+    def test_giving_no_longer_carries_a_destination(self):
+        """Remittance happens once a month, not each time money is
+        received, so asking per entry was the wrong question."""
+        self.assertFalse(hasattr(Giving(), "remitted_to"))
+
     def test_giving_without_a_session_still_works(self):
         """Most giving is not tied to one meeting."""
         fund = Fund.objects.create(name="Tithe")
@@ -150,19 +155,6 @@ class SessionOfferingTestCase(Base):
                                   amount=50, location=self.bahrain)
         self.assertIsNone(g.session)
 
-    def test_where_the_money_went_is_recorded(self):
-        fund = Fund.objects.create(name="Offering")
-        method = PaymentMethod.objects.create(name="Cash")
-        g = Giving.objects.create(date=self.today, fund=fund, method=method,
-                                  amount=50, location=self.bahrain, remitted_to="dubai")
-        self.assertEqual(g.get_remitted_to_display(), "DLBC account, Dubai")
-
-    def test_money_defaults_to_being_retained(self):
-        fund = Fund.objects.create(name="Offering")
-        method = PaymentMethod.objects.create(name="Cash")
-        g = Giving.objects.create(date=self.today, fund=fund, method=method,
-                                  amount=50, location=self.bahrain)
-        self.assertEqual(g.remitted_to, "retained")
 
 
 class SpreadsheetTestCase(Base):

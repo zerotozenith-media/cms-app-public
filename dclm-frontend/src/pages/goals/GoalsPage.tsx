@@ -6,6 +6,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Icon } from '../../components/ui/Icon';
 import type { Goal, GoalHorizon } from '../../types/goals';
 
+import { useAuth } from '../../context/AuthContext';
 const HORIZONS: GoalHorizon[] = ['Short-term', 'Medium-term', 'Long-term', 'Spiritual growth'];
 
 function progressColor(current: number, target: number): 'green' | 'red' | '' {
@@ -20,7 +21,11 @@ export function GoalsPage() {
   const navigate = useNavigate();
   const { data: goals } = useGoals();
   const createGoal = useCreateGoal();
-  const updateProgress = useUpdateGoalProgress();
+  // Controls a person cannot use are not shown.
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('goals', 'create');
+  const canEdit = hasPermission('goals', 'edit');
+  const canDelete = hasPermission('goals', 'delete');
   const deleteGoal = useDeleteGoal();
 
   const [showForm, setShowForm] = useState(false);
@@ -65,9 +70,11 @@ export function GoalsPage() {
           Each goal shows how it is tracked: auto-tracked goals are computed live from Attendance, Members, or
           Newcomers data. Manual goals are updated by the team responsible.
         </div>
-        <a className="btn sm" onClick={() => setShowForm(!showForm)}>
-          <Icon name="plus" size={15} /> Add goal
-        </a>
+        {canCreate && (
+          <a className="btn sm" onClick={() => setShowForm(!showForm)}>
+            <Icon name="plus" size={15} /> Add goal
+          </a>
+        )}
       </div>
 
       {showForm && (
@@ -109,7 +116,7 @@ export function GoalsPage() {
           <div className="card section-gap" key={h}>
             <h3>{h}</h3>
             {goalsInHorizon.length ? goalsInHorizon.map((g) => (
-              <GoalRow key={g.id} goal={g} onUpdateProgress={updateProgress.mutate} onDelete={handleDelete} onNavigate={navigate} />
+              <GoalRow key={g.id} goal={g} canEdit={canEdit} canDelete={canDelete} onDelete={handleDelete} onNavigate={navigate} />
             )) : <div className="empty">No goals in this category yet.</div>}
           </div>
         );
@@ -119,13 +126,27 @@ export function GoalsPage() {
 }
 
 function GoalRow({
-  goal, onUpdateProgress, onDelete, onNavigate,
+  goal, canEdit, canDelete, onDelete, onNavigate,
 }: {
   goal: Goal;
-  onUpdateProgress: (v: { id: number; current: number }) => void;
+  canEdit: boolean;
+  canDelete: boolean;
   onDelete: (id: number) => void;
   onNavigate: (path: string) => void;
 }) {
+  // Saves only a real change, and says whether it worked. It used to save
+  // on every click away, silently, even when refused.
+  const updateProgress = useUpdateGoalProgress();
+  const [status, setStatus] = useState<'' | 'saved' | 'failed'>('');
+  function saveProgress(el: HTMLInputElement) {
+    const value = Number(el.value);
+    if (el.value === '' || value === Number(goal.current)) return;
+    setStatus('');
+    updateProgress.mutate({ id: goal.id, current: value }, {
+      onSuccess: () => setStatus('saved'),
+      onError: () => { el.value = String(goal.current); setStatus('failed'); },
+    });
+  }
   const isAuto = goal.tracking === 'auto';
   const displayValue = goal.calculation_error ? null : goal.current_value;
   const pct = goal.target && displayValue !== null ? Math.min(100, Math.round((displayValue / goal.target) * 100)) : 0;
@@ -145,20 +166,30 @@ function GoalRow({
             </>
           ) : (
             <>
-              <input
-                type="number"
-                defaultValue={goal.current}
-                style={{ width: 70, border: '1px solid var(--line)', borderRadius: 7, padding: '.3rem .4rem' }}
-                onBlur={(e) => onUpdateProgress({ id: goal.id, current: Number(e.target.value) })}
-              />
+              {canEdit ? (
+                <input
+                  type="number"
+                  aria-label={`Current figure for ${goal.name}`}
+                  defaultValue={goal.current}
+                  className="goal-input"
+                  onBlur={(e) => saveProgress(e.currentTarget)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                />
+              ) : (
+                <b style={{ color: 'var(--blue-deep)' }}>{goal.current}{goal.unit}</b>
+              )}
               <span className="muted">/ {goal.target}{goal.unit}</span>
             </>
           )}
-          <button className="icon-btn" title="Delete goal" onClick={() => onDelete(goal.id)}>
-            <Icon name="trash" size={14} />
-          </button>
+          {canDelete && (
+            <button className="icon-btn" title="Delete goal" onClick={() => onDelete(goal.id)}>
+              <Icon name="trash" size={14} />
+            </button>
+          )}
         </span>
       </div>
+      {status === 'saved' && <div className="muted" style={{ fontSize: '.78rem' }}>Saved.</div>}
+      {status === 'failed' && <div className="form-error">That figure could not be saved.</div>}
       <div className="bar-track"><div className={`bar-fill ${progressColor(displayValue ?? 0, goal.target)}`} style={{ width: `${pct}%` }} /></div>
       <div className="goal-source">
         {goal.calculation_error ? (

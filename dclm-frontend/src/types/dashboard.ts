@@ -1,48 +1,83 @@
-export interface FollowUpDue {
-  newcomer_id: number;
-  newcomer_name: string;
-  due_date: string;
-  text: string;
+/**
+ * The dashboard summary. Each section is present only when the viewer
+ * may see that module; otherwise it carries `*_access: false` so the page
+ * can show a restricted state rather than an empty one.
+ */
+
+export type DashPeriod = 'this-month' | 'last-month' | 'this-year' | 'last-year' | string;
+
+export interface AttendancePoint {
+  date: string;
+  adults: number;
+  youth: number;
+  children: number;
+  online: number;
+  total: number;
 }
 
-export interface ShortTermGoal {
+export interface GoalSummary {
   id: number;
   name: string;
   current: number;
   target: number;
   unit: string;
   pct: number;
+  /** Stated in words, because colour alone had no key. */
+  status: 'on-track' | 'behind' | 'attention';
+  not_started: boolean;
   link_route: string;
   link_tab: string;
 }
 
-/**
- * Phase 4.3 security fix: each section is now gated by the viewer's
- * real per-module permission and entirely omitted (not just empty) when
- * they lack it , a Members-only user's response genuinely has no
- * giving_total key at all, not a zero one. Every section's fields are
- * therefore optional here, present only alongside its own *_access: true.
- */
 export interface DashboardSummary {
+  period: { start: string; end: string; label: string };
+  banner: { message: string; has_outstanding: boolean };
+
   attendance_access: boolean;
-  friday_worship?: {
-    total: number;
+  attendance?: {
+    meeting_id: string | null;
+    meeting_name: string;
+    trend: AttendancePoint[];
+    average: number;
+    latest: number;
     target: number | null;
-    trend: { date: string; total: number }[];
+  };
+  meetings?: { id: string; name: string }[];
+  pending_sessions?: number;
+  fellowships?: {
+    groups: { name: string; attendance: number; meetings: number }[];
+    meetings_held: number;
+    offering: number;
   };
 
   finance_access: boolean;
   giving_total?: number;
   expense_total?: number;
   net_total?: number;
+  giving_previous?: number;
+  giving_change_pct?: number | null;
   giving_by_fund?: { fund: string; value: number }[];
-  fund_count?: number;
 
   newcomers_access: boolean;
   newcomers_in_pipeline?: number;
-  pending_followups_count?: number;
-  follow_ups_due?: FollowUpDue[];
+  newcomers_registered?: number;
+  unassigned_newcomers?: number;
+  follow_ups?: {
+    overdue: number;
+    this_week: number;
+    later: number;
+    urgent: { newcomer_id: number; newcomer_name: string; text: string;
+              due_date: string; days: number }[];
+  };
+  new_members?: { count: number; recent: { id: number; name: string; how: string }[] };
+  enquiries_waiting?: {
+    count: number;
+    oldest: { id: number; name: string; source: string; days: number }[];
+  };
 
   goals_access: boolean;
-  short_term_goals?: ShortTermGoal[];
+  short_term_goals?: GoalSummary[];
+
+  testimonies_access: boolean;
+  testimonies?: { count: number; recent: { text: string; by: string; date: string }[] };
 }

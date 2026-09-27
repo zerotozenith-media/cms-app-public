@@ -33,7 +33,8 @@ export function LoginPage() {
       navigate(from, { replace: true });
     } catch (err: any) {
       if (err?.response?.status === 429) {
-        setError('Too many attempts. Please wait a few minutes and try again.');
+        // The server says how long to wait.
+        setError(err?.response?.data?.detail ?? 'Too many attempts. Please wait a few minutes and try again.');
       } else {
         setError('Invalid email or password.');
       }

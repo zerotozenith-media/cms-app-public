@@ -10,6 +10,10 @@ export interface Fellowship {
   id: number;
   name: string;
   area: string;
+  /** Where it meets. Null means every location. */
+  location: string | null;
+  location_name: string;
+  meeting_type: string | null;
   is_active: boolean;
   session_count: number;
 }
@@ -17,6 +21,15 @@ export interface Fellowship {
 export interface MeetingType {
   /** Who is expected, and so who is followed up when absent. */
   audience: MeetingAudience;
+  /** Whether the session form asks for an offering. Set in Admin rather
+   *  than fixed in code, so the church can change it. */
+  collects_offering: boolean;
+  /** False when the day is not a weekday the generator recognises, in
+   *  which case no sessions are being created for this meeting. */
+  generates_sessions: boolean;
+  /** The one target every screen shows: the goal where set, otherwise the
+   *  meeting's own figure. */
+  effective_target: number | null;
   id: string;
   name: string;
   day: string;

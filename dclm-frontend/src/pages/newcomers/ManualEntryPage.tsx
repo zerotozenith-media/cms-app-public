@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCreateNewcomer, useNewcomerSources } from '../../api/newcomers';
-import { useLocations } from '../../api/locations';
+import { useMyLocations } from '../../api/locations';
 import { IntakeFormFields, EMPTY_INTAKE_VALUES, intakeFullName, type IntakeFormValues } from './IntakeFormFields';
 import { Button } from '../../components/ui/Button';
 
 export function ManualEntryPage() {
   const navigate = useNavigate();
   const { data: sources } = useNewcomerSources();
-  const { data: locations } = useLocations();
+  const { data: locations } = useMyLocations();
   const createNewcomer = useCreateNewcomer();
 
   const [values, setValues] = useState<IntakeFormValues>(EMPTY_INTAKE_VALUES);

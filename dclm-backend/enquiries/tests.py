@@ -145,15 +145,20 @@ class EnquiryAPITestCase(APITestCase):
         task.refresh_from_db()
         self.assertFalse(task.done)
 
-    def test_completing_requires_all_four_outcome_fields(self):
+    def test_completing_needs_how_they_were_reached(self):
+        """Version 11: the method is required. The four pastoral questions
+        are optional for enquiries, since replying to a message involves no
+        visit, scripture or root cause. Version 10 required all four."""
         enquiry = self._enquiry()
         task = EnquiryTask.objects.create(
             enquiry=enquiry, text="Reply", due_date=timezone.localdate())
-        resp = self.client.post(f"/api/enquiry-tasks/{task.id}/complete/",
-                                {"contact_method": "WhatsApp"})
+        resp = self.client.post(f"/api/enquiry-tasks/{task.id}/complete/", {})
         self.assertEqual(resp.status_code, 400)
         task.refresh_from_db()
         self.assertFalse(task.done)
+        resp = self.client.post(f"/api/enquiry-tasks/{task.id}/complete/",
+                                {"contact_method": "WhatsApp"})
+        self.assertEqual(resp.status_code, 200)
 
     def test_completing_with_everything_records_the_outcome(self):
         enquiry = self._enquiry()

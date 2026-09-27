@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { useReports, useGenerateReport, useDeleteReport } from '../../api/reports';
 import { Icon } from '../../components/ui/Icon';
 
+import { useAuth } from '../../context/AuthContext';
+import { useMyLocations } from '../../api/locations';
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
@@ -10,6 +12,14 @@ const MONTHS = [
 const now = new Date();
 
 export function ReportGenerateTab() {
+  // Controls a person cannot use are not shown.
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('reports', 'create');
+  const canDelete = hasPermission('reports', 'delete');
+  // Whose figures. Somebody covering several locations may choose the
+  // whole church or one location; somebody limited to one always gets theirs.
+  const { data: myLocations } = useMyLocations();
+  const [scope, setScope] = useState('');
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
   const [otherAdditions, setOtherAdditions] = useState('');
@@ -23,7 +33,7 @@ export function ReportGenerateTab() {
     e.preventDefault();
     setError(null);
     try {
-      await generateReport.mutateAsync({ period_month: month, period_year: year, other_additions: otherAdditions });
+      await generateReport.mutateAsync({ period_month: month, period_year: year, other_additions: otherAdditions, ...(scope ? { location: scope } : {}) });
       setOtherAdditions('');
     } catch (err: any) {
       if (err?.response?.status === 409) {
@@ -53,19 +63,28 @@ export function ReportGenerateTab() {
               <label htmlFor="report-year">Year</label>
               <input id="report-year" type="number" value={year} onChange={(e) => setYear(Number(e.target.value))} />
             </div>
+            {(myLocations ?? []).length > 1 && (
+              <div className="field">
+                <label htmlFor="report-scope">Covers</label>
+                <select id="report-scope" value={scope} onChange={(e) => setScope(e.target.value)}>
+                  <option value="">All locations</option>
+                  {(myLocations ?? []).map((l) => <option key={l.id} value={l.id}>{l.name} only</option>)}
+                </select>
+              </div>
+            )}
           </div>
           <h3 className="section-gap">Included sections</h3>
           <p className="muted" style={{ fontSize: '.84rem', margin: '4px 0 12px' }}>
             Every report includes Executive Summary, Attendance, Finance, Testimonies, Challenges, Goals &amp;
             Growth, Other Additions, and Conclusion, compiled from live records at the moment you generate it.
           </p>
-          <div className="field">
+          {canCreate && <div className="field">
             <label htmlFor="report-other">Other additions / general comments</label>
             <textarea
               id="report-other" value={otherAdditions} onChange={(e) => setOtherAdditions(e.target.value)}
               placeholder="Anything else leadership should see in this report..."
             />
-          </div>
+          </div>}
           {error && <p style={{ color: 'var(--red)', fontSize: '.85rem', margin: '4px 0 10px' }}>{error}</p>}
           <span className="report-actions">
           <button className="btn outline" type="button" disabled={downloading}
@@ -73,15 +92,17 @@ export function ReportGenerateTab() {
               // The PDF is the report; this is for whoever combines several
               // locations and would otherwise retype the figures out of it.
               setDownloading(true);
-              try { await downloadMonthlySpreadsheet(year, month); }
+              try { await downloadMonthlySpreadsheet(year, month, scope || undefined); }
               finally { setDownloading(false); }
             }}>
             {downloading ? 'Preparing…' : 'Spreadsheet'}
           </button>
           </span>
-          <button className="btn red" type="submit" disabled={generateReport.isPending}>
-            {generateReport.isPending ? 'Generating…' : 'Generate report'}
-          </button>
+          {canCreate && (
+            <button className="btn red" type="submit" disabled={generateReport.isPending}>
+              {generateReport.isPending ? 'Generating…' : 'Generate report'}
+            </button>
+          )}
         </form>
       </div>
 
@@ -89,11 +110,12 @@ export function ReportGenerateTab() {
         <h3>Past reports</h3>
         {reports?.results.length ? (
           <table className="cardtable">
-            <thead><tr><th>Period</th><th>Generated</th><th>By</th><th></th><th></th></tr></thead>
+            <thead><tr><th>Period</th><th>Covers</th><th>Generated</th><th>By</th><th></th><th></th></tr></thead>
             <tbody>
               {reports.results.map((r) => (
                 <tr key={r.id}>
                   <td data-label="Period">{MONTHS[r.period_month - 1]} {r.period_year}</td>
+                  <td data-label="Covers">{r.location_name ? `${r.location_name} only` : 'All locations'}</td>
                   <td data-label="Generated">{r.generated_at.slice(0, 10)}</td>
                   <td data-label="By">{r.generated_by_name}</td>
                   <td data-label="">
@@ -102,9 +124,11 @@ export function ReportGenerateTab() {
                     </a>
                   </td>
                   <td className="td-actions">
-                    <button className="icon-btn" title="Delete report" onClick={() => handleDelete(r.id)}>
-                      <Icon name="trash" size={14} />
-                    </button>
+                    {canDelete && (
+                      <button className="icon-btn" title="Delete report" onClick={() => handleDelete(r.id)}>
+                        <Icon name="trash" size={14} />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

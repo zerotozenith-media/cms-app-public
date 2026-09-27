@@ -82,24 +82,13 @@ class Giving(models.Model):
         "attendance.AttendanceSession", on_delete=models.SET_NULL,
         related_name="giving", null=True, blank=True)
 
-    # Where the money was sent. The system knew which fund it went into
-    # but not where it went afterwards, which the monthly report has to
-    # state.
-    REMIT_CHOICES = [
-        ("retained", "Retained in location account"),
-        ("dubai", "DLBC account, Dubai"),
-        ("lagos", "DLBC account, Lagos"),
-        ("qatar", "DLBC account, Qatar"),
-    ]
-    remitted_to = models.CharField(
-        max_length=20, choices=REMIT_CHOICES, default="retained")
 
     class Meta:
         ordering = ["-date"]
         verbose_name_plural = "Giving"
 
     def __str__(self):
-        return f"{self.fund} , {self.amount} ({self.date})"
+        return f"{self.fund} · {self.amount} ({self.date})"
 
 
 class Expense(models.Model):
@@ -122,4 +111,10 @@ class Expense(models.Model):
         ordering = ["-date"]
 
     def __str__(self):
-        return f"{self.category} , {self.amount} ({self.date})"
+        return f"{self.category} · {self.amount} ({self.date})"
+
+
+# Monthly remittance lives in its own module: it is a different kind of
+# record from giving and expenses, recorded once a month rather than as
+# money moves.
+from .remittance_models import Remittance, RemittanceLine  # noqa: E402,F401

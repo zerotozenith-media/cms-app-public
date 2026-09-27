@@ -85,10 +85,36 @@ def unique_phone(used, prefix="+973 3"):
 class Command(BaseCommand):
     help = "Seeds ~2.5 years of realistic, internally-consistent demo data for local development."
 
+    def _link_converted_members(self):
+        """
+        Give every newcomer at the Member stage the member record the real
+        conversion creates.
+
+        Setting the stage alone left the two out of step: 25 people shown
+        as members on the newcomer board, none of them on the member roll,
+        and the "earlier members" link leading to an empty list. The join
+        date follows when they reached the stage, so the thirty-day window
+        on the board has something real to show.
+        """
+        from members.models import Member
+        for n in Newcomer.objects.filter(stage="member"):
+            if getattr(n, "became_member", None):
+                continue
+            parts = n.name.strip().split()
+            first = parts[0] if parts else n.name
+            surname = " ".join(parts[1:]) if len(parts) > 1 else first
+            Member.objects.create(
+                surname=surname, first_name=first,
+                phone=(n.phone or "").strip() or None, email=n.email, location=n.location,
+                joined_date=n.stage_since,
+                category=Member.Category.GENERAL,
+                from_newcomer=n,
+            )
+
     def handle(self, *args, **options):
         if User.objects.filter(email="chinedu@dclm-bh.org").exists():
             self.stdout.write(self.style.WARNING(
-                "Demo data already seeded (chinedu@dclm-bh.org exists) , refusing to run again. "
+                "Demo data already seeded (chinedu@dclm-bh.org exists), so it will not run again. "
                 "This command doesn't reconcile partial state; wipe the database first if you "
                 "genuinely want to regenerate from scratch."
             ))
@@ -126,6 +152,7 @@ class Command(BaseCommand):
                 self._seed_enquiries(members)
                 self._seed_leaders_and_newcomer_attendance(members)
                 self._seed_fellowships_and_hybrid(members)
+                self._link_converted_members()
         finally:
             post_save.connect(audit_on_save)
             post_delete.connect(audit_on_delete)
@@ -143,10 +170,10 @@ class Command(BaseCommand):
 
     def _seed_locations(self):
         bahrain, _ = Location.objects.get_or_create(
-            id="bahrain", defaults={"name": "Bahrain", "is_core": True},
+            id="bahrain", defaults={"name": "Bahrain HQ", "is_core": True},
         )
         others, _ = Location.objects.get_or_create(
-            id="others", defaults={"name": "Others", "note": "Qatar , supporting location"},
+            id="others", defaults={"name": "Qatar", "note": "Supporting location"},
         )
         self.stdout.write("Seeded locations.")
         return bahrain, others
@@ -198,26 +225,26 @@ class Command(BaseCommand):
             # measure "a few hours after" against, so it is set too.
             dict(id="fri-worship", name="Friday Worship Service", day="Friday",
                  frequency="weekly", detail_level="detailed", monthly_target=45,
-                 counts_for_absence=True, start_time=datetime.time(18, 0)),
+                 counts_for_absence=True, start_time=datetime.time(18, 0), collects_offering=True),
             dict(id="mon-bs", name="Monday Bible Study", day="Monday",
-                 frequency="weekly", detail_level="detailed", monthly_target=25),
+                 frequency="weekly", detail_level="detailed", monthly_target=25, collects_offering=True),
             dict(id="tue-leadership", name="Tuesday Leadership Development", day="Tuesday",
                  frequency="weekly", detail_level="simple", monthly_target=None,
-                 audience="leadership"),
+                 audience="leadership", collects_offering=False),
             dict(id="wed-rev", name="Wednesday Revival and Evangelism Training", day="Wednesday",
-                 frequency="weekly", detail_level="detailed", monthly_target=None),
+                 frequency="weekly", detail_level="detailed", monthly_target=None, collects_offering=True),
             dict(id="fri-house", name="Friday House Caring Fellowship", day="Friday",
-                 frequency="weekly", detail_level="detailed", monthly_target=None),
+                 frequency="weekly", detail_level="detailed", monthly_target=None, collects_offering=True),
             dict(id="sat-workers", name="Saturday Workers Meeting", day="Saturday",
                  frequency="weekly", detail_level="simple", monthly_target=15,
-                 audience="workers"),
+                 audience="workers", collects_offering=False),
             # Occasional meetings have no fixed day, so nothing recurring is
             # generated; a session is created when one is actually held.
             dict(id="gck", name="Global Crusade with Kumuyi (GCK)", day="",
-                 frequency="occasional", detail_level="detailed", monthly_target=None),
+                 frequency="occasional", detail_level="detailed", monthly_target=None, collects_offering=False),
             dict(id="min-renewal", name="Ministerial Renewal", day="",
                  frequency="occasional", detail_level="simple", monthly_target=None,
-                 audience="leadership"),
+                 audience="leadership", collects_offering=False),
         ]
         meeting_types = {}
         for spec in specs:
@@ -654,7 +681,7 @@ class Command(BaseCommand):
                 due = session.date + datetime.timedelta(days=2)
                 task = MemberFollowUpTask.objects.create(
                     member=member,
-                    text=f"Missed {session.meeting_type.name}, check in",
+                    text=f"Missed {session.meeting_type.name}, check in with them",
                     due_date=due,
                     assigned_to=member.assigned_to,
                     missed_session=session,
@@ -834,8 +861,17 @@ class Command(BaseCommand):
         from attendance.models import AttendanceSession, Fellowship, MeetingType
         from finance.models import Fund, Giving, PaymentMethod
 
-        women, _ = Fellowship.objects.get_or_create(name="HCF Women", defaults={"area": "Riffa"})
-        men, _ = Fellowship.objects.get_or_create(name="HCF Men", defaults={"area": "Manama"})
+        house = MeetingType.objects.filter(id="fri-house").first()
+        women, _ = Fellowship.objects.get_or_create(
+            name="HCF Women", defaults={"area": "Riffa", "meeting_type": house,
+                                        "location_id": "bahrain"})
+        men, _ = Fellowship.objects.get_or_create(
+            name="HCF Men", defaults={"area": "Manama", "meeting_type": house,
+                                      "location_id": "bahrain"})
+        Fellowship.objects.filter(meeting_type__isnull=True).update(meeting_type=house)
+        # Fellowships meet at one location. Left blank they would be given a
+        # session at every location, including Qatar.
+        Fellowship.objects.filter(location__isnull=True).update(location_id="bahrain")
 
         workers = [m for m in members if m.category == Member.Category.WORKER]
         if not workers:
@@ -862,7 +898,7 @@ class Command(BaseCommand):
                 Giving.objects.create(
                     date=s.date, fund=tithe, method=cash,
                     amount=Decimal(str(RNG.randint(60, 260))),
-                    location=s.location, session=s, remitted_to="retained",
+                    location=s.location, session=s,
                 )
 
         # A few hybrid Friday services, so the online split is visible.

@@ -85,7 +85,7 @@ export function useReports() {
 export function useGenerateReport() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: { period_month: number; period_year: number; other_additions: string }) =>
+    mutationFn: async (payload: { period_month: number; period_year: number; other_additions: string; location?: string }) =>
       (await apiClient.post<Report>('/reports/generate/', payload)).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['reports'] }),
   });

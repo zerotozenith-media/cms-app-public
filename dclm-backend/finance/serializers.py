@@ -24,11 +24,15 @@ class ExpenseCategorySerializer(serializers.ModelSerializer):
 class ProjectSerializer(serializers.ModelSerializer):
     amount_raised = serializers.ReadOnlyField()
     amount_spent = serializers.SerializerMethodField()
+    # Made from the name when not given, so adding a project in Admin only
+    # asks for what a person knows: its name, target and location.
+    id = serializers.SlugField(max_length=60, required=False)
+    location_name = serializers.CharField(source="location.name", read_only=True)
 
     class Meta:
         model = Project
         fields = [
-            "id", "name", "description", "location", "target_amount",
+            "id", "name", "description", "location", "location_name", "target_amount",
             "target_date", "status", "amount_raised", "amount_spent",
         ]
 
@@ -38,6 +42,16 @@ class ProjectSerializer(serializers.ModelSerializer):
         # never a stored running total.
         from django.db.models import Sum
         return obj.expenses.aggregate(total=Sum("amount"))["total"] or 0
+
+    def create(self, validated):
+        if not validated.get("id"):
+            from django.utils.text import slugify
+            base = slugify(validated["name"])[:50] or "project"
+            slug, n = base, 2
+            while Project.objects.filter(id=slug).exists():
+                slug = f"{base}-{n}"; n += 1
+            validated["id"] = slug
+        return super().create(validated)
 
 
 class GivingSerializer(serializers.ModelSerializer):

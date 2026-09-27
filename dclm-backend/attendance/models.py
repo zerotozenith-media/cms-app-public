@@ -18,7 +18,13 @@ class MeetingType(models.Model):
 
     id = models.SlugField(primary_key=True, max_length=50)
     name = models.CharField(max_length=150)
-    day = models.CharField(max_length=20, blank=True, default="")
+    WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday",
+                "Friday", "Saturday", "Sunday"]
+    day = models.CharField(
+        max_length=20, blank=True, default="",
+        help_text="Full weekday name for a weekly meeting, or blank for an "
+                  "occasional one. Anything else generates no sessions.",
+    )
     start_time = models.TimeField(
         null=True, blank=True,
         help_text="Used only for absence follow-up timing (counts_for_absence) , "
@@ -48,9 +54,58 @@ class MeetingType(models.Model):
         max_length=20, choices=Audience.choices, default=Audience.EVERYONE,
         help_text="Who is expected at this meeting, and so who is followed up when absent.",
     )
+    collects_offering = models.BooleanField(
+        default=False,
+        help_text="Whether the session form asks for an offering. Set here rather "
+                  "than fixed in code, so the church can change it.",
+    )
 
     class Meta:
         ordering = ["name"]
+
+    def clean(self):
+        """Refuse a day the generator cannot match."""
+        from django.core.exceptions import ValidationError
+        if self.frequency == "weekly":
+            if not self.day:
+                raise ValidationError({"day": "A weekly meeting needs a day."})
+            if self.day not in self.WEEKDAYS:
+                raise ValidationError({"day":
+                    f"{self.day} is not a weekday. Use one of: "
+                    f"{', '.join(self.WEEKDAYS)}. Sessions are only generated "
+                    "for a day spelled in full."})
+
+    @property
+    def effective_target(self):
+        """
+        The one target every screen shows for this meeting.
+
+        The goal set for it wins, falling back to the meeting's own
+        figure. Before this the dashboard read the goal (150) and the
+        attendance chart read the meeting field (45), so two screens
+        disagreed about the same meeting.
+        """
+        goal = self.goal_set.order_by("id").first() if hasattr(self, "goal_set") else None
+        if goal and goal.target:
+            return float(goal.target)
+        return float(self.monthly_target) if self.monthly_target else None
+
+    @property
+    def has_fellowships(self):
+        """Whether this meeting runs as several fellowships meeting at the
+        same time, in which case each needs its own session."""
+        return self.fellowship_set.filter(is_active=True).exists()
+
+    @property
+    def generates_sessions(self):
+        """Whether the weekly generator will actually produce anything.
+        Shown in Admin so a misconfigured meeting is visible rather than
+        silently empty."""
+        return self.frequency == "weekly" and self.day in self.WEEKDAYS
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name
@@ -71,6 +126,25 @@ class Fellowship(models.Model):
     name = models.CharField(max_length=100, unique=True)
     area = models.CharField(max_length=100, blank=True, default="")
     is_active = models.BooleanField(default=True)
+
+    # Which meeting these fellowships are. Without it the generator has to
+    # hardcode an id, and a church renaming its fellowship meeting would
+    # silently stop getting sessions.
+    meeting_type = models.ForeignKey(
+        "attendance.MeetingType", on_delete=models.CASCADE,
+        null=True, blank=True, related_name="fellowship_set",
+        help_text="The meeting these fellowships hold, so one session is "
+                  "generated per fellowship per date.",
+    )
+
+    # Where it meets. Without it every location was given a session for
+    # every fellowship, so Qatar had three unfillable Bahrain fellowship
+    # sessions each Friday. Blank means it meets at every location.
+    location = models.ForeignKey(
+        "core.Location", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="fellowships",
+        help_text="The location this fellowship belongs to. Blank for every location.",
+    )
 
     class Meta:
         ordering = ["name"]
@@ -135,7 +209,12 @@ class AttendanceSession(models.Model):
         ordering = ["-date"]
 
     def __str__(self):
-        return f"{self.meeting_type} , {self.date}"
+        # Several sessions can share a meeting and a date, one per location
+        # and per fellowship, so both are named to tell them apart.
+        name = self.meeting_type.name
+        if self.fellowship_id:
+            name += f" ({self.fellowship.name})"
+        return f"{name} · {self.location.name} · {self.date}"
 
     @property
     def online_total(self):

@@ -1,4 +1,7 @@
+from django.urls import path
 from rest_framework.routers import DefaultRouter
+
+from .roster import AttendanceRosterView, FinanceRosterView
 
 from .views import FellowshipViewSet, MeetingTypeViewSet, AttendanceSessionViewSet
 
@@ -7,4 +10,7 @@ router.register("meeting-types", MeetingTypeViewSet, basename="meeting-type")
 router.register(r"fellowships", FellowshipViewSet, basename="fellowship")
 router.register("attendance-sessions", AttendanceSessionViewSet, basename="attendance-session")
 
-urlpatterns = router.urls
+urlpatterns = router.urls + [
+    path("attendance-roster/", AttendanceRosterView.as_view(), name="attendance-roster"),
+    path("finance-roster/", FinanceRosterView.as_view(), name="finance-roster"),
+]

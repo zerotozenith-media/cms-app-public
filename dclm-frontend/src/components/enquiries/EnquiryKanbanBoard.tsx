@@ -4,6 +4,8 @@ import { ENQUIRY_STAGES } from '../../types/enquiries';
 import type { Enquiry, EnquiryStage } from '../../types/enquiries';
 
 interface Props {
+  /** Off for somebody who cannot change an enquiry. */
+  canMove?: boolean;
   enquiries: Enquiry[];
   onCardClick: (id: number) => void;
   onDropToStage: (id: number, stage: EnquiryStage) => void;
@@ -18,7 +20,7 @@ interface Props {
  * drop does not work on touch screens at all, so without it nobody
  * could move a card along from a phone.
  */
-export function EnquiryKanbanBoard({ enquiries, onCardClick, onDropToStage, onSelectStage }: Props) {
+export function EnquiryKanbanBoard({ enquiries, onCardClick, onDropToStage, onSelectStage, canMove = true }: Props) {
   const [dragOverStage, setDragOverStage] = useState<EnquiryStage | null>(null);
 
   return (
@@ -43,10 +45,11 @@ export function EnquiryKanbanBoard({ enquiries, onCardClick, onDropToStage, onSe
               <div
                 key={e.id}
                 className="kcard"
-                draggable
+                draggable={canMove}
                 onDragStart={(ev) => ev.dataTransfer.setData('text/plain', String(e.id))}
+                onClick={() => onCardClick(e.id)}
               >
-                <b style={{ cursor: 'pointer' }} onClick={() => onCardClick(e.id)}>{e.name}</b>
+                <b>{e.name}</b>
                 <small>{e.source_name}{e.social_handle ? ` · ${e.social_handle}` : ''}</small>
                 <div className="kcard-meta">
                   <span
@@ -67,17 +70,18 @@ export function EnquiryKanbanBoard({ enquiries, onCardClick, onDropToStage, onSe
                 <label className="sr-only" htmlFor={`stage-${e.id}`}>
                   Move {e.name} to another stage
                 </label>
-                <select
+                {canMove && (<select
                   id={`stage-${e.id}`}
                   className="kstage-select"
                   value={e.stage}
+                  onClick={(ev) => ev.stopPropagation()}
                   onChange={(ev) => onSelectStage(e, ev.target.value as EnquiryStage)}
                 >
                   {ENQUIRY_STAGES.map((s) => (
                     <option key={s.key} value={s.key}>{s.label}</option>
                   ))}
                   <option value="not-pursuing">Not pursuing</option>
-                </select>
+                </select>)}
               </div>
             ))}
           </div>

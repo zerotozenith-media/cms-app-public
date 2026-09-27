@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFellowships, useMeetingTypes, useCreateSession } from '../../api/attendance';
-import { useLocations } from '../../api/locations';
+import { useMyLocations } from '../../api/locations';
 import { Button } from '../../components/ui/Button';
 
 const today = new Date().toISOString().slice(0, 10);
@@ -9,7 +9,7 @@ const today = new Date().toISOString().slice(0, 10);
 export function NewSessionPage() {
   const navigate = useNavigate();
   const { data: meetingTypes } = useMeetingTypes();
-  const { data: locations } = useLocations();
+  const { data: locations } = useMyLocations();
   const createSession = useCreateSession();
 
   const [meetingType, setMeetingType] = useState('');

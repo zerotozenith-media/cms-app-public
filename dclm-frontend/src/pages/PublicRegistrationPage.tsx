@@ -30,6 +30,10 @@ export function PublicRegistrationPage() {
         ...rest, name: intakeFullName(values),
         meeting_attended: values.meeting_attended || null,
         website, form_loaded_at: formLoadedAt.current,
+        // The location this QR code was made for, so the visitor lands in
+        // that location's pipeline. The server checks it exists.
+        ...(new URLSearchParams(window.location.search).get('location')
+          ? { location: new URLSearchParams(window.location.search).get('location') } : {}),
       });
       setSubmitted(true);
     } catch (err: any) {

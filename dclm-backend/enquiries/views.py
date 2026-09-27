@@ -1,3 +1,4 @@
+from accounts.permissions import require
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import viewsets, filters
@@ -67,6 +68,7 @@ class EnquiryViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="change-stage")
     def change_stage(self, request, pk=None):
+        require(request.user, ("newcomers", "can_edit"))
         enquiry = self.get_object()
         serializer = ChangeEnquiryStageSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -101,6 +103,7 @@ class EnquiryViewSet(viewsets.ModelViewSet):
         The enquiry is kept rather than deleted: the link is what makes
         "how many online enquiries became people in the room" answerable.
         """
+        require(request.user, ("newcomers", "can_create"), ("newcomers", "can_edit"))
         enquiry = self.get_object()
 
         if enquiry.converted_newcomer_id:
@@ -136,6 +139,17 @@ class EnquiryViewSet(viewsets.ModelViewSet):
                 address=enquiry.area,
                 prayer_request=enquiry.enquiry_text,
             )
+
+            # The enquiry's handler becomes the shepherd only if they are a
+            # shepherd at the location attended. Otherwise the newcomer is
+            # given one the same way registration does. Converting used to
+            # leave them with nobody whenever the enquiry was unassigned.
+            from members.assignment import assign_on_registration, eligible_shepherds
+            if newcomer.assigned_to_id and newcomer.assigned_to_id not in {
+                    u.id for u in eligible_shepherds(location=location)}:
+                newcomer.assigned_to = None
+                newcomer.save(update_fields=["assigned_to"])
+            assign_on_registration(newcomer)
 
             enquiry.converted_newcomer = newcomer
             enquiry.stage = Enquiry.Stage.ATTENDED
@@ -192,6 +206,7 @@ class EnquiryTaskViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def complete(self, request, pk=None):
+        require(request.user, ("newcomers", "can_edit"))
         task = self.get_object()
         serializer = CompleteEnquiryTaskSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -208,7 +223,8 @@ class EnquiryTaskViewSet(viewsets.ModelViewSet):
 
         log_audit(
             request.user, "Recorded follow-up outcome", "Enquiry", task.enquiry.name,
-            f"{task.contact_method}: {task.contact_goal[:50]}", instance=task,
+            task.contact_method + (f": {task.contact_goal[:50]}" if task.contact_goal else ""),
+            instance=task,
         )
         return Response(EnquiryTaskSerializer(task).data)
 
@@ -265,3 +281,19 @@ class CampaignViewSet(viewsets.ModelViewSet):
             "cost_per_newcomer": round(total_spend / total_converted, 2) if total_converted and total_spend else None,
             "campaigns": campaigns.count(),
         })
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        A campaign with enquiries against it is kept. Removing it would
+        leave those enquiries with no campaign and lose what it cost per
+        person reached, which is the reason for recording campaigns.
+        """
+        campaign = self.get_object()
+        used = campaign.enquiries.count()
+        if used:
+            return Response(
+                {"detail": f"{campaign.name} has {used} enquir{'ies' if used != 1 else 'y'} "
+                           f"recorded against it, so it is kept for the outreach figures."},
+                status=400)
+        return super().destroy(request, *args, **kwargs)
+

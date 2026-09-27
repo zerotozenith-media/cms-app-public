@@ -9,6 +9,8 @@ export interface MemberCategoryHistoryEntry {
 export type MemberCategory = 'General Member' | 'Worker in Training' | 'Worker';
 
 export interface Member {
+  /** How they came to the church, where known. */
+  arrived_via?: string;
   id: number;
   surname: string;
   first_name: string;
@@ -52,6 +54,7 @@ export interface PaginatedResponse<T> {
 }
 
 export interface MemberListParams {
+  from_pipeline?: string;
   search?: string;
   category?: string;
   /** A user id, or "none" to find members with nobody assigned. */
@@ -126,12 +129,23 @@ export interface AssignmentChange {
   from_name: string | null;
   to_id: number;
   to_name: string;
-  reason: 'Household' | 'Balanced load';
+  reason: 'Household' | 'Balanced load' | 'Chosen by hand';
+}
+
+/** Each shepherd's load now and after the proposed changes. Without it a
+ *  batch that goes to one worker reads as a fault, when that worker was
+ *  simply carrying far fewer than the rest. */
+export interface ShepherdLoad {
+  id: number;
+  name: string;
+  now: number;
+  after: number;
 }
 
 export interface AssignmentPreview {
   reassign_everyone: boolean;
   count: number;
+  load?: ShepherdLoad[];
   changes: AssignmentChange[];
 }
 

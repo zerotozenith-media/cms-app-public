@@ -36,6 +36,11 @@ def create_auto_tasks(newcomer):
     an automated send. Nothing is emailed or messaged by the system
     itself; a human still does the actual visit/conversation.
     """
+    # Give them a shepherd first, so the tasks below have somebody to
+    # belong to. A task created unowned is never picked up afterwards.
+    from members.assignment import assign_on_registration
+    assign_on_registration(newcomer)
+
     task_specs = []
     if newcomer.wants_visit:
         task_specs.append(("Schedule a home visit", 5))

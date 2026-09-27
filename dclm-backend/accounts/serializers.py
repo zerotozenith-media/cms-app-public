@@ -15,10 +15,22 @@ class RolePermissionSerializer(serializers.ModelSerializer):
 
 class RoleSerializer(serializers.ModelSerializer):
     permissions = RolePermissionSerializer(many=True, read_only=True)
+    # Whether the person asking may give this role to someone. The server
+    # refuses a role more powerful than their own, so the add-user form
+    # only offers the ones this says yes to.
+    assignable = serializers.SerializerMethodField()
 
     class Meta:
         model = Role
-        fields = ["id", "name", "permissions"]
+        fields = ["id", "name", "permissions", "assignable"]
+
+    def get_assignable(self, role):
+        request = self.context.get("request")
+        if request is None:
+            return True
+        from accounts.views import is_full_administrator, role_within
+        user = request.user
+        return bool(user.is_superuser or is_full_administrator(user) or role_within(user, role))
 
 
 class UserSerializer(serializers.ModelSerializer):

@@ -147,9 +147,10 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
       h: 'Using the QR code',
       steps: [
         'Tap Newcomers & Follow-up, then the QR Registration tab.',
+        'If you cover more than one location, choose this service\'s location in Code for. Each location has its own code, and a printed one keeps working.',
         'Show them the code on your screen, or have it projected during the announcement.',
         'They scan it with their phone camera and fill the form themselves.',
-        'Their details appear in the New column of the pipeline straight away.',
+        'Their details appear straight away in the New column of that location\'s pipeline, with a shepherd from there.',
       ],
     },
     {
@@ -163,13 +164,14 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
     },
     {
       h: 'Why those tick boxes matter',
-      p: 'If they ask for a visit, want to know more, or want salvation information, ticking the box creates a task for someone to act on, with a deadline. Salvation requests get a shorter deadline. Leave them unticked and nothing happens.',
+      p: 'If they tick Would like a visit, Would like to know more about the church, or Want to know about being a Christian, a task is created for someone to act on, with a deadline. The last of these gets a shorter deadline. Leave them unticked and nothing happens.',
     },
     {
       h: 'Moving someone through the pipeline',
       steps: [
         'Go to the Pipeline tab.',
-        'Drag their card from one column to the next as things progress.',
+        'Drag their card from one column to the next, or choose the new stage in the dropdown at the bottom of the card. On a phone only the dropdown works.',
+        'Dropping a card on Member asks you to confirm, because it adds them to the member roll.',
         'New means not yet contacted. Contacted means someone reached out. Attending means they have come at least once. Member means they are on the member roll.',
       ],
     },
@@ -187,9 +189,9 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
     {
       h: '1. Set up your locations',
       steps: [
-        'Go to Admin, find the Locations area.',
-        'Bahrain is already there and cannot be deleted.',
-        'Add any other location the church runs in.',
+        'Go to Admin, then Config Lists, and find Locations.',
+        'The main location, Bahrain HQ, is already there and cannot be deleted.',
+        'Add any other location the church runs in. Use the pencil beside a location to rename it at any time. Records stay with it.',
       ],
     },
     {
@@ -257,9 +259,9 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
 
   attendance: [
     { h: 'Two ways attendance is recorded', p: 'Headcounts are the official figure: how many men, women, youth and children were present. Named check-in records exactly which members came. Both are kept, and recording one does not change the other.' },
-    { h: 'Recording a headcount', p: 'Open the session from the Attendance list and fill in the numbers. Whether you see four boxes or two depends on whether that meeting type is set to Detailed or Simple. Save it and the session moves from Pending to Filled.' },
-    { h: 'Live check-in during a service', p: 'Open a pending session and press Check in. You get the member list grouped by category. Tap a name as each person arrives and it saves immediately, so several ushers on different doors can work at the same time without overwriting each other. Tap again to undo. Use Mark online for anyone joining remotely.' },
-    { h: 'Where sessions come from', p: 'Sessions for regular weekly meetings are created automatically. You do not need to make one each week. Use New session only for one-off meetings.' },
+    { h: 'Recording a headcount', p: 'Open the session from the Attendance list and fill in the numbers. Whether you see six boxes or two depends on whether that meeting type is set to Detailed or Simple. If the meeting collects an offering, enter it in the Offering collected box on the same form. It is recorded as giving for that service, dated to it. Save it and the session moves from Pending to Filled. A service that has not happened yet cannot be recorded.' },
+    { h: 'Live check-in during a service', p: 'On the day of the service, press Check in on its row in the Attendance list. You get the member list grouped by category. Tap a name as each person arrives and it saves immediately, so several ushers on different doors can work at the same time without overwriting each other. Tap again to undo. Use Mark online for anyone joining remotely.' },
+    { h: 'Where sessions come from', p: 'Sessions for regular weekly meetings are created automatically. You do not need to make one each week. A house fellowship meeting gets one session per fellowship, at the location where each fellowship meets. Use New session only for one-off meetings.' },
   ],
 
   members: [
@@ -267,7 +269,7 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
     { h: 'Households', p: 'Linking people to a household keeps families together in the records. It also matters for shepherd assignment: auto-assign keeps a household with the same shepherd rather than splitting them between workers.' },
     { h: 'What a shepherd is', p: 'Every member can be assigned a shepherd, a worker responsible for checking on them. When someone misses a tracked service, the follow-up task goes to their shepherd automatically.' },
     { h: 'Assigning shepherds', p: 'Three ways. One at a time on the member\'s profile. Several at once by ticking the boxes in the member list and choosing a shepherd. Or press Auto-assign to let the system propose assignments for everyone who has none.' },
-    { h: 'How auto-assign decides', p: 'Household first, so families stay together. Then whoever currently carries the fewest people. Only Workers can be shepherds. Nothing is saved until you review the proposed list and press Apply. By default it only fills people who have no shepherd, so deliberate pairings are left alone. Reassign everyone recalculates from scratch, which is useful when a worker leaves.' },
+    { h: 'How auto-assign decides', p: 'Household first, so families stay together. Then whoever currently carries the fewest people. Only Workers can be shepherds. Nothing is saved until you review the proposed list and press Apply. Before applying you can choose a different shepherd for any row, or leave someone unassigned, and each shepherd\'s load now and after is shown. By default it only fills people who have no shepherd, so deliberate pairings are left alone. Reassign everyone recalculates from scratch, which is useful when a worker leaves.' },
   ],
 
   followup: [
@@ -280,31 +282,32 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
   ],
 
   newcomers: [
-    { h: 'Two ways someone is registered', p: 'They scan the QR code and fill the form on their own phone, or a worker types in a paper card using Manual Entry. Both collect the same information and both land in the same pipeline.' },
+    { h: 'Two ways someone is registered', p: 'They scan the QR code and fill the form on their own phone, or a worker types in a paper card using Manual Entry. Both collect the same information and both land in the pipeline of the location they attended.' },
     { h: 'The pipeline', p: 'New means registered and nobody has reached them yet. Contacted means someone has spoken to them. Attending means they have come to a service at least once. Member means they are on the member roll. Drag a card between columns, or use the dropdown on each card, which is the only way on a phone.' },
-    { h: 'Becoming a member', p: 'A newcomer is proposed for membership once the Salvation milestone is recorded and they have attended at least half the Friday services over six months. The system only proposes it. An administrator confirms, and can add anyone at any time regardless, for example someone relocating from another church. Dropping a card on the Member column asks you to confirm first.' },
+    { h: 'Becoming a member', p: 'A newcomer is proposed for membership once three things are true: the Salvation milestone is recorded with its date, they have attended at least half the Friday services held at their location since they first came, and they first came at least six months ago. The system only proposes it. An administrator confirms, and can add anyone at any time regardless, for example someone relocating from another church. Dropping a card on the Member column asks you to confirm first, and needs permission to add members.' },
     { h: 'Who each meeting is for', p: 'Every meeting is marked Everyone, Workers or Leadership. This decides who is followed up when absent, so a general member is never asked why they missed a workers meeting. Leadership is a tick on the member record rather than a category, because a leader is a Worker who also leads.' },
-    { h: 'Automatic tasks on registration', p: 'If someone ticks that they would like a visit, want to know more, or want salvation information, the matching tasks are created straight away for whoever is assigned to them. Salvation requests are given a shorter deadline.' },
+    { h: 'Automatic tasks on registration', p: 'If someone ticks Would like a visit, Would like to know more about the church, or Want to know about being a Christian, the matching tasks are created straight away for whoever is assigned to them. The last of these is given a shorter deadline.' },
     { h: 'Not interested', p: 'Marking someone Not Interested takes them out of the active pipeline without deleting them, and records the reason. They can be reactivated later.' },
   ],
 
   finance: [
-    { h: 'Recording giving', p: 'Enter the amount, the fund it belongs to, and how it was given. Linking it to a member is optional, so anonymous giving is fine. Linked giving builds up a total on that member\'s profile.' },
-    { h: 'Expenses and receipts', p: 'Record the amount, category and a short description. A receipt can be attached, and is worth doing for anything significant.' },
+    { h: 'Recording giving', p: 'Set the date it was given, then the amount, the fund it belongs to, and how it was given. Offerings taken at a service are already recorded if they were entered on the session form, so only record giving that came in another way. Linking it to a member is optional, so anonymous giving is fine. Linked giving builds up a total on that member\'s profile.' },
+    { h: 'Expenses and receipts', p: 'Set the date to the month the expense belongs to, then the amount, category and a short description. A receipt can be attached, and is worth doing for anything significant.' },
+    { h: 'The monthly remittance', p: 'Once a month, after expenses, what is due is sent on. On Giving and Finance, the Remittance tab lists each month. Press Record, check the amount sent for each fund and where it went, add the date and bank reference, and save. If you send more or less than is due, say why in the box that appears. Each location records its own remittance, from its own figures.' },
     { h: 'Projects', p: 'A project is something being raised toward with a target. Giving tagged to it shows progress against that target.' },
     { h: 'Who can see this', p: 'Finance is permission-controlled. Someone without finance access does not see these figures anywhere, including on the dashboard.' },
   ],
 
   goals: [
     { h: 'Two kinds of goals', p: 'Auto-tracked goals calculate themselves from data already in the system, so there is nothing to update by hand. Manual goals are ones no data can measure, so someone types in the current figure as it changes.' },
-    { h: 'Reading progress', p: 'Green means on track, red means behind. Every goal links through to the screen the number comes from, so you can see what is behind it.' },
-    { h: 'Monthly reports', p: 'The report pulls the month\'s attendance, giving, newcomers and testimonies into one document you can download and share. Weekly notes and testimonies recorded during the month are included.' },
+    { h: 'Reading progress', p: 'A bar is green at 90% of its target or more, blue from 60% to 90%, and red below 60%. Every goal links through to the screen the number comes from, so you can see what is behind it.' },
+    { h: 'Monthly reports', p: 'The report pulls the month\'s attendance, giving, newcomers and testimonies into one document you can download and share. Weekly notes and testimonies recorded during the month are included. An administrator covering every location chooses All locations or one location. Somebody limited to one location gets their own location\'s report. The cover says which.' },
   ],
 
   admin: [
-    { h: 'Users and roles', p: 'Create an account for each person and give them a role. The role decides which menu items they see and what they can change. Give the narrowest role that lets someone do their job.' },
-    { h: 'Meeting types', p: 'Each regular meeting is set up once: its name, day, and whether attendance is Detailed or Simple. The absence follow-up switch decides whether missing it creates a follow-up task.' },
-    { h: 'Follow-up assignment settings', p: 'Controls whether newcomers are included when auto-assign runs. Turn it off if whoever meets a newcomer should keep them rather than having the system reassign.' },
+    { h: 'Users and roles', p: 'Create an account for each person and give them a role. The role decides which menu items they see and what they can change. Give the narrowest role that lets someone do their job. A coordinator limited to one location can add accounts at that location only, with roles no more powerful than their own. Roles themselves apply to every location, so only an administrator covering every location changes them.' },
+    { h: 'Meeting types', p: 'Each regular meeting is set up once: its name, its day chosen from the Day column, whether attendance is Detailed or Simple, who it is for, and whether it collects an offering. The absence follow-up switch decides whether missing it creates a follow-up task. Meetings apply to every location, so only an administrator covering every location changes them.' },
+    { h: 'Follow-up assignment settings', p: 'Controls whether newcomers are included when auto-assign runs. Turn it off if whoever meets a newcomer should keep them rather than having the system reassign. Only an administrator covering every location changes it.' },
     { h: 'The lists', p: 'Funds, expense categories, newcomer sources and so on are all editable here, so the wording matches how this church actually speaks rather than being fixed in the software.' },
     { h: 'Audit log', p: 'Every significant action is recorded with who did it and when. Useful for answering "who changed this" without guesswork.' },
   ],

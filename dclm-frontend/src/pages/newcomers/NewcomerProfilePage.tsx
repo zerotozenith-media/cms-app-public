@@ -11,6 +11,8 @@ import { Badge } from '../../components/ui/Badge';
 import { Icon } from '../../components/ui/Icon';
 import { FollowUpCompletionForm } from '../../components/followup/FollowUpCompletionForm';
 import { CompletedFollowUpLog } from '../../components/followup/CompletedFollowUpLog';
+import { useLocationName, useMyLocations } from '../../api/locations';
+import { useAuth } from '../../context/AuthContext';
 
 function stageBadgeColor(stage: string): 'blue' | 'green' | 'gray' {
   if (stage === 'member') return 'green';
@@ -27,6 +29,13 @@ function stageLabel(stage: string): string {
 const today = new Date().toISOString().slice(0, 10);
 
 export function NewcomerProfilePage() {
+  const locationName = useLocationName();
+  const { data: myLocations } = useMyLocations();
+  const [editPhone, setEditPhone] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  const [editLocation, setEditLocation] = useState('');
+  const [editError, setEditError] = useState('');
   const { id } = useParams();
   const newcomerId = Number(id);
   const navigate = useNavigate();
@@ -36,6 +45,13 @@ export function NewcomerProfilePage() {
   const deleteNewcomer = useDeleteNewcomer();
   const changeStage = useChangeStage(newcomerId);
   const setMilestone = useSetMilestone(newcomerId);
+  // Controls a person cannot use are not shown. Making a member also adds
+  // them to the member roll, so it needs the Members permission too.
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('newcomers', 'create');
+  const canEdit = hasPermission('newcomers', 'edit');
+  const canDelete = hasPermission('newcomers', 'delete');
+  const canMakeMember = canEdit && hasPermission('members', 'create');
   const createTask = useCreateTask(newcomerId);
   const deleteTask = useDeleteTask(newcomerId);
   const { data: readiness } = useNewcomerReadiness(newcomerId);
@@ -68,11 +84,29 @@ export function NewcomerProfilePage() {
   function startEdit() {
     setEditName(n!.name);
     setEditSource(n!.source);
+    setEditPhone(n!.phone ?? '');
+    setEditEmail(n!.email ?? '');
+    setEditAddress(n!.address ?? '');
+    setEditLocation(n!.location ?? '');
+    setEditError('');
     setEditing(true);
   }
+  // Every contact detail can be corrected, and the location changed. Only
+  // the name and source could be before, so a mistyped phone number from a
+  // paper card could never be fixed.
   async function saveEdit() {
-    await updateNewcomer.mutateAsync({ name: editName, source: editSource });
-    setEditing(false);
+    setEditError('');
+    try {
+      await updateNewcomer.mutateAsync({
+        name: editName, source: editSource, phone: editPhone, email: editEmail,
+        address: editAddress, location: editLocation,
+      } as any);
+      setEditing(false);
+    } catch (err: any) {
+      const d = err?.response?.data ?? {};
+      const first = Object.entries(d)[0] as [string, any] | undefined;
+      setEditError(first ? `${first[0]}: ${[].concat(first[1])[0]}` : 'Could not save the changes.');
+    }
   }
   async function handleDelete() {
     if (!confirm('Delete this newcomer record?')) return;
@@ -99,6 +133,40 @@ export function NewcomerProfilePage() {
     <>
       <a className="backlink" onClick={() => navigate('/newcomers')}>← Back to pipeline</a>
 
+      <div className="card profile-head">
+        <div className="profile-head-main">
+          <h3>{n.name}</h3>
+          <div className="muted">
+            {n.source_name}
+            {' · '}
+            {n.assigned_to_name ? `Shepherd: ${n.assigned_to_name}` : <Badge color="amber">Unassigned</Badge>}
+            {' · '}
+            {locationName(n.location)}
+          </div>
+        </div>
+        <div className="profile-head-actions">
+          <Badge color={n.stage === 'member' ? 'green' : 'blue'}>{stageLabel(n.stage)}</Badge>
+          {canEdit && <button className="icon-btn edit" title="Edit" onClick={startEdit}><Icon name="edit" size={15} /></button>}
+          {canDelete && <button className="icon-btn" title="Delete" onClick={handleDelete}><Icon name="trash" size={15} /></button>}
+        </div>
+      </div>
+
+      {/* How to reach them and what they told us. The profile showed none
+          of it, so whoever was to call or visit could not see how. */}
+      <div className="card contact-card" style={{ marginBottom: 16 }}>
+        <div className="contact-grid">
+          <div><span className="muted">Phone</span><div>{n.phone ? <a href={`tel:${n.phone}`}>{n.phone}</a> : '–'}</div></div>
+          <div><span className="muted">Email</span><div>{n.email ? <a href={`mailto:${n.email}`}>{n.email}</a> : '–'}</div></div>
+          <div><span className="muted">Address</span><div>{[n.address, n.city_governorate].filter(Boolean).join(', ') || '–'}</div></div>
+          <div><span className="muted">First came to</span><div>{n.meeting_attended_name || '–'}</div></div>
+          <div><span className="muted">Gender and age</span><div>{[n.gender, n.age_group].filter(Boolean).join(', ') || '–'}</div></div>
+          <div><span className="muted">Invited by</span><div>{n.invited_by_member_name || '–'}</div></div>
+        </div>
+        {n.prayer_request && (
+          <div className="section-gap"><span className="muted">Prayer request</span><div>{n.prayer_request}</div></div>
+        )}
+      </div>
+
       {n.stage === 'member' ? (
         <div className="ready-banner member-banner">
           <Icon name="check" size={17} />
@@ -109,15 +177,17 @@ export function NewcomerProfilePage() {
         <div className="ready-banner">
           <Icon name="check" size={17} />
           <b>Ready for membership.</b> Both conditions are met, so this is proposed for you to confirm.
-          <button className="btn sm" style={{ marginLeft: 'auto' }}
-            onClick={handleMakeMember} disabled={makeMember.isPending}>Make a member</button>
+          {canMakeMember && (
+            <button className="btn sm" style={{ marginLeft: 'auto' }}
+              onClick={handleMakeMember} disabled={makeMember.isPending}>Make a member</button>
+          )}
         </div>
       ) : null}
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="toolbar" style={{ marginBottom: 12 }}>
           <h3 style={{ flex: 'none' }}>Membership readiness</h3>
-          {n.stage !== 'member' && (
+          {canMakeMember && n.stage !== 'member' && (
             <button className="btn sm outline" onClick={handleMakeMember} disabled={makeMember.isPending}>
               <Icon name="check" size={14} /> Make a member now
             </button>
@@ -125,8 +195,9 @@ export function NewcomerProfilePage() {
         </div>
         {readiness && <ReadinessCards r={readiness} />}
         <div className="muted" style={{ fontSize: '.8rem' }}>
-          A newcomer is proposed once the Salvation milestone is recorded and they have attended at
-          least half the Friday services over six months. An administrator always confirms, and can
+          A newcomer is proposed once the Salvation milestone is recorded, they have attended at
+          least half the Friday services at their location since they first came, and they first
+          came at least six months ago. An administrator always confirms, and can
           add anyone at any time regardless, for example someone relocating from another church.
         </div>
       </div>
@@ -140,7 +211,7 @@ export function NewcomerProfilePage() {
         </div>
         <JourneyTimeline events={journey ?? []} />
 
-        <div className="form-card section-gap">
+        {canCreate && <div className="form-card section-gap">
           <div className="muted" style={{ fontSize: '.8rem', marginBottom: 8 }}>
             Tried and could not reach them? Record it, so the history does not look as though
             nobody tried.
@@ -167,21 +238,11 @@ export function NewcomerProfilePage() {
             }}>
             <Icon name="plus" size={14} /> Log the attempt
           </button>
-        </div>
+        </div>}
       </div>
 
       <div className="grid g2">
         <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <h3 style={{ fontSize: '1.15rem' }}>{n.name}</h3>
-            <div className="row-actions">
-              <button className="icon-btn edit" title="Edit" onClick={startEdit}><Icon name="edit" size={15} /></button>
-              <button className="icon-btn" title="Delete" onClick={handleDelete}><Icon name="trash" size={15} /></button>
-            </div>
-          </div>
-          <div className="muted" style={{ margin: '4px 0 14px' }}>
-            Source: {n.source_name} · Assigned: {n.assigned_to_name || 'Unassigned'} · {n.location}
-          </div>
 
           {editing && sources && (
             <div className="form-card">
@@ -192,6 +253,19 @@ export function NewcomerProfilePage() {
                   {sources.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
+              <div className="form-row">
+                <div className="field"><label htmlFor="nc-edit-phone">Phone</label><input id="nc-edit-phone" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} /></div>
+                <div className="field"><label htmlFor="nc-edit-email">Email</label><input id="nc-edit-email" type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} /></div>
+              </div>
+              <div className="field"><label htmlFor="nc-edit-address">Address</label><input id="nc-edit-address" value={editAddress} onChange={(e) => setEditAddress(e.target.value)} /></div>
+              <div className="field">
+                <label htmlFor="nc-edit-location">Location</label>
+                <select id="nc-edit-location" value={editLocation} onChange={(e) => setEditLocation(e.target.value)}>
+                  {(myLocations ?? []).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                </select>
+                <div className="field-hint">Moving them gives them a shepherd at the new location if theirs cannot serve it.</div>
+              </div>
+              {editError && <p className="form-error" role="alert">{editError}</p>}
               <button className="btn sm" onClick={saveEdit} disabled={updateNewcomer.isPending}>Save changes</button>
               <button className="btn sm ghost" onClick={() => setEditing(false)}>Cancel</button>
             </div>
@@ -199,7 +273,7 @@ export function NewcomerProfilePage() {
 
           <Badge color={stageBadgeColor(n.stage)}>{stageLabel(n.stage)}</Badge>
 
-          {n.stage !== 'not-interested' ? (
+          {n.stage !== 'not-interested' ? (canEdit && (
             <>
               <span style={{ marginLeft: 8 }}>
                 <button className="btn sm ghost" onClick={() => setShowNotInterested(!showNotInterested)}>Mark as Not Interested</button>
@@ -218,7 +292,7 @@ export function NewcomerProfilePage() {
                 </div>
               )}
             </>
-          ) : (
+          )) : (
             <div className="form-card section-gap" style={{ borderColor: 'var(--line)', background: 'var(--sky-2)' }}>
               <div style={{ fontWeight: 700, color: 'var(--blue-deep)', marginBottom: 4 }}>Marked Not Interested</div>
               <div className="muted" style={{ fontSize: '.84rem' }}>
@@ -245,7 +319,7 @@ export function NewcomerProfilePage() {
               ignores: it would look like it worked and change nothing. */}
           <TaskList newcomerId={newcomerId} onDelete={(taskId) => deleteTask.mutate(taskId)} />
           <div className="form-card section-gap">
-            <form onSubmit={handleAddTask}>
+            {canCreate && <form onSubmit={handleAddTask}>
               <div className="form-row">
                 <div className="field" style={{ marginBottom: 8 }}>
                   <label htmlFor="nc-task-text">Task</label>
@@ -257,7 +331,7 @@ export function NewcomerProfilePage() {
                 </div>
               </div>
               <button className="btn sm" type="submit"><Icon name="plus" size={14} /> Add task</button>
-            </form>
+            </form>}
           </div>
         </div>
 
@@ -268,6 +342,7 @@ export function NewcomerProfilePage() {
               <input
                 type="checkbox"
                 checked={!!m.achieved_date}
+                disabled={!canEdit}
                 onChange={(e) => setMilestone.mutate({ milestone_type: m.milestone_type_id, achieved: e.target.checked })}
               />
               <span className="mname">{m.name}</span>
@@ -281,6 +356,9 @@ export function NewcomerProfilePage() {
 }
 
 function TaskList({ newcomerId, onDelete }: { newcomerId: number; onDelete: (id: number) => void }) {
+  const { hasPermission } = useAuth();
+  const canEdit = hasPermission('newcomers', 'edit');
+  const canDelete = hasPermission('newcomers', 'delete');
   const { data: tasks } = useNewcomerTasks(newcomerId);
   const complete = useCompleteNewcomerTask(newcomerId);
   const [completingId, setCompletingId] = useState<number | null>(null);
@@ -300,10 +378,12 @@ function TaskList({ newcomerId, onDelete }: { newcomerId: number; onDelete: (id:
               </div>
               <div className="row-actions">
                 {t.done && <Badge color="green">Done</Badge>}
-                <button className="btn sm outline" onClick={() => setCompletingId(isCompleting ? null : t.id)}>
-                  {t.done ? 'Edit' : 'Mark done'}
-                </button>
-                <button className="icon-btn" title="Delete task" onClick={() => onDelete(t.id)}><Icon name="trash" size={14} /></button>
+                {canEdit && (
+                  <button className="btn sm outline" onClick={() => setCompletingId(isCompleting ? null : t.id)}>
+                    {t.done ? 'Edit' : 'Mark done'}
+                  </button>
+                )}
+                {canDelete && <button className="icon-btn" title="Delete task" onClick={() => onDelete(t.id)}><Icon name="trash" size={14} /></button>}
               </div>
             </div>
             {isCompleting && (

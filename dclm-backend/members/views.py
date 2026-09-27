@@ -1,3 +1,5 @@
+from accounts.permissions import require
+from core.scoping import LocationScopedMixin
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import viewsets, filters, serializers
@@ -75,6 +77,11 @@ class MemberViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
 
         if self.request.query_params.get("is_leader") == "true":
             qs = qs.filter(is_leader=True)
+
+        # Behind the "earlier members" link on the newcomer board. Without
+        # it the link opened every member, which is not what it said.
+        if self.request.query_params.get("from_pipeline") == "true":
+            qs = qs.filter(from_newcomer__isnull=False)
         # Phase 4.1 fix: total_given was a per-object live .aggregate()
         # call in the serializer , correct, but O(n) queries for a list
         # of n members. Measured against the real ~42-member seed data:
@@ -139,6 +146,7 @@ class MemberViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
         field update with a MemberCategoryHistory entry, atomically, so
         the two can never drift out of sync (Batch 0.1 approved behavior).
         """
+        require(request.user, ("members", "can_edit"))
         member = self.get_object()
         serializer = MoveCategorySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -177,7 +185,8 @@ class MemberViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
         return Response(MemberSerializer(fresh).data)
 
 
-class MemberCategoryHistoryViewSet(viewsets.ModelViewSet):
+class MemberCategoryHistoryViewSet(LocationScopedMixin, viewsets.ModelViewSet):
+    location_lookup = "member__location_id"
     """
     Corrections allowed directly (Batch 0.1, Finding 4) , not append-only.
     Governed by the same 'members' module permission as Member itself,
@@ -189,14 +198,15 @@ class MemberCategoryHistoryViewSet(viewsets.ModelViewSet):
     serializer_class = MemberCategoryHistorySerializer
 
     def perform_update(self, serializer):
-        instance = serializer.save()
+        instance = self._save_within_reach(serializer)
         log_audit(
             self.request.user, "Corrected", "Member category history",
             str(instance.member), instance=instance,
         )
 
 
-class MemberFollowUpTaskViewSet(viewsets.ModelViewSet):
+class MemberFollowUpTaskViewSet(LocationScopedMixin, viewsets.ModelViewSet):
+    location_lookup = "member__location_id"
     """
     Real member-absence follow-up (confirmed design, built after the
     Newcomers follow-up pattern already proven in this app). Governed by
@@ -224,7 +234,7 @@ class MemberFollowUpTaskViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        instance = serializer.save()
+        instance = self._save_within_reach(serializer)
         log_audit(
             self.request.user, "Created follow-up task", "Member", instance.member.full_name,
             f"Missed {instance.missed_meeting_name} on {instance.missed_date}", instance=instance,
@@ -234,6 +244,7 @@ class MemberFollowUpTaskViewSet(viewsets.ModelViewSet):
     def complete(self, request, pk=None):
         """The only correct way to mark a follow-up done , requires the
         real visitation outcome, mirroring NewcomerTaskViewSet.complete()."""
+        require(request.user, ("members", "can_edit"))
         task = self.get_object()
         serializer = CompleteMemberFollowUpTaskSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -300,6 +311,7 @@ class ShepherdAssignmentView(APIView):
             "reassign_everyone": reassign,
             "count": len(changes),
             "changes": changes,
+            "load": _load_summary(location, changes),
         })
 
     def post(self, request):
@@ -307,6 +319,7 @@ class ShepherdAssignmentView(APIView):
         trusting a client-supplied list, so a stale preview left open in
         a browser tab cannot write assignments based on data that has
         since changed."""
+        require(request.user, ("members", "can_edit"))
         reassign = bool(request.data.get("reassign_everyone", False))
         location = None if request.user.is_superuser or not request.user.location_id else request.user.location
         changes, error = build_assignment_preview(location=location, reassign_everyone=reassign)
@@ -316,11 +329,28 @@ class ShepherdAssignmentView(APIView):
             return Response({"detail": "Nothing to assign. Everyone in scope already has a shepherd.",
                              "applied_members": 0, "applied_newcomers": 0})
 
+        # Apply what the reviewer chose, on top of a fresh recomputation.
+        #
+        # The recomputation stays: it is what stops a preview left open in
+        # a browser tab from writing assignments against data that has
+        # since changed. But without honouring the reviewer's edits, a
+        # shepherd chosen by hand would be silently replaced by the
+        # system's original pick when Apply was pressed.
+        changes, hand_picked, skipped = _apply_reviewer_edits(
+            changes, request.data, location)
+        if not changes:
+            return Response({"detail": "Every change was skipped, so nothing was assigned.",
+                             "applied_members": 0, "applied_newcomers": 0})
+
         applied_members, applied_newcomers = apply_assignment_changes(changes)
+        detail = "Reassigned everyone" if reassign else "Filled unassigned only"
+        if hand_picked:
+            detail += f", {hand_picked} chosen by hand"
+        if skipped:
+            detail += f", {skipped} skipped"
         log_audit(
             request.user, "Auto-assigned shepherds", "Member",
-            f"{applied_members + applied_newcomers} record(s)",
-            "Reassigned everyone" if reassign else "Filled unassigned only",
+            f"{applied_members + applied_newcomers} record(s)", detail,
         )
         return Response({
             "applied_members": applied_members,
@@ -335,6 +365,7 @@ class BulkAssignShepherdView(APIView):
     permission_classes = [ModulePermission]
 
     def post(self, request):
+        require(request.user, ("members", "can_edit"))
         serializer = BulkAssignSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -377,10 +408,74 @@ class EligibleShepherdsView(APIView):
     permission_classes = [ModulePermission]
 
     def get(self, request):
-        location = None
+        # A location-limited person always gets their own location's
+        # shepherds. Anyone else may ask for one location, so a member's
+        # profile only offers shepherds who can actually be assigned there.
+        location = request.query_params.get("location") or None
         if not request.user.is_superuser and request.user.location_id:
             location = request.user.location_id
         shepherds = eligible_shepherds(location)
         return Response([
             {"id": s.id, "name": display_name(s)} for s in shepherds
         ])
+
+def _apply_reviewer_edits(changes, data, location):
+    """
+    Lay the reviewer's choices over a freshly computed set of changes.
+
+    Only people still in the fresh set are touched. If somebody was
+    assigned in another tab while this one sat open, their override is
+    ignored rather than overwriting the newer decision.
+
+    An override may only name an eligible shepherd for that location. The
+    list comes from the browser, so it is checked rather than trusted: a
+    crafted request must not be able to make anybody a shepherd.
+    """
+    eligible = {u.id: u for u in eligible_shepherds(location=location)}
+    overrides = {}
+    for o in (data.get("overrides") or []):
+        try:
+            key = (o["kind"], int(o["id"]))
+            to_id = int(o["to_id"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if to_id in eligible:
+            overrides[key] = to_id
+    skips = set()
+    for s in (data.get("skips") or []):
+        try:
+            skips.add((s["kind"], int(s["id"])))
+        except (KeyError, TypeError, ValueError):
+            continue
+
+    kept, hand_picked, skipped = [], 0, 0
+    for ch in changes:
+        key = (ch["kind"], ch["id"])
+        if key in skips:
+            skipped += 1
+            continue
+        if key in overrides and overrides[key] != ch["to_id"]:
+            ch = dict(ch, to_id=overrides[key], reason="Chosen by hand")
+            hand_picked += 1
+        kept.append(ch)
+    return kept, hand_picked, skipped
+
+
+def _load_summary(location, changes):
+    """
+    Each shepherd's load now and after these changes.
+
+    Without it, a batch that sends everyone to one worker reads as a
+    fault, when that worker was simply carrying far fewer than the rest.
+    """
+    from collections import Counter
+    from .assignment import _shepherd_name, current_load
+    shepherds = eligible_shepherds(location=location)
+    now = current_load(shepherds)
+    gained = Counter(ch["to_id"] for ch in changes)
+    return sorted(({
+        "id": s.id, "name": _shepherd_name(s),
+        "now": now.get(s.id, 0),
+        "after": now.get(s.id, 0) + gained.get(s.id, 0),
+    } for s in shepherds), key=lambda x: x["name"])
+

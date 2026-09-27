@@ -101,10 +101,14 @@ class EnquiryTaskSerializer(serializers.ModelSerializer):
 class CompleteEnquiryTaskSerializer(serializers.Serializer):
     contact_date = serializers.DateField(required=False)
     contact_method = serializers.ChoiceField(choices=EnquiryTask.Method.choices)
-    contact_goal = serializers.CharField()
-    contact_scripture = serializers.CharField()
-    contact_root_cause = serializers.CharField()
-    contact_next_step = serializers.CharField()
+    # How they were reached is required. The pastoral questions are
+    # optional here: replying to somebody's message involves no visit,
+    # scripture or root cause, and requiring them only invites made-up
+    # answers. Member and newcomer follow-ups still require them.
+    contact_goal = serializers.CharField(required=False, allow_blank=True, default="")
+    contact_scripture = serializers.CharField(required=False, allow_blank=True, default="")
+    contact_root_cause = serializers.CharField(required=False, allow_blank=True, default="")
+    contact_next_step = serializers.CharField(required=False, allow_blank=True, default="")
 
 
 class EnquirySerializer(serializers.ModelSerializer):

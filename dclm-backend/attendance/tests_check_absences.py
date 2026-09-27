@@ -35,7 +35,11 @@ class CheckAbsencesCommandTestCase(TestCase):
         # as local time, shifting everything by the UTC+3 offset. Found
         # this exact mistake empirically when a "1 hour ago" test value
         # was actually being treated as several hours further past.
-        past_start = timezone.localtime(self.now - datetime.timedelta(hours=5)).time().replace(microsecond=0)
+        started = timezone.localtime(self.now - datetime.timedelta(hours=5))
+        past_start = started.time().replace(microsecond=0)
+        # The local date the service started on, which is yesterday when
+        # the tests run in the small hours.
+        self.service_date = started.date()
         self.tracked_mt = MeetingType.objects.create(
             id="fri-worship", name="Friday Worship Service", day="Friday",
             frequency="weekly", detail_level="detailed", counts_for_absence=True,
@@ -59,7 +63,7 @@ class CheckAbsencesCommandTestCase(TestCase):
 
     def _session(self, meeting_type, date=None):
         return AttendanceSession.objects.create(
-            meeting_type=meeting_type, date=date or self.now.date(),
+            meeting_type=meeting_type, date=date or self.service_date,
             location=self.bahrain, mode="in-person", status="pending",
         )
 
@@ -89,10 +93,11 @@ class CheckAbsencesCommandTestCase(TestCase):
     # --- The timing threshold is real, not decorative ---
 
     def test_session_not_yet_past_threshold_is_untouched(self):
-        recent_start = timezone.localtime(self.now - datetime.timedelta(hours=1)).time().replace(microsecond=0)
+        began = timezone.localtime(self.now - datetime.timedelta(hours=1))
+        recent_start = began.time().replace(microsecond=0)
         mt = MeetingType.objects.create(id="wed-rev", name="Wednesday Revival", day="Wednesday",
             frequency="weekly", detail_level="detailed", counts_for_absence=True, start_time=recent_start)
-        self._session(mt)
+        self._session(mt, date=began.date())
         call_command("check_absences")
         self.assertEqual(MemberFollowUpTask.objects.count(), 0,
             "A session whose meeting started only 1 hour ago (threshold is 3) must not be processed yet.")
@@ -128,11 +133,11 @@ class CheckAbsencesCommandTestCase(TestCase):
     # --- The confirmed "don't stack tasks" rule, and its correct limit ---
 
     def test_second_different_session_absence_does_not_stack_while_first_is_open(self):
-        session1 = self._session(self.tracked_mt, date=self.now.date() - datetime.timedelta(days=7))
+        session1 = self._session(self.tracked_mt, date=self.service_date - datetime.timedelta(days=7))
         call_command("check_absences")
         self.assertEqual(MemberFollowUpTask.objects.filter(member=self.member_absent).count(), 1)
 
-        session2 = self._session(self.tracked_mt, date=self.now.date())
+        session2 = self._session(self.tracked_mt, date=self.service_date)
         call_command("check_absences")
         self.assertEqual(
             MemberFollowUpTask.objects.filter(member=self.member_absent).count(), 1,
@@ -143,7 +148,7 @@ class CheckAbsencesCommandTestCase(TestCase):
         """The distinction that actually matters: 'don't stack' should
         block piling up open tasks, not block real, separate follow-ups
         once the earlier one is actually resolved."""
-        session1 = self._session(self.tracked_mt, date=self.now.date() - datetime.timedelta(days=7))
+        session1 = self._session(self.tracked_mt, date=self.service_date - datetime.timedelta(days=7))
         call_command("check_absences")
         first_task = MemberFollowUpTask.objects.get(member=self.member_absent)
         first_task.done = True
@@ -151,7 +156,7 @@ class CheckAbsencesCommandTestCase(TestCase):
         first_task.contact_date = timezone.localdate()
         first_task.save()
 
-        session2 = self._session(self.tracked_mt, date=self.now.date())
+        session2 = self._session(self.tracked_mt, date=self.service_date)
         call_command("check_absences")
         tasks = MemberFollowUpTask.objects.filter(member=self.member_absent)
         self.assertEqual(tasks.count(), 2, "A resolved prior task must not block a genuinely new absence.")

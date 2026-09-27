@@ -111,6 +111,8 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_PAGINATION_CLASS": "core.pagination.StandardPagination",
     "PAGE_SIZE": 25,
+    # A model refusing a save comes back as a message, not a server error.
+    "EXCEPTION_HANDLER": "core.exceptions.api_exception_handler",
 }
 
 from datetime import timedelta  # noqa: E402
@@ -138,27 +140,9 @@ APP_BASE_URL = env("APP_BASE_URL", default="")
 # loudly instead of quietly accepting anyone.
 TASK_SECRET = os.environ.get("DCLM_TASK_SECRET", "")
 
-# ---- Logging ----
-# With DEBUG=False, Django's default logging only emails admins on
-# unhandled exceptions — nothing reaches stdout, so gunicorn's log (and
-# therefore Azure Log stream) shows the request line but never the
-# traceback. This sends request-level exceptions to the console too,
-# so they show up in Log stream without needing DEBUG=True.
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "handlers": {
-        "console": {"class": "logging.StreamHandler"},
-    },
-    "root": {
-        "handlers": ["console"],
-        "level": "INFO",
-    },
-    "loggers": {
-        "django.request": {
-            "handlers": ["console"],
-            "level": "ERROR",
-            "propagate": False,
-        },
-    },
-}
+
+# Lets the site read the file name a download is sent with, so a
+# spreadsheet is named after the figures it holds. Without it the browser
+# hides the header whenever the site and the server have different
+# addresses, as they may in production.
+CORS_EXPOSE_HEADERS = ["Content-Disposition"]

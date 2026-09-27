@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCreateMember } from '../../api/members';
-import { useLocations } from '../../api/locations';
+import { useMyLocations } from '../../api/locations';
 import { MemberFormFields, type MemberFormValues } from './MemberFormFields';
 import { Button } from '../../components/ui/Button';
 
@@ -14,7 +14,7 @@ const EMPTY: MemberFormValues = {
 
 export function AddMemberPage() {
   const navigate = useNavigate();
-  const { data: locations } = useLocations();
+  const { data: locations } = useMyLocations();
   const createMember = useCreateMember();
   const [values, setValues] = useState<MemberFormValues>(EMPTY);
   const [error, setError] = useState<string | null>(null);

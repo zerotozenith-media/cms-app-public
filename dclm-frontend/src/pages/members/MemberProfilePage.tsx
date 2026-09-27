@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useMember, useUpdateMember, useDeleteMember, useMoveCategory } from '../../api/members';
-import { useLocations } from '../../api/locations';
+import { useMyLocations } from '../../api/locations';
 import { apiClient } from '../../api/client';
 import { useQuery } from '@tanstack/react-query';
 import { MemberFormFields, type MemberFormValues } from './MemberFormFields';
@@ -9,7 +9,10 @@ import { Badge } from '../../components/ui/Badge';
 import { Icon } from '../../components/ui/Icon';
 import { fmt } from '../../lib/format';
 import type { Household, Member } from '../../types/members';
+import { useAuth } from '../../context/AuthContext';
+import { useLocationName } from '../../api/locations';
 
+import { useEligibleShepherds } from '../../api/followup';
 const CATEGORIES = ['General Member', 'Worker in Training', 'Worker'];
 
 function categoryBadgeColor(cat: string): 'green' | 'amber' | 'gray' {
@@ -32,14 +35,28 @@ export function MemberProfilePage() {
   const memberId = Number(id);
   const navigate = useNavigate();
   const { data: member, isLoading } = useMember(memberId);
-  const { data: locations } = useLocations();
+  const { data: locations } = useMyLocations();
   const updateMember = useUpdateMember(memberId);
+  // Who looks after this person, shown on the profile and changeable here.
+  // It was missing entirely, so nobody could see it without the list.
+  const { data: shepherds } = useEligibleShepherds(member?.location);
+  const [shepherdError, setShepherdError] = useState('');
+  async function changeShepherd(value: string) {
+    setShepherdError('');
+    try { await updateMember.mutateAsync({ assigned_to: value ? Number(value) : null } as any); }
+    catch (err: any) { setShepherdError(err?.response?.data?.assigned_to?.[0] ?? 'That shepherd could not be saved.'); }
+  }
   const deleteMember = useDeleteMember();
   const moveCategory = useMoveCategory(memberId);
+  const { hasPermission } = useAuth();
+  const canEdit = hasPermission('members', 'edit');
+  const canDelete = hasPermission('members', 'delete');
+  const locationName = useLocationName();
 
   const [editing, setEditing] = useState(false);
   const [formValues, setFormValues] = useState<MemberFormValues | null>(null);
   const [moveTarget, setMoveTarget] = useState('');
+  const [editError, setEditError] = useState('');
 
   const { data: household } = useQuery({
     queryKey: ['household', member?.household],
@@ -64,15 +81,31 @@ export function MemberProfilePage() {
 
   async function saveEdit() {
     if (!formValues) return;
-    await updateMember.mutateAsync({
-      surname: formValues.surname,
-      first_name: formValues.first_name,
-      phone: formValues.phone,
-      email: formValues.email,
-      location: formValues.location,
-      household: formValues.household ? Number(formValues.household) : null,
-    });
-    setEditing(false);
+    // Every field the form shows is sent. Other names, gender and date of
+    // birth were shown and editable but left out, so changes to them were
+    // silently lost while the form closed as if saved.
+    setEditError('');
+    try {
+      await updateMember.mutateAsync({
+        surname: formValues.surname,
+        first_name: formValues.first_name,
+        other_names: formValues.other_names,
+        gender: formValues.gender,
+        date_of_birth: formValues.date_of_birth || null,
+        phone: formValues.phone,
+        email: formValues.email,
+        location: formValues.location,
+        household: formValues.household ? Number(formValues.household) : null,
+      });
+      setEditing(false);
+    } catch (err: any) {
+      const d = err?.response?.data ?? {};
+      const first = Object.entries(d)[0] as [string, any] | undefined;
+      const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+      setEditError(first
+        ? `${cap(first[0].replace(/_/g, ' '))}: ${cap(String([].concat(first[1])[0]))}`
+        : 'Could not save the changes.');
+    }
   }
 
   async function handleDelete() {
@@ -102,16 +135,20 @@ export function MemberProfilePage() {
               )}
             </h3>
             <div className="row-actions">
-              <button className="icon-btn edit" title="Edit" onClick={startEdit}>
-                <Icon name="edit" size={15} />
-              </button>
-              <button className="icon-btn" title="Delete member" onClick={handleDelete}>
-                <Icon name="trash" size={15} />
-              </button>
+              {canEdit && (
+                <button className="icon-btn edit" title="Edit" onClick={startEdit}>
+                  <Icon name="edit" size={15} />
+                </button>
+              )}
+              {canDelete && (
+                <button className="icon-btn" title="Delete member" onClick={handleDelete}>
+                  <Icon name="trash" size={15} />
+                </button>
+              )}
             </div>
           </div>
           <div className="muted" style={{ margin: '4px 0 14px' }}>
-            {member.location} · Joined {member.joined_date}
+            {locationName(member.location)} · Joined {member.joined_date}
           </div>
 
           {editing && formValues && locations && (
@@ -123,6 +160,7 @@ export function MemberProfilePage() {
                 excludeMemberId={memberId}
                 showCategoryAndJoined={false}
               />
+              {editError && <p className="form-error" role="alert">{editError}</p>}
               <button className="btn sm" onClick={saveEdit} disabled={updateMember.isPending}>
                 Save changes
               </button>
@@ -140,6 +178,18 @@ export function MemberProfilePage() {
           </div>
 
           <div className="field section-gap">
+            <label htmlFor="member-shepherd">Shepherd</label>
+            {canEdit ? (
+              <select id="member-shepherd" value={member.assigned_to ?? ''}
+                onChange={(e) => changeShepherd(e.target.value)}>
+                <option value="">No shepherd</option>
+                {(shepherds ?? []).map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            ) : <div>{member.assigned_to_name || 'No shepherd'}</div>}
+            {shepherdError && <p className="form-error" role="alert">{shepherdError}</p>}
+          </div>
+
+          {canEdit && <div className="field section-gap">
             <label htmlFor="move-category">Move to category</label>
             <div style={{ display: 'flex', gap: 8 }}>
               <select id="move-category" className="selectbox" value={moveTarget || availableCategories[0]} onChange={(e) => setMoveTarget(e.target.value)}>
@@ -147,7 +197,7 @@ export function MemberProfilePage() {
               </select>
               <button className="btn sm" onClick={handleMove} disabled={moveCategory.isPending}>Move</button>
             </div>
-          </div>
+          </div>}
         </div>
 
         <div>

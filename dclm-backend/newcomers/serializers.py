@@ -186,9 +186,14 @@ class SetMilestoneSerializer(serializers.Serializer):
 class PublicRegistrationSerializer(serializers.Serializer):
     """
     The real intake-slip fields, for the public QR self-registration
-    endpoint. Deliberately excludes location, source, stage, and
-    assigned_to , all auto-set server-side, never accepted from an
-    unauthenticated public submission.
+    endpoint. Source, stage and assigned_to are set by the server and
+    never accepted from an unauthenticated submission.
+
+    The location is read by the view from the QR code's link, so a
+    visitor at another location lands in that location's pipeline. It
+    only ever selects an existing location, and anything unknown falls
+    back to the main one, so a submission cannot create or reach
+    anything else.
     """
     name = serializers.CharField(max_length=150)
     address = serializers.CharField(max_length=300, required=False, allow_blank=True, default="")

@@ -78,6 +78,14 @@ class Member(models.Model):
     class Meta:
         ordering = ["surname", "first_name"]
 
+    def save(self, *args, **kwargs):
+        # Phone numbers are unique on the roll. A blank one is stored as
+        # nothing: as an empty string it counted as a number, so once one
+        # member had no phone, adding a second without one failed with a
+        # server error.
+        self.phone = (self.phone or "").strip() or None
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return self.full_name
 

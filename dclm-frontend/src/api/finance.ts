@@ -103,3 +103,24 @@ export function useDeleteExpense() {
     onSuccess: () => invalidateFinance(queryClient),
   });
 }
+
+/** Projects are fundraising targets the church sets, so they belong in
+ *  Admin rather than in code. */
+export function useCreateProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { name: string; target_amount: string; location?: string }) =>
+      (await apiClient.post('/projects/', payload)).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
+  });
+}
+
+/** Removing one with giving against it is refused by the server: those
+ *  records would point at a project that no longer exists. */
+export function useDeleteProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string | number) => apiClient.delete(`/projects/${id}/`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
+  });
+}

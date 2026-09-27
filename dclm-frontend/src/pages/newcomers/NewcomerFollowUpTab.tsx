@@ -7,6 +7,7 @@ import { Icon } from '../../components/ui/Icon';
 import { FollowUpCompletionForm } from '../../components/followup/FollowUpCompletionForm';
 import { CompletedFollowUpLog } from '../../components/followup/CompletedFollowUpLog';
 import type { NewcomerTask } from '../../types/newcomers';
+import { useAuth } from '../../context/AuthContext';
 
 type StatusFilter = 'open' | 'completed' | 'all';
 
@@ -26,6 +27,8 @@ function urgency(task: NewcomerTask): 'green' | 'red' | 'amber' | 'gray' {
  * completion form and the log display rather than duplicating them.
  */
 export function NewcomerFollowUpTab() {
+  const { hasPermission } = useAuth();
+  const canEdit = hasPermission('newcomers', 'edit');
   const navigate = useNavigate();
   const [status, setStatus] = useState<StatusFilter>('open');
   const [ordering, setOrdering] = useState('due_date');
@@ -118,9 +121,9 @@ export function NewcomerFollowUpTab() {
               </div>
               <div className="followup-row-actions">
                 <Badge color={urgency(t)}>{t.done ? 'Done' : `Due ${t.due_date}`}</Badge>
-                <button className="btn sm outline" onClick={() => setCompletingId(isCompleting ? null : t.id)}>
+                {canEdit && (<button className="btn sm outline" onClick={() => setCompletingId(isCompleting ? null : t.id)}>
                   {t.done ? 'Edit' : 'Mark done'}
-                </button>
+                </button>)}
                 <button className="icon-btn" title="Delete this task" onClick={() => handleDelete(t.id)}>
                   <Icon name="trash" size={14} />
                 </button>

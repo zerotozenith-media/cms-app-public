@@ -509,3 +509,55 @@ class NewcomerTaskFilterTestCase(APITestCase):
         self.client.force_authenticate(user=self.admin)
         resp = self.client.get("/api/newcomer-tasks/")
         self.assertEqual(len(resp.data["results"]), 2)
+
+
+class DragToMemberTestCase(APITestCase):
+    """
+    Dragging a card to Member used to change the label only, leaving the
+    person on the board as a member and missing from the member roll.
+    """
+    def setUp(self):
+        from accounts.models import Role, RolePermission, User
+        from core.models import Location
+        self.loc = Location.objects.create(id="bahrain", name="Bahrain", is_core=True)
+        role = Role.objects.create(name="Administrator")
+        for m in ["members", "attendance", "newcomers", "finance",
+                  "goals", "reports", "outreach", "admin"]:
+            RolePermission.objects.create(role=role, module=m, can_view=True,
+                                          can_create=True, can_edit=True, can_delete=True)
+        self.admin = User.objects.create_user(email="d@t.com", password="x", role=role)
+        self.client.force_authenticate(user=self.admin)
+        src = NewcomerSource.objects.create(name="Walk-in")
+        today = timezone.localdate()
+        self.n = Newcomer.objects.create(
+            name="Joy Mensah", source=src, location=self.loc,
+            stage=Newcomer.Stage.ATTENDING, created_at=today, stage_since=today)
+
+    def move(self):
+        return self.client.post(f"/api/newcomers/{self.n.id}/change-stage/",
+                                {"to_stage": "member"}, format="json")
+
+    def test_dragging_to_member_creates_the_member_record(self):
+        from members.models import Member
+        self.move()
+        self.assertTrue(Member.objects.filter(from_newcomer=self.n).exists())
+
+    def test_the_newcomer_is_at_the_member_stage(self):
+        self.move()
+        self.n.refresh_from_db()
+        self.assertEqual(self.n.stage, Newcomer.Stage.MEMBER)
+
+    def test_dragging_twice_does_not_create_two_members(self):
+        from members.models import Member
+        self.move()
+        self.n.refresh_from_db()
+        self.n.stage = Newcomer.Stage.ATTENDING
+        self.n.save()
+        self.move()
+        self.assertEqual(Member.objects.filter(from_newcomer=self.n).count(), 1)
+
+    def test_the_button_and_the_drag_agree(self):
+        """Both routes must produce the same result."""
+        from members.models import Member
+        self.client.post(f"/api/newcomers/{self.n.id}/make-member/")
+        self.assertEqual(Member.objects.filter(from_newcomer=self.n).count(), 1)

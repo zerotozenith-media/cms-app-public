@@ -128,7 +128,7 @@ class AuditLog(models.Model):
         verbose_name_plural = "Audit log"
 
     def __str__(self):
-        return f"{self.timestamp} , {self.user_name_snapshot} , {self.action} {self.entity_type}"
+        return f"{self.timestamp} · {self.user_name_snapshot} · {self.action} {self.entity_type}"
 
 
 class LoginAttempt(models.Model):
@@ -160,4 +160,4 @@ class LoginAttempt(models.Model):
 
     def __str__(self):
         status = "OK" if self.successful else f"FAILED ({self.reason})"
-        return f"{self.timestamp} , {self.email_attempted} , {status}"
+        return f"{self.timestamp} · {self.email_attempted} · {status}"

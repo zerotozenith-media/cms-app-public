@@ -100,7 +100,7 @@ class Command(BaseCommand):
 
             MemberFollowUpTask.objects.create(
                 member=member,
-                text=f"Missed {session.meeting_type.name} , check in",
+                text=f"Missed {session.meeting_type.name}, check in with them",
                 due_date=timezone.localdate() + datetime.timedelta(days=FOLLOWUP_DUE_IN_DAYS),
                 assigned_to=member.assigned_to,
                 missed_session=session,

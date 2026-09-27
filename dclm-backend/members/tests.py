@@ -313,7 +313,7 @@ class MemberFollowUpTaskTestCase(APITestCase):
         self.member = Member.objects.create(surname="Noor", first_name="Fatima", location=self.bahrain,
             joined_date=datetime.date(2024, 1, 1), assigned_to=self.shepherd)
         self.task = MemberFollowUpTask.objects.create(
-            member=self.member, text="Missed Friday Worship Service , check in",
+            member=self.member, text="Missed Friday Worship Service, check in with them",
             due_date=datetime.date(2026, 8, 16), assigned_to=self.shepherd,
             missed_meeting_name="Friday Worship Service", missed_date=datetime.date(2026, 8, 14),
         )
