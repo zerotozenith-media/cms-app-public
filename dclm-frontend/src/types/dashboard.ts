@@ -30,6 +30,7 @@ export interface GoalSummary {
 }
 
 export interface DashboardSummary {
+  follow_up_people?: { name: string; task: string; due_date: string; days_overdue: number; link: string }[];
   period: { start: string; end: string; label: string };
   banner: { message: string; has_outstanding: boolean };
 
@@ -37,6 +38,8 @@ export interface DashboardSummary {
   attendance?: {
     meeting_id: string | null;
     meeting_name: string;
+    grouping?: 'month' | 'service';
+    period?: { key: string; label: string };
     trend: AttendancePoint[];
     average: number;
     latest: number;
@@ -79,5 +82,5 @@ export interface DashboardSummary {
   short_term_goals?: GoalSummary[];
 
   testimonies_access: boolean;
-  testimonies?: { count: number; recent: { text: string; by: string; date: string }[] };
+  testimonies?: { count: number; recent: { text: string; by: string; service?: string; date: string }[] };
 }

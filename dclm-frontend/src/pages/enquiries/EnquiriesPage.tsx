@@ -1,3 +1,4 @@
+import { Skeleton } from '../../components/ui/Skeleton';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useEnquiries, useEnquiryStats, useChangeEnquiryStage } from '../../api/enquiries';
@@ -72,7 +73,7 @@ export function EnquiriesPage() {
 
       <StatRow stats={statItems} />
 
-      {isLoading && <div className="card section-gap">Loading…</div>}
+      {isLoading && <div className="card section-gap"><Skeleton shape="list" /></div>}
 
       <EnquiryKanbanBoard
         enquiries={all}

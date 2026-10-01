@@ -204,6 +204,14 @@ class AttendanceSession(models.Model):
     lesson = models.CharField(
         max_length=60, blank=True, default="",
         help_text='Which study was covered, for example "BTB 15".')
+    # F22: an occasional meeting, such as GCK or Ministerial Renewal, has its
+    # own edition each time it is held.
+    edition_name = models.CharField(
+        max_length=120, blank=True, default="",
+        help_text="The theme or title of this edition, for an occasional meeting.")
+    edition_place = models.CharField(
+        max_length=120, blank=True, default="",
+        help_text="Where this edition is held: the host city or venue.")
 
     class Meta:
         ordering = ["-date"]

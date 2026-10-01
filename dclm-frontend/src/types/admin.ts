@@ -26,6 +26,7 @@ export interface AdminUser {
   location_name: string | null;
   member: number | null;
   is_active: boolean;
+  can_shepherd?: boolean;
   last_login: string | null;
 }
 

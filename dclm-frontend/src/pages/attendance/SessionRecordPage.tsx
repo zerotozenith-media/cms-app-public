@@ -1,3 +1,4 @@
+import { Skeleton } from '../../components/ui/Skeleton';
 import { useQuery } from '@tanstack/react-query';
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -51,11 +52,21 @@ export function SessionRecordPage() {
   const [newConverts, setNewConverts] = useState(0);
   const [ledBy, setLedBy] = useState<number | ''>('');
   const [lesson, setLesson] = useState('');
+  // F22: the edition of an occasional meeting.
+  const [editionName, setEditionName] = useState('');
+  const [editionPlace, setEditionPlace] = useState('');
   // What was collected, by fund. Saved as giving linked to this meeting
   // rather than as a second copy of the same money.
   const [offering, setOffering] = useState<Record<string, string>>({});
   const [trackNamed, setTrackNamed] = useState(false);
   const [attendeeIds, setAttendeeIds] = useState<Set<number>>(new Set());
+  // A refused save says why, instead of leaving the form unchanged.
+  const [saveError, setSaveError] = useState('');
+  const explain = (err: any) => {
+    const d = err?.response?.data;
+    const first = d && typeof d === 'object' ? Object.values(d)[0] : null;
+    setSaveError(typeof d?.detail === 'string' ? d.detail : first ? `This could not be saved: ${String(([] as any[]).concat(first)[0])}` : 'This could not be saved. Check your connection and try again.');
+  };
   const [selectedNames, setSelectedNames] = useState<Map<number, string>>(new Map());
   const [search, setSearch] = useState('');
   const [searchResults, setSearchResults] = useState<Member[]>([]);
@@ -68,9 +79,14 @@ export function SessionRecordPage() {
       youth_girls: session.youth_girls, children_boys: session.children_boys, children_girls: session.children_girls,
     });
     setTrackNamed(session.track_named);
-    const ids = new Set(session.attendees.map((a) => a.member));
+    setEditionName(session.edition_name ?? '');
+    setEditionPlace(session.edition_place ?? '');
+    // Members only: newcomers checked in at the door have no member number,
+    // and an empty one made every save of this session fail.
+    const members = session.attendees.filter((a) => a.member != null);
+    const ids = new Set(members.map((a) => a.member as number));
     setAttendeeIds(ids);
-    const names = new Map(session.attendees.map((a) => [a.member, a.member_name] as const));
+    const names = new Map(members.map((a) => [a.member as number, a.member_name] as const));
     setSelectedNames(names);
   }, [session]);
 
@@ -87,7 +103,7 @@ export function SessionRecordPage() {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [search]);
 
-  if (isLoading || !session || !meetingTypes) return <div className="card">Loading…</div>;
+  if (isLoading || !session || !meetingTypes) return <Skeleton shape="form" />;
 
   const meetingType = meetingTypes.find((m) => m.id === session.meeting_type);
   const fields = meetingType?.detail_level === 'simple' ? SIMPLE_FIELDS : DETAILED_FIELDS;
@@ -96,6 +112,7 @@ export function SessionRecordPage() {
   const onlineCount = Object.values(online).reduce((a, b) => a + b, 0);
   const total = inPerson + onlineCount;
   const isFellowship = !!session?.fellowship;
+  const isOccasional = meetingTypes?.find((t) => t.id === session?.meeting_type)?.frequency === 'occasional';
   const { hasPermission } = useAuth();
   const canEdit = hasPermission('attendance', 'edit');
   const canDelete = hasPermission('attendance', 'delete');
@@ -124,12 +141,14 @@ export function SessionRecordPage() {
 
   async function handleDelete() {
     if (!confirm('Delete this session?')) return;
-    await deleteSession.mutateAsync(sessionId);
+    try { await deleteSession.mutateAsync(sessionId); } catch (err) { explain(err); return; }
     navigate('/attendance');
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setSaveError('');
+    try {
     await recordSession.mutateAsync({
       ...counts,
       online_men: online.men, online_women: online.women,
@@ -137,10 +156,12 @@ export function SessionRecordPage() {
       online_children_boys: online.children_boys, online_children_girls: online.children_girls,
       new_comers: newComers, new_converts: newConverts,
       ...(isFellowship ? { led_by: ledBy === '' ? null : ledBy, lesson } : {}),
+      ...(isOccasional ? { edition_name: editionName, edition_place: editionPlace } : {}),
       ...(collectsOffering ? { offering } : {}),
       track_named: trackNamed,
       attendee_ids: Array.from(attendeeIds),
     });
+    } catch (err) { explain(err); return; }
     navigate('/attendance');
   }
 
@@ -154,7 +175,10 @@ export function SessionRecordPage() {
               {session.meeting_type_name}
               {session.fellowship_name ? ` · ${session.fellowship_name}` : ''} · {session.date}
             </h3>
-            <div className="muted" style={{ marginBottom: 16 }}>{locationName(session.location)} · {session.mode === 'in-person' ? 'In person' : session.mode.replace('-', ' ')}</div>
+            <div className="muted" style={{ marginBottom: (session.edition_name || session.edition_place) ? 4 : 16 }}>{locationName(session.location)} · {session.mode === 'in-person' ? 'In person' : session.mode.replace('-', ' ')}</div>
+            {(session.edition_name || session.edition_place) && (
+              <div style={{ fontWeight: 600, marginBottom: 16 }}>{[session.edition_name, session.edition_place].filter(Boolean).join(', ')}</div>
+            )}
           </div>
           {canDelete && (
             <button className="icon-btn" title="Delete session" onClick={handleDelete}>
@@ -170,6 +194,18 @@ export function SessionRecordPage() {
           {/* Read only for somebody who cannot change it: boxes they could
               type into but never save would only mislead. */}
           <fieldset disabled={!canEdit} className="plain-fieldset">
+          {isOccasional && (
+            <div className="form-row">
+              <div className="field">
+                <label htmlFor="session-edition">Edition name</label>
+                <input id="session-edition" value={editionName} onChange={(e) => setEditionName(e.target.value)} maxLength={120} placeholder="The theme or title of this edition" />
+              </div>
+              <div className="field">
+                <label htmlFor="session-edition-place">Where it is held</label>
+                <input id="session-edition-place" value={editionPlace} onChange={(e) => setEditionPlace(e.target.value)} maxLength={120} placeholder="Host city or venue" />
+              </div>
+            </div>
+          )}
           <div className="followup-guide">
             <div className="followup-guide-title"><Icon name="users" size={14} /> In person</div>
             <div className="followup-guide-note">Everyone physically in the room.</div>
@@ -345,6 +381,7 @@ export function SessionRecordPage() {
               This service has not happened yet. Attendance can be recorded on the day or after.
             </p>
           )}
+          {saveError && <p className="form-error" role="alert">{saveError}</p>}
           {canEdit && (
             <button className="btn" type="submit" disabled={recordSession.isPending || isFuture}>
               {recordSession.isPending ? 'Saving…' : 'Save session'}

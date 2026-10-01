@@ -1,3 +1,4 @@
+import { Skeleton } from '../../components/ui/Skeleton';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCampaigns, useCampaignSummary, useCreateCampaign, useDeleteCampaign } from '../../api/campaigns';
@@ -108,7 +109,7 @@ export function OutreachPage() {
           </div>
         )}
 
-        {isLoading && <div className="empty">Loading…</div>}
+        {isLoading && <Skeleton shape="list" />}
 
         {!isLoading && (campaigns ?? []).length === 0 && (
           <div className="empty">

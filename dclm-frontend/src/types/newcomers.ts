@@ -42,6 +42,8 @@ export interface Newcomer {
 }
 
 export interface NewcomerTask {
+  newcomer_name?: string;
+  shepherd_name?: string;
   id: number;
   newcomer: number;
   text: string;

@@ -31,6 +31,15 @@ export const HELP_SECTIONS: HelpSection[] = [
 
 export const HELP_CONTENT: Record<string, HelpEntry[]> = {
   start: [
+    { h: 'Your account', p: 'Tap your round badge at the top right for your name, role and location, My profile and Sign out. In My profile you can add a photo, correct your name, phone and email, and change your password.' },
+    { h: 'Forgotten your password', steps: [
+      'On the sign-in page, press Forgotten your password? under the Sign in button.',
+      'Type the email you sign in with and press Send reset link.',
+      'Open the email and press Choose a new password. The link works once, for one hour.',
+      'Type the new password twice and press Save and sign in.',
+    ], note: 'Only people with no account yet need to ask an administrator.' },
+    { h: 'The bell', p: 'The bell at the top shows everything waiting on you: red when something is overdue, amber when things are only waiting. Tap it for the list and tap a line to open it. If you do not oversee others, it counts only your own follow-ups.' },
+    { h: 'Viewing one location', p: 'Administrators covering every location have a location picker at the top. Choose a location and every page narrows to it until you choose All locations again.' },
     {
       h: 'New here? Pick what you do',
       p: 'This guide is split by job, not by menu. Find yours below and follow the steps. Everything else can wait until you need it.',
@@ -134,7 +143,7 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
     },
     {
       h: 'Reading someone\'s history before you visit',
-      p: 'Tap their name to open their profile. The Follow-ups section shows every past visit and what was discussed. Worth two minutes before you knock on a door.',
+      p: 'Tap their name to open their profile. The Journey tab shows every past visit and what was discussed. Worth two minutes before you knock on a door.',
     },
   ],
 
@@ -225,7 +234,7 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
         'Review what it proposes. Households are kept together, and the rest are spread evenly across your workers.',
         'Tap Apply if it looks right, or Cancel and assign people by hand instead.',
       ],
-      note: 'Only members in the Worker category can be shepherds, so make sure your workers are set to that category first.',
+      note: 'Only accounts ticked Can shepherd others in Admin are given people. Tick at least one at each location first.',
     },
     {
       h: '6. Check your goals',
@@ -238,6 +247,12 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
   ],
 
   situations: [
+    { h: 'I have no service badge', p: 'The service badge is for people who follow others up: shepherds, and roles that can change newcomers.' },
+    { h: 'My level went down', p: 'Points count the last 90 days. A note gives 30 days of warning with the steps that keep your level, before you move down one level.' },
+    { h: 'Someone asked us to stop messaging them', p: 'On their profile, open Messages and press Stop messages. You can still message them yourself.' },
+    { h: 'A newcomer is getting no messages', p: 'They may have unticked Keep in touch, or were added before this feature. Press Start messages on their Messages tab.' },
+    { h: 'A shepherd is stopping', p: 'In Admin, untick Shepherd under their role. Then press Auto-assign on the Members page, choose Reassign everyone instead, check the proposal and press Apply.' },
+    { h: 'I am locked out', p: 'After five wrong passwords, sign-in is locked for 15 minutes. The fourth attempt warns you first. Wait, or reset your password with Forgotten your password?' },
     { h: 'Someone new walked in today', p: 'Register them before they leave. Newcomers & Follow-up, then either QR Registration for them to fill in themselves, or Manual Entry if you have their paper card.' },
     { h: 'A member has stopped coming', p: 'If the meeting has absence follow-up switched on, a task was already created for their shepherd. Check Members, Follow-up tab. If nothing is there, the meeting may not be set to track absences, or nobody checked them in that week.' },
     { h: 'I typed the wrong attendance number or count', p: 'Open the session again from the Attendance list, correct the numbers, and save. It simply overwrites the old figure.' },
@@ -258,6 +273,7 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
   ],
 
   attendance: [
+    { h: 'Occasional meetings', p: 'For GCK, Ministerial Renewal and other occasional meetings, a new session asks for the Edition name and Where it is held, the host city or venue. They show under the meeting name in All sessions.' },
     { h: 'Two ways attendance is recorded', p: 'Headcounts are the official figure: how many men, women, youth and children were present. Named check-in records exactly which members came. Both are kept, and recording one does not change the other.' },
     { h: 'Recording a headcount', p: 'Open the session from the Attendance list and fill in the numbers. Whether you see six boxes or two depends on whether that meeting type is set to Detailed or Simple. If the meeting collects an offering, enter it in the Offering collected box on the same form. It is recorded as giving for that service, dated to it. Save it and the session moves from Pending to Filled. A service that has not happened yet cannot be recorded.' },
     { h: 'Live check-in during a service', p: 'On the day of the service, press Check in on its row in the Attendance list. You get the member list grouped by category. Tap a name as each person arrives and it saves immediately, so several ushers on different doors can work at the same time without overwriting each other. Tap again to undo. Use Mark online for anyone joining remotely.' },
@@ -265,11 +281,12 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
   ],
 
   members: [
-    { h: 'Member categories', p: 'General Member, Worker in Training, and Worker. To move someone, open their profile and use Move to category. This keeps a dated history so you can see when someone progressed, which also feeds the growth goals.' },
+    { h: 'Member categories', p: 'General Member, Worker in Training, and Worker. To move someone, open their profile and use Move to category on the Overview tab. The move is dated in their Journey, which also feeds the growth goals. The category is church status only: it gives no powers in the system.' },
     { h: 'Households', p: 'Linking people to a household keeps families together in the records. It also matters for shepherd assignment: auto-assign keeps a household with the same shepherd rather than splitting them between workers.' },
-    { h: 'What a shepherd is', p: 'Every member can be assigned a shepherd, a worker responsible for checking on them. When someone misses a tracked service, the follow-up task goes to their shepherd automatically.' },
+    { h: 'What a shepherd is', p: 'Every member can be assigned a shepherd, a person responsible for checking on them. Anyone whose account is ticked Can shepherd others in Admin can be one, whatever their member category. When someone misses a tracked service, the follow-up task goes to their shepherd automatically.' },
+    { h: 'One profile for each person', p: 'A newcomer and a member have the same profile page. When a newcomer becomes a member, their journey simply continues: how they first came, every contact, their milestones and any open follow-ups stay on the same page.' },
     { h: 'Assigning shepherds', p: 'Three ways. One at a time on the member\'s profile. Several at once by ticking the boxes in the member list and choosing a shepherd. Or press Auto-assign to let the system propose assignments for everyone who has none.' },
-    { h: 'How auto-assign decides', p: 'Household first, so families stay together. Then whoever currently carries the fewest people. Only Workers can be shepherds. Nothing is saved until you review the proposed list and press Apply. Before applying you can choose a different shepherd for any row, or leave someone unassigned, and each shepherd\'s load now and after is shown. By default it only fills people who have no shepherd, so deliberate pairings are left alone. Reassign everyone recalculates from scratch, which is useful when a worker leaves.' },
+    { h: 'How auto-assign decides', p: 'Household first, so families stay together. Then whoever currently carries the fewest people. Only accounts ticked Can shepherd others in Admin can be shepherds. Nothing is saved until you review the proposed list and press Apply. Before applying you can choose a different shepherd for any row, or leave someone unassigned, and each shepherd\'s load now and after is shown. By default it only fills people who have no shepherd, so deliberate pairings are left alone. Reassign everyone recalculates from scratch, which is useful when a shepherd stops.' },
   ],
 
   followup: [
@@ -282,6 +299,15 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
   ],
 
   newcomers: [
+    { h: 'The service ladder', p: 'Everyone who follows people up has a level, from Sower to Good and Faithful Servant, shown by a badge beside the bell. Points come from the last 90 days: follow-ups done on time, messages sent, discipler steps, and the people you look after returning, joining and being baptised. Hover over the badge, or tap it, for your points and next steps. My service, at the foot of My profile, shows the six levels and the team.' },
+    { h: 'Follow-up messages', p: 'Everyone we follow up gets a short planned message now and then, sent by the person looking after them from their own WhatsApp. There are three journeys: Online contacts, Newcomers and New converts. Each person is on one at a time, and moving between them is automatic.' },
+    { h: "Sending today's messages", steps: [
+      'Open the Messages tab. You see everyone you look after who is due a message today.',
+      'If they have not replied since your last message, leave it on No and press Send on WhatsApp.',
+      'Send it in WhatsApp, come back, and press Yes, record it.',
+    ], note: 'If they have replied, choose Yes and write a personal reply. Their planned message moves to the next day.' },
+    { h: 'Another message, or your own', p: 'Use another message opens the message bank for their journey. You can also use one of your saved messages or write your own. Keep it to one or two sentences, end with one easy question, and offer only one next step.' },
+    { h: "A person's messages", p: 'The Messages tab on a profile shows their journey and what was sent. You can switch between Standard and Daily, stop or restart messages, start messages for someone with none, or record a decision for Christ, which moves them to New converts.' },
     { h: 'Two ways someone is registered', p: 'They scan the QR code and fill the form on their own phone, or a worker types in a paper card using Manual Entry. Both collect the same information and both land in the pipeline of the location they attended.' },
     { h: 'The pipeline', p: 'New means registered and nobody has reached them yet. Contacted means someone has spoken to them. Attending means they have come to a service at least once. Member means they are on the member roll. Drag a card between columns, or use the dropdown on each card, which is the only way on a phone.' },
     { h: 'Becoming a member', p: 'A newcomer is proposed for membership once three things are true: the Salvation milestone is recorded with its date, they have attended at least half the Friday services held at their location since they first came, and they first came at least six months ago. The system only proposes it. An administrator confirms, and can add anyone at any time regardless, for example someone relocating from another church. Dropping a card on the Member column asks you to confirm first, and needs permission to add members.' },

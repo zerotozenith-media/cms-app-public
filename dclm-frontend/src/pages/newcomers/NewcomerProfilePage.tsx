@@ -1,5 +1,6 @@
+import { Skeleton } from '../../components/ui/Skeleton';
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Navigate, useParams, useNavigate } from 'react-router-dom';
 import {
   useNewcomer, useUpdateNewcomer, useDeleteNewcomer, useChangeStage, useSetMilestone,
   useCreateTask, useDeleteTask, useCompleteNewcomerTask, useNewcomerSources, useNewcomerTasks,
@@ -7,6 +8,13 @@ import {
 } from '../../api/newcomers';
 import { ReadinessCards } from '../../components/journey/ReadinessCards';
 import { JourneyTimeline } from '../../components/journey/JourneyTimeline';
+import { usePerson } from '../../api/person';
+import { PersonMessages } from '../../components/person/PersonMessages';
+import { AttendanceList, PersonStats, PersonTabs, initialsOf } from '../../components/person/PersonParts';
+
+const longDate = (d?: string | null) =>
+  d ? new Date(`${d}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '–';
+
 import { Badge } from '../../components/ui/Badge';
 import { Icon } from '../../components/ui/Icon';
 import { FollowUpCompletionForm } from '../../components/followup/FollowUpCompletionForm';
@@ -39,7 +47,7 @@ export function NewcomerProfilePage() {
   const { id } = useParams();
   const newcomerId = Number(id);
   const navigate = useNavigate();
-  const { data: n, isLoading } = useNewcomer(newcomerId);
+  const { data: n, isLoading, isError } = useNewcomer(newcomerId);
   const { data: sources } = useNewcomerSources();
   const updateNewcomer = useUpdateNewcomer(newcomerId);
   const deleteNewcomer = useDeleteNewcomer();
@@ -67,8 +75,12 @@ export function NewcomerProfilePage() {
       `Add ${n.name} to the member roll?\n\n` +
       'Their follow-up history stays with them, and their card remains on the board under Member.'
     )) return;
-    await makeMember.mutateAsync();
+    setMakeError('');
+    // A refusal, such as their phone already belonging to a member, says why.
+    try { await makeMember.mutateAsync(); }
+    catch (e: any) { setMakeError(e?.response?.data?.detail || 'They could not be added to the member roll. Try again.'); }
   }
+  const [makeError, setMakeError] = useState('');
 
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState('');
@@ -79,7 +91,16 @@ export function NewcomerProfilePage() {
   const [taskText, setTaskText] = useState('');
   const [taskDue, setTaskDue] = useState(today);
 
-  if (isLoading || !n) return <div className="card">Loading…</div>;
+  const { data: person } = usePerson('newcomers', newcomerId);
+  // Someone at another location, or deleted: say so, rather than a page that
+  // waits for ever.
+  if (isError) return (
+    <div className="card empty">
+      This person could not be found. They may be at another location, or no longer recorded.
+      <div style={{ marginTop: 10 }}><button className="btn sm outline" onClick={() => navigate('/newcomers')}>Back to newcomers</button></div>
+    </div>
+  );
+  if (isLoading || !n) return <Skeleton shape="profile" />;
 
   function startEdit() {
     setEditName(n!.name);
@@ -129,70 +150,35 @@ export function NewcomerProfilePage() {
     setTaskDue(today);
   }
 
-  return (
-    <>
-      <a className="backlink" onClick={() => navigate('/newcomers')}>← Back to pipeline</a>
-
-      <div className="card profile-head">
-        <div className="profile-head-main">
-          <h3>{n.name}</h3>
-          <div className="muted">
-            {n.source_name}
-            {' · '}
-            {n.assigned_to_name ? `Shepherd: ${n.assigned_to_name}` : <Badge color="amber">Unassigned</Badge>}
-            {' · '}
-            {locationName(n.location)}
-          </div>
-        </div>
-        <div className="profile-head-actions">
-          <Badge color={n.stage === 'member' ? 'green' : 'blue'}>{stageLabel(n.stage)}</Badge>
-          {canEdit && <button className="icon-btn edit" title="Edit" onClick={startEdit}><Icon name="edit" size={15} /></button>}
-          {canDelete && <button className="icon-btn" title="Delete" onClick={handleDelete}><Icon name="trash" size={15} /></button>}
-        </div>
-      </div>
-
-      {/* How to reach them and what they told us. The profile showed none
-          of it, so whoever was to call or visit could not see how. */}
-      <div className="card contact-card" style={{ marginBottom: 16 }}>
-        <div className="contact-grid">
-          <div><span className="muted">Phone</span><div>{n.phone ? <a href={`tel:${n.phone}`}>{n.phone}</a> : '–'}</div></div>
-          <div><span className="muted">Email</span><div>{n.email ? <a href={`mailto:${n.email}`}>{n.email}</a> : '–'}</div></div>
-          <div><span className="muted">Address</span><div>{[n.address, n.city_governorate].filter(Boolean).join(', ') || '–'}</div></div>
-          <div><span className="muted">First came to</span><div>{n.meeting_attended_name || '–'}</div></div>
-          <div><span className="muted">Gender and age</span><div>{[n.gender, n.age_group].filter(Boolean).join(', ') || '–'}</div></div>
-          <div><span className="muted">Invited by</span><div>{n.invited_by_member_name || '–'}</div></div>
-        </div>
-        {n.prayer_request && (
-          <div className="section-gap"><span className="muted">Prayer request</span><div>{n.prayer_request}</div></div>
-        )}
-      </div>
-
-      {n.stage === 'member' ? (
-        <div className="ready-banner member-banner">
-          <Icon name="check" size={17} />
-          <b>{n.name} is on the member roll.</b>
-          <span className="muted">Their card stays on the board under Member.</span>
-        </div>
-      ) : readiness?.ready ? (
+  // F16: one page per person. Once they are a member, their card opens the
+  // member profile, which carries this whole story.
+  if (n.stage === 'member' && person?.member_id) {
+    return <Navigate to={`/members/${person.member_id}`} replace />;
+  }
+  const phoneDigits = (n.phone || '').replace(/[^0-9]/g, '');
+  const tabs = [
+    { key: 'overview', label: 'Overview', body: (
+      <>
+        {person && <PersonStats p={person} />}
+        {readiness?.ready && n.stage !== 'member' && (
         <div className="ready-banner">
           <Icon name="check" size={17} />
-          <b>Ready for membership.</b> Both conditions are met, so this is proposed for you to confirm.
+          <b>Ready for membership.</b> All three conditions are met, so this is proposed for you to confirm.
           {canMakeMember && (
             <button className="btn sm" style={{ marginLeft: 'auto' }}
               onClick={handleMakeMember} disabled={makeMember.isPending}>Make a member</button>
           )}
         </div>
-      ) : null}
-
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div className="toolbar" style={{ marginBottom: 12 }}>
-          <h3 style={{ flex: 'none' }}>Membership readiness</h3>
+)}
+        <div className="toolbar" style={{ margin: '4px 0 12px' }}>
+          <h4 style={{ flex: 1, margin: 0 }}>Membership readiness</h4>
           {canMakeMember && n.stage !== 'member' && (
             <button className="btn sm outline" onClick={handleMakeMember} disabled={makeMember.isPending}>
               <Icon name="check" size={14} /> Make a member now
             </button>
           )}
         </div>
+        {makeError && <p className="form-error" role="alert">{makeError}</p>}
         {readiness && <ReadinessCards r={readiness} />}
         <div className="muted" style={{ fontSize: '.8rem' }}>
           A newcomer is proposed once the Salvation milestone is recorded, they have attended at
@@ -200,79 +186,7 @@ export function NewcomerProfilePage() {
           came at least six months ago. An administrator always confirms, and can
           add anyone at any time regardless, for example someone relocating from another church.
         </div>
-      </div>
-
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div className="toolbar" style={{ marginBottom: 4 }}>
-          <h3 style={{ flex: 'none' }}>Journey</h3>
-        </div>
-        <div className="muted" style={{ fontSize: '.8rem', marginBottom: 10 }}>
-          Every contact, including attempts that did not reach them.
-        </div>
-        <JourneyTimeline events={journey ?? []} />
-
-        {canCreate && <div className="form-card section-gap">
-          <div className="muted" style={{ fontSize: '.8rem', marginBottom: 8 }}>
-            Tried and could not reach them? Record it, so the history does not look as though
-            nobody tried.
-          </div>
-          <div className="form-row">
-            <div className="field">
-              <label htmlFor="attempt-method">How you tried</label>
-              <select id="attempt-method" value={attemptMethod}
-                onChange={(e) => setAttemptMethod(e.target.value)}>
-                {ATTEMPT_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="attempt-note">Note</label>
-              <input id="attempt-note" value={attemptNote}
-                onChange={(e) => setAttemptNote(e.target.value)}
-                placeholder="e.g. left a voice note" />
-            </div>
-          </div>
-          <button className="btn sm outline" disabled={logAttempt.isPending}
-            onClick={async () => {
-              await logAttempt.mutateAsync({ method: attemptMethod, note: attemptNote });
-              setAttemptNote('');
-            }}>
-            <Icon name="plus" size={14} /> Log the attempt
-          </button>
-        </div>}
-      </div>
-
-      <div className="grid g2">
-        <div className="card">
-
-          {editing && sources && (
-            <div className="form-card">
-              <div className="field"><label htmlFor="nc-edit-name">Name</label><input id="nc-edit-name" value={editName} onChange={(e) => setEditName(e.target.value)} /></div>
-              <div className="field">
-                <label htmlFor="nc-edit-source">Source</label>
-                <select id="nc-edit-source" value={editSource} onChange={(e) => setEditSource(Number(e.target.value))}>
-                  {sources.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-              </div>
-              <div className="form-row">
-                <div className="field"><label htmlFor="nc-edit-phone">Phone</label><input id="nc-edit-phone" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} /></div>
-                <div className="field"><label htmlFor="nc-edit-email">Email</label><input id="nc-edit-email" type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} /></div>
-              </div>
-              <div className="field"><label htmlFor="nc-edit-address">Address</label><input id="nc-edit-address" value={editAddress} onChange={(e) => setEditAddress(e.target.value)} /></div>
-              <div className="field">
-                <label htmlFor="nc-edit-location">Location</label>
-                <select id="nc-edit-location" value={editLocation} onChange={(e) => setEditLocation(e.target.value)}>
-                  {(myLocations ?? []).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-                </select>
-                <div className="field-hint">Moving them gives them a shepherd at the new location if theirs cannot serve it.</div>
-              </div>
-              {editError && <p className="form-error" role="alert">{editError}</p>}
-              <button className="btn sm" onClick={saveEdit} disabled={updateNewcomer.isPending}>Save changes</button>
-              <button className="btn sm ghost" onClick={() => setEditing(false)}>Cancel</button>
-            </div>
-          )}
-
-          <Badge color={stageBadgeColor(n.stage)}>{stageLabel(n.stage)}</Badge>
-
+        <div className="section-gap">
           {n.stage !== 'not-interested' ? (canEdit && (
             <>
               <span style={{ marginLeft: 8 }}>
@@ -311,12 +225,63 @@ export function NewcomerProfilePage() {
               </div>
             </div>
           )}
+        </div>
+      </>
+    ) },
+    { key: 'journey', label: 'Journey', body: (
+      <>
+        <h4 style={{ margin: '0 0 8px' }}>Spiritual milestones</h4>
+        <div style={{ marginBottom: 14 }}>
+          {n.milestones.map((m) => (
+            <div className="mrow" key={m.milestone_type_id}>
+              <input
+                type="checkbox"
+                checked={!!m.achieved_date}
+                disabled={!canEdit}
+                onChange={(e) => setMilestone.mutate({ milestone_type: m.milestone_type_id, achieved: e.target.checked })}
+              />
+              <span className="mname">{m.name}</span>
+              <span className="mdate">{m.achieved_date || ''}</span>
+            </div>
+          ))}
+        </div>
+        <div className="muted" style={{ fontSize: '.8rem', marginBottom: 10 }}>
+          Every contact, including attempts that did not reach them.
+        </div>
+        <JourneyTimeline events={journey ?? []} />
 
-          <h3 className="section-gap">Follow-up tasks</h3>
-          {/* Batch E replaces this with the real four-field completion
-              form. Until then the button is disabled rather than left
-              wired to a PATCH of { done: true }, which the API now
-              ignores: it would look like it worked and change nothing. */}
+        {canCreate && <div className="form-card section-gap">
+          <div className="muted" style={{ fontSize: '.8rem', marginBottom: 8 }}>
+            Tried and could not reach them? Record it, so the history does not look as though
+            nobody tried.
+          </div>
+          <div className="form-row">
+            <div className="field">
+              <label htmlFor="attempt-method">How you tried</label>
+              <select id="attempt-method" value={attemptMethod}
+                onChange={(e) => setAttemptMethod(e.target.value)}>
+                {ATTEMPT_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="attempt-note">Note</label>
+              <input id="attempt-note" value={attemptNote}
+                onChange={(e) => setAttemptNote(e.target.value)}
+                placeholder="e.g. left a voice note" />
+            </div>
+          </div>
+          <button className="btn sm outline" disabled={logAttempt.isPending}
+            onClick={async () => {
+              await logAttempt.mutateAsync({ method: attemptMethod, note: attemptNote });
+              setAttemptNote('');
+            }}>
+            <Icon name="plus" size={14} /> Log the attempt
+          </button>
+        </div>}
+      </>
+    ) },
+    { key: 'followups', label: 'Follow-ups', body: (
+      <>
           <TaskList newcomerId={newcomerId} onDelete={(taskId) => deleteTask.mutate(taskId)} />
           <div className="form-card section-gap">
             {canCreate && <form onSubmit={handleAddTask}>
@@ -333,23 +298,81 @@ export function NewcomerProfilePage() {
               <button className="btn sm" type="submit"><Icon name="plus" size={14} /> Add task</button>
             </form>}
           </div>
-        </div>
+      </>
+    ) },
+    { key: 'attendance', label: 'Attendance', body: person ? <AttendanceList p={person} /> : null },
+    ...(hasPermission('newcomers', 'view') ? [{ key: 'messages', label: 'Messages', body: <PersonMessages kind="newcomer" id={newcomerId} /> }] : []),
+  ];
 
-        <div className="card">
-          <h3>Spiritual milestones</h3>
-          {n.milestones.map((m) => (
-            <div className="mrow" key={m.milestone_type_id}>
-              <input
-                type="checkbox"
-                checked={!!m.achieved_date}
-                disabled={!canEdit}
-                onChange={(e) => setMilestone.mutate({ milestone_type: m.milestone_type_id, achieved: e.target.checked })}
-              />
-              <span className="mname">{m.name}</span>
-              <span className="mdate">{m.achieved_date || ''}</span>
+  return (
+    <>
+      <a className="backlink" onClick={() => navigate('/newcomers')}>← Back to newcomers</a>
+      <div className="person-grid">
+        <div className="card person-side">
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+            <div className="big-av">{initialsOf(n.name)}</div>
+            <div className="row-actions" style={{ marginLeft: 'auto' }}>
+              {canEdit && <button className="icon-btn edit" title="Edit" aria-label="Edit" onClick={startEdit}><Icon name="edit" size={15} /></button>}
+              {canDelete && <button className="icon-btn" title="Delete" aria-label="Delete" onClick={handleDelete}><Icon name="trash" size={15} /></button>}
             </div>
-          ))}
+          </div>
+          <div className="pname">{n.name}</div>
+          <div className="person-chips">
+            <Badge color="blue">Newcomer</Badge>
+            <Badge color={stageBadgeColor(n.stage)}>{stageLabel(n.stage)}</Badge>
+            <Badge color="blue">{locationName(n.location)}</Badge>
+          </div>
+          {/* F9: the edit opens here, under the name, where the pencil is. */}
+          <div className="section-gap">
+          {editing && sources && (
+            <div className="form-card">
+              <div className="field"><label htmlFor="nc-edit-name">Name</label><input id="nc-edit-name" value={editName} onChange={(e) => setEditName(e.target.value)} /></div>
+              <div className="field">
+                <label htmlFor="nc-edit-source">Source</label>
+                <select id="nc-edit-source" value={editSource} onChange={(e) => setEditSource(Number(e.target.value))}>
+                  {sources.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+              <div className="form-row">
+                <div className="field"><label htmlFor="nc-edit-phone">Phone</label><input id="nc-edit-phone" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} /></div>
+                <div className="field"><label htmlFor="nc-edit-email">Email</label><input id="nc-edit-email" type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} /></div>
+              </div>
+              <div className="field"><label htmlFor="nc-edit-address">Address</label><input id="nc-edit-address" value={editAddress} onChange={(e) => setEditAddress(e.target.value)} /></div>
+              <div className="field">
+                <label htmlFor="nc-edit-location">Location</label>
+                <select id="nc-edit-location" value={editLocation} onChange={(e) => setEditLocation(e.target.value)}>
+                  {(myLocations ?? []).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                </select>
+                <div className="field-hint">Moving them gives them a shepherd at the new location if theirs cannot serve it.</div>
+              </div>
+              {editError && <p className="form-error" role="alert">{editError}</p>}
+              <button className="btn sm" onClick={saveEdit} disabled={updateNewcomer.isPending}>Save changes</button>
+              <button className="btn sm ghost" onClick={() => setEditing(false)}>Cancel</button>
+            </div>
+          )}
+          </div>
+          {phoneDigits && (
+            <div className="person-acts">
+              <a href={`tel:${n.phone}`}>Call</a>
+              <a href={`https://wa.me/${phoneDigits}`} target="_blank" rel="noreferrer">WhatsApp</a>
+            </div>
+          )}
+          <div className="person-facts">
+            <div className="pf"><span>Phone</span><span>{n.phone || '–'}</span></div>
+            <div className="pf"><span>Email</span><span style={{ wordBreak: 'break-all' }}>{n.email || '–'}</span></div>
+            <div className="pf"><span>Address</span><span>{[n.address, n.city_governorate].filter(Boolean).join(', ') || '–'}</span></div>
+            <div className="pf"><span>Shepherd</span>{n.assigned_to_name ? <span>{n.assigned_to_name}</span> : <Badge color="amber">Unassigned</Badge>}</div>
+            <div className="pf"><span>How they came</span><span>{n.source_name || '–'}</span></div>
+            {person?.first_came && <div className="pf"><span>First came</span><span>{longDate(person.first_came)}</span></div>}
+            <div className="pf"><span>First meeting</span><span>{n.meeting_attended_name || '–'}</span></div>
+            <div className="pf"><span>Gender and age</span><span>{[n.gender, n.age_group].filter(Boolean).join(', ') || '–'}</span></div>
+            <div className="pf"><span>Invited by</span><span>{n.invited_by_member_name || '–'}</span></div>
+          </div>
+          {n.prayer_request && (
+            <div className="section-gap" style={{ fontSize: '.86rem' }}><span className="muted">Prayer request</span><div>{n.prayer_request}</div></div>
+          )}
         </div>
+        <PersonTabs tabs={tabs} />
       </div>
     </>
   );

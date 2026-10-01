@@ -1,4 +1,7 @@
+import { HelpMark } from '../../components/ui/HelpMark';
 import { useMeetingTypes } from '../../api/attendance';
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '../../api/client';
 
 export interface IntakeFormValues {
   /** Split in the form because people fill a paper slip that way, but
@@ -18,6 +21,7 @@ export interface IntakeFormValues {
   wants_visit: boolean;
   wants_to_know_more: boolean;
   wants_salvation_info: boolean;
+  keep_in_touch: boolean;
   invited_by_name: string;
 }
 
@@ -26,6 +30,8 @@ export const EMPTY_INTAKE_VALUES: IntakeFormValues = {
   gender: '', age_group: '', prayer_request: '', meeting_attended: '',
   is_first_timer: false, is_new_resident: false,
   wants_visit: false, wants_to_know_more: false, wants_salvation_info: false,
+  // F19: ticked by default, as Kay chose.
+  keep_in_touch: true,
   invited_by_name: '',
 };
 
@@ -50,8 +56,13 @@ interface IntakeFormFieldsProps {
  * unassociated label. A real accessibility gap, not just a testing
  * inconvenience , a screen reader would have had the same problem.
  */
-export function IntakeFormFields({ values, onChange, idPrefix = 'intake' }: IntakeFormFieldsProps) {
-  const { data: meetingTypes } = useMeetingTypes();
+export function IntakeFormFields({ values, onChange, idPrefix = 'intake', publicForm = false }: IntakeFormFieldsProps & { publicForm?: boolean }) {
+  // The public QR form is used before sign-in, so it reads the public list
+  // of meeting names. It was refused before, leaving the list empty.
+  const signedIn = useMeetingTypes({ enabled: !publicForm });
+  const open = useQuery({ queryKey: ['public-meetings'], enabled: !!publicForm,
+    queryFn: async () => (await apiClient.get<{ id: string; name: string }[]>('/public/meetings/')).data });
+  const meetingTypes = publicForm ? open.data : signedIn.data;
   const fid = (name: string) => `${idPrefix}-${name}`;
 
   function set<K extends keyof IntakeFormValues>(key: K, value: IntakeFormValues[K]) {
@@ -140,6 +151,11 @@ export function IntakeFormFields({ values, onChange, idPrefix = 'intake' }: Inta
         <label htmlFor={fid('wants-salvation')} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '.85rem' }}>
           <input id={fid('wants-salvation')} type="checkbox" checked={values.wants_salvation_info} onChange={(e) => set('wants_salvation_info', e.target.checked)} style={{ width: 16, height: 16 }} />
           Want to know about being a Christian
+        </label>
+        <label htmlFor={fid('keep-in-touch')} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '.85rem' }}>
+          <input id={fid('keep-in-touch')} type="checkbox" checked={values.keep_in_touch} onChange={(e) => set('keep_in_touch', e.target.checked)} style={{ width: 16, height: 16 }} />
+          Keep in touch with me with a short word of encouragement
+          <HelpMark topic="fuKeepInTouch" />
         </label>
       </div>
 

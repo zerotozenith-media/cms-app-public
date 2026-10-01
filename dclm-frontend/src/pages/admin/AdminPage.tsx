@@ -7,8 +7,9 @@ import { UsersRolesTab } from './UsersRolesTab';
 import { MeetingTypesHouseholdsTab } from './MeetingTypesHouseholdsTab';
 import { ConfigListsTab } from './ConfigListsTab';
 import { AuditLogTab } from './AuditLogTab';
+import { MessageBankTab } from './MessageBankTab';
 
-type Tab = 'users' | 'meetings' | 'config' | 'audit';
+type Tab = 'users' | 'meetings' | 'config' | 'bank' | 'audit';
 
 export function AdminPage() {
   const [tab, setTab] = useState<Tab>('users');
@@ -32,12 +33,14 @@ export function AdminPage() {
           <button className={`tab${tab === 'users' ? ' active' : ''}`} onClick={() => setTab('users')}>Users &amp; Roles</button>
           <button className={`tab${tab === 'meetings' ? ' active' : ''}`} onClick={() => setTab('meetings')}>Meeting Types &amp; Households</button>
           <button className={`tab${tab === 'config' ? ' active' : ''}`} onClick={() => setTab('config')}>Config Lists</button>
+          <button className={`tab${tab === 'bank' ? ' active' : ''}`} onClick={() => setTab('bank')}>Message Bank</button>
           <button className={`tab${tab === 'audit' ? ' active' : ''}`} onClick={() => setTab('audit')}>Audit Log</button>
         </div>
       </div>
       {tab === 'users' && <UsersRolesTab />}
       {tab === 'meetings' && <MeetingTypesHouseholdsTab />}
       {tab === 'config' && <ConfigListsTab />}
+      {tab === 'bank' && <MessageBankTab />}
       {tab === 'audit' && <AuditLogTab />}
     </>
   );

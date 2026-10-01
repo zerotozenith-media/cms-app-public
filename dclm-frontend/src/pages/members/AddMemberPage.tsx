@@ -39,7 +39,8 @@ export function AddMemberPage() {
       navigate(`/members/${created.id}`);
     } catch (err: any) {
       const data = err?.response?.data;
-      if (data?.phone) setError(`Phone: ${data.phone[0]}`);
+      // Plain words for the common case: the phone is already someone's.
+      if (data?.phone) setError(String(data.phone[0]).includes('already exists') ? 'This phone number already belongs to another member.' : `Phone: ${data.phone[0]}`);
       else setError('Could not create the member. Please check the form and try again.');
     }
   }
@@ -58,7 +59,7 @@ export function AddMemberPage() {
         <h3>Add member</h3>
         <form onSubmit={handleSubmit}>
           <MemberFormFields values={values} onChange={setValues} locations={locations} />
-          {error && <p style={{ color: 'var(--red)', fontSize: '.85rem', marginBottom: 12 }}>{error}</p>}
+          {error && <p className="form-error" role="alert" style={{ color: 'var(--red)', fontSize: '.85rem', marginBottom: 12 }}>{error}</p>}
           <Button type="submit" disabled={createMember.isPending}>
             {createMember.isPending ? 'Adding…' : 'Add member'}
           </Button>

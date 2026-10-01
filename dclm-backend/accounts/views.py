@@ -115,7 +115,22 @@ class LoginView(APIView):
                 )
             except User.DoesNotExist:
                 reason = LoginAttempt.Reason.INVALID_CREDENTIALS
-            return reject(reason)
+            response = reject(reason)
+            # Warn on the attempt before the lock. The count is per email
+            # typed, whether or not an account exists, so this reveals
+            # nothing about which addresses are real.
+            if recent_account_failures + 1 == MAX_FAILED_PER_ACCOUNT - 1:
+                response.data = {
+                    "detail": f"Invalid email or password. One more wrong attempt will lock sign-in "
+                              f"for {RATE_LIMIT_WINDOW_MINUTES} minutes. Use Forgotten your password? "
+                              f"if you need a new one.",
+                    "warning": True,
+                }
+            # The attempt that locks sign-in says so at once, rather than on
+            # the next try.
+            elif recent_account_failures + 1 >= MAX_FAILED_PER_ACCOUNT:
+                response.data = dict(LOCKED_ERROR)
+            return response
 
         # Success
         LoginAttempt.objects.create(
@@ -126,31 +141,32 @@ class LoginView(APIView):
         user.last_login = timezone.now()
         user.save(update_fields=["last_login"])
 
-        refresh = RefreshToken.for_user(user)
-        role_permissions = []
-        if user.role_id:
-            role_permissions = list(
-                user.role.permissions.values("module", "can_view", "can_create", "can_edit", "can_delete")
-            )
-        return Response({
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
-            "user": {
-                "id": user.id,
-                "email": user.email,
-                "name": display_name(user),
-                "role": user.role.name if user.role_id else None,
-                "location": user.location_id,
-                "location_name": user.location.name if user.location_id else None,
-                # Included directly , Batch 3.2 finding: the frontend needs
-                # real permission data for nav filtering, and matching by
-                # role name string would be exactly the fragile pattern
-                # deliberately avoided in Batch 2.5's goal calculation_type
-                # redesign. An ID-based extra round-trip was the alternative;
-                # this is simpler and avoids both problems.
-                "role_permissions": role_permissions,
-            },
-        })
+        return Response(signed_in_payload(user))
+
+
+def signed_in_payload(user):
+    """What a successful sign-in returns. Shared with the password reset,
+    which signs the person straight in once their new password is saved."""
+    refresh = RefreshToken.for_user(user)
+    role_permissions = []
+    if user.role_id:
+        role_permissions = list(
+            user.role.permissions.values("module", "can_view", "can_create", "can_edit", "can_delete")
+        )
+    return {
+        "access": str(refresh.access_token),
+        "refresh": str(refresh),
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "name": display_name(user),
+            "role": user.role.name if user.role_id else None,
+            "location": user.location_id,
+            "location_name": user.location.name if user.location_id else None,
+            "photo": user.photo.url if user.photo else None,
+            "role_permissions": role_permissions,
+        },
+    }
 
 
 class LogoutView(APIView):

@@ -78,10 +78,12 @@ class DashboardSummaryTestCase(APITestCase):
 
     def test_fw_trend_excludes_dates_outside_scope_correctly(self):
         self.auth(self.coord)
-        resp = self.client.get("/api/dashboard/summary/?period=2026")
-        trend_dates = [t["date"] for t in resp.data["attendance"]["trend"]]
-        self.assertIn("2026-08-07", trend_dates)
-        self.assertIn("2026-07-31", trend_dates)
+        # The chart has its own period and groups a year by month (F8).
+        resp = self.client.get("/api/dashboard/summary/?period=2026&chart_period=2026")
+        trend = {t["date"]: t for t in resp.data["attendance"]["trend"]}
+        self.assertEqual(resp.data["attendance"]["grouping"], "month")
+        self.assertIn("2026-08-01", trend)  # the 7 August service
+        self.assertIn("2026-07-01", trend)  # the 31 July service
 
     # --- Finance: location-scoped totals ---
 

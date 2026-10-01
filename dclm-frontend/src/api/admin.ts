@@ -25,6 +25,18 @@ export function useDeleteUser() {
   });
 }
 
+// Change part of an account, such as the Can shepherd others tick (F7).
+export function useUpdateUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...data }: { id: number; can_shepherd?: boolean }) => {
+      const r = await apiClient.patch(`/users/${id}/`, data);
+      return r.data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
+  });
+}
+
 // --- Roles & Permissions ---
 export function useRoles() {
   return useQuery({

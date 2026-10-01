@@ -1,3 +1,4 @@
+import { Skeleton } from '../../components/ui/Skeleton';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAllNewcomerTasks, useCompleteNewcomerTask, useDeleteTask } from '../../api/newcomers';
@@ -26,9 +27,25 @@ function urgency(task: NewcomerTask): 'green' | 'red' | 'amber' | 'gray' {
  * learned one screen should not have to learn a second. Shares the
  * completion form and the log display rather than duplicating them.
  */
+function initials(name?: string) {
+  const p = (name || '').trim().split(/\s+/).filter(Boolean);
+  return ((p[0]?.[0] ?? '') + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase() || '?';
+}
+
+/** The due state in words, as on the members' list: "17 days overdue", "Due today", "Due Tue 29 Sept". */
+function dueWords(due: string) {
+  const d = new Date(`${due}T00:00:00`);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const days = Math.round((today.getTime() - d.getTime()) / 86400000);
+  if (days > 0) return `${days} day${days === 1 ? '' : 's'} overdue`;
+  if (days === 0) return 'Due today';
+  return `Due ${d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}`;
+}
+
 export function NewcomerFollowUpTab() {
   const { hasPermission } = useAuth();
   const canEdit = hasPermission('newcomers', 'edit');
+  const canDelete = hasPermission('newcomers', 'delete');
   const navigate = useNavigate();
   const [status, setStatus] = useState<StatusFilter>('open');
   const [ordering, setOrdering] = useState('due_date');
@@ -74,6 +91,7 @@ export function NewcomerFollowUpTab() {
         <div className="tabs">
           <button className="tab" onClick={() => navigate('/newcomers')}>Pipeline</button>
           <button className="tab active">Follow-up</button>
+          <button className="tab" onClick={() => navigate('/newcomers/messages')}>Messages</button>
           <button className="tab" onClick={() => navigate('/newcomers/qr')}>QR Registration</button>
           <button className="tab" onClick={() => navigate('/newcomers/manual')}>Manual Entry</button>
         </div>
@@ -102,31 +120,34 @@ export function NewcomerFollowUpTab() {
           </div>
         </div>
 
-        {isLoading && <div className="empty">Loading…</div>}
+        {isLoading && <Skeleton shape="list" />}
 
         {!isLoading && rows.map((t) => {
           const isCompleting = completingId === t.id;
           return (
             <div key={t.id} className="followup-row" style={isCompleting ? { flexWrap: 'wrap' } : undefined}>
               <span className="avatar" style={t.done ? { background: 'var(--green-bg)', color: 'var(--green)' } : undefined}>
-                {t.done ? <Icon name="check" size={16} /> : 'N'}
+                {t.done ? <Icon name="check" size={16} /> : initials(t.newcomer_name)}
               </span>
               <div className="followup-row-info">
+                {/* F10: the person first, like the members' follow-up list. */}
                 <b style={{ cursor: 'pointer', color: 'var(--blue-deep)' }}
-                  onClick={() => navigate(`/newcomers/${t.newcomer}`)}>{t.text}</b>
+                  onClick={() => navigate(`/newcomers/${t.newcomer}`)}>{t.newcomer_name}</b>
                 <div className="muted" style={{ fontSize: '.8rem' }}>
-                  Due {t.due_date}
+                  {t.text} · Shepherd: {t.shepherd_name || 'Unassigned'}
                 </div>
                 {t.done && <CompletedFollowUpLog log={t} />}
               </div>
               <div className="followup-row-actions">
-                <Badge color={urgency(t)}>{t.done ? 'Done' : `Due ${t.due_date}`}</Badge>
+                <Badge color={urgency(t)}>{t.done ? 'Done' : dueWords(t.due_date)}</Badge>
                 {canEdit && (<button className="btn sm outline" onClick={() => setCompletingId(isCompleting ? null : t.id)}>
                   {t.done ? 'Edit' : 'Mark done'}
                 </button>)}
-                <button className="icon-btn" title="Delete this task" onClick={() => handleDelete(t.id)}>
-                  <Icon name="trash" size={14} />
-                </button>
+                {canDelete && (
+                  <button className="icon-btn" title="Delete this task" aria-label="Delete this task" onClick={() => handleDelete(t.id)}>
+                    <Icon name="trash" size={14} />
+                  </button>
+                )}
               </div>
               {isCompleting && (
                 <div style={{ flexBasis: '100%' }}>

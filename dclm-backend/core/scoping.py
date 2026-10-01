@@ -7,6 +7,7 @@ to a location coordinator. This is the one shared way to do it.
 """
 from django.db import transaction
 from rest_framework.exceptions import PermissionDenied
+from core.viewing import scope_location_id
 
 
 class LocationScopedMixin:
@@ -15,7 +16,7 @@ class LocationScopedMixin:
 
     def _limit(self):
         user = self.request.user
-        return None if (user.is_superuser or not user.location_id) else user.location_id
+        return scope_location_id(user)
 
     def get_queryset(self):
         qs = super().get_queryset()

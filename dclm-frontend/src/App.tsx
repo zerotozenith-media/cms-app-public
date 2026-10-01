@@ -1,6 +1,11 @@
+import { TeamListPage } from './components/service/ServiceBadge';
+import { FollowUpMessagesPage } from './pages/newcomers/FollowUpMessagesPage';
 import { Routes, Route } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
+import { MyProfilePage } from './pages/MyProfilePage';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { MembersListPage } from './pages/members/MembersListPage';
@@ -39,8 +44,12 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/register" element={<PublicRegistrationPage />} />
       <Route path="/" element={page('Dashboard', undefined, <DashboardPage />)} />
+      <Route path="/profile" element={page('My profile', undefined, <MyProfilePage />)} />
+      <Route path="/profile/team" element={page('My profile', undefined, <TeamListPage />)} />
 
       <Route path="/attendance" element={page('Attendance', 'attendance', <AttendanceListPage />)} />
       <Route path="/attendance/new" element={page('Attendance', 'attendance', <NewSessionPage />)} />
@@ -55,6 +64,7 @@ export default function App() {
       <Route path="/newcomers" element={page('Newcomers & Follow-up', 'newcomers', <NewcomersListPage />)} />
       <Route path="/newcomers/qr" element={page('Newcomers & Follow-up', 'newcomers', <QrRegistrationPage />)} />
       <Route path="/newcomers/manual" element={page('Newcomers & Follow-up', 'newcomers', <ManualEntryPage />)} />
+      <Route path="/newcomers/messages" element={page('Newcomers & Follow-up', 'newcomers', <FollowUpMessagesPage />)} />
       <Route path="/newcomers/follow-up" element={page('Newcomers & Follow-up', 'newcomers', <NewcomerFollowUpTab />)} />
       <Route path="/newcomers/:id" element={page('Newcomers & Follow-up', 'newcomers', <NewcomerProfilePage />)} />
 

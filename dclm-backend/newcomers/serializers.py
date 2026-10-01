@@ -39,10 +39,20 @@ class NewcomerStatusHistorySerializer(serializers.ModelSerializer):
 
 
 class NewcomerTaskSerializer(serializers.ModelSerializer):
+    # The person's name and shepherd on each row (F10). The list showed only
+    # the task, with a fixed letter N, until the task was opened.
+    newcomer_name = serializers.CharField(source="newcomer.name", read_only=True)
+    shepherd_name = serializers.SerializerMethodField()
+
+    def get_shepherd_name(self, obj):
+        from accounts.names import display_name
+        who = obj.assigned_to or obj.newcomer.assigned_to
+        return display_name(who) if who else ""
+
     class Meta:
         model = NewcomerTask
         fields = [
-            "id", "newcomer", "text", "due_date", "done", "assigned_to",
+            "id", "newcomer", "newcomer_name", "shepherd_name", "text", "due_date", "done", "assigned_to",
             "contact_date", "contact_method", "contact_notes",
             "contact_goal", "contact_scripture", "contact_root_cause", "contact_next_step",
         ]
@@ -113,7 +123,7 @@ class NewcomerSerializer(serializers.ModelSerializer):
             "address", "city_governorate", "phone", "email", "gender", "age_group",
             "prayer_request", "meeting_attended", "meeting_attended_name",
             "is_first_timer", "is_new_resident",
-            "wants_visit", "wants_to_know_more", "wants_salvation_info",
+            "wants_visit", "wants_to_know_more", "wants_salvation_info", "keep_in_touch",
             "invited_by_member", "invited_by_member_name", "invited_by_name",
         ]
         read_only_fields = ["id", "stage", "stage_since", "created_at", "not_interested_note", "invited_by_member"]
@@ -209,6 +219,7 @@ class PublicRegistrationSerializer(serializers.Serializer):
     is_first_timer = serializers.BooleanField(default=False)
     is_new_resident = serializers.BooleanField(default=False)
     wants_visit = serializers.BooleanField(default=False)
+    keep_in_touch = serializers.BooleanField(default=True)  # F19, ticked by default
     wants_to_know_more = serializers.BooleanField(default=False)
     wants_salvation_info = serializers.BooleanField(default=False)
     invited_by_name = serializers.CharField(max_length=150, required=False, allow_blank=True, default="")

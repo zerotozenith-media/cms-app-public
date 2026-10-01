@@ -41,6 +41,8 @@ INSTALLED_APPS = [
     "finance",
     "goals",
     "reports",
+    "followup",
+    "service",
 ]
 
 MIDDLEWARE = [
@@ -53,6 +55,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "core.middleware.CurrentUserMiddleware",
+    "core.viewing.ViewingLocationMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -146,3 +149,9 @@ TASK_SECRET = os.environ.get("DCLM_TASK_SECRET", "")
 # hides the header whenever the site and the server have different
 # addresses, as they may in production.
 CORS_EXPOSE_HEADERS = ["Content-Disposition"]
+# The top bar location picker (F2) sends the location being viewed.
+from corsheaders.defaults import default_headers
+CORS_ALLOW_HEADERS = (*default_headers, "x-viewing-location")
+
+# A password reset link works for one hour, and only once.
+PASSWORD_RESET_TIMEOUT = 60 * 60

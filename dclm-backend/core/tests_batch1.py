@@ -155,11 +155,12 @@ class RegistrationAssignmentTestCase(Base):
     def setUp(self):
         super().setUp()
         self.source = NewcomerSource.objects.create(name="Walk-in")
-        worker_role = Role.objects.create(name="Follow-up")
+        # The upgrade now creates a Follow-up role, so a separate test role.
+        worker_role = Role.objects.create(name="Follow-up test")
         RolePermission.objects.create(role=worker_role, module="newcomers",
                                       can_view=True, can_create=True, can_edit=True)
         self.shepherd = User.objects.create_user(
-            email="s@t.com", password="x", role=worker_role, location=self.bahrain)
+            email="s@t.com", password="x", role=worker_role, location=self.bahrain, can_shepherd=True)
         m = Member.objects.create(surname="Osei", first_name="Sarah",
                                   location=self.bahrain, joined_date=self.today,
                                   category=Member.Category.WORKER)

@@ -16,6 +16,7 @@ from rest_framework.views import APIView
 
 from accounts.permissions import ModulePermission
 from members.models import Member
+from core.viewing import scope_location_id
 
 
 class AttendanceRosterView(APIView):
@@ -25,8 +26,8 @@ class AttendanceRosterView(APIView):
     def get(self, request):
         qs = Member.objects.all().order_by("surname", "first_name")
         user = request.user
-        if not user.is_superuser and user.location_id:
-            qs = qs.filter(location_id=user.location_id)
+        if scope_location_id(user):
+            qs = qs.filter(location_id=scope_location_id(user))
         location = request.query_params.get("location")
         if location:
             qs = qs.filter(location_id=location)

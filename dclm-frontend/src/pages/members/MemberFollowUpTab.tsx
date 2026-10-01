@@ -1,3 +1,4 @@
+import { Skeleton } from '../../components/ui/Skeleton';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -99,7 +100,7 @@ export function MemberFollowUpTab() {
           </div>
         </div>
 
-        {isLoading && <div className="empty">Loading…</div>}
+        {isLoading && <Skeleton shape="list" />}
 
         {!isLoading && rows.map((t) => {
           const isCompleting = completingId === t.id;

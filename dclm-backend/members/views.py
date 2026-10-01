@@ -12,6 +12,7 @@ from accounts.permissions import ModulePermission, LocationScopedQuerySetMixin
 from .assignment import build_assignment_preview, apply_assignment_changes, eligible_shepherds
 from .models import Household, Member, MemberCategoryHistory, MemberFollowUpTask
 from accounts.names import display_name
+from core.viewing import scope_location_id
 from .serializers import (
     HouseholdSerializer, MemberSerializer,
     MemberCategoryHistorySerializer, MoveCategorySerializer,
@@ -51,6 +52,12 @@ class MemberViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["surname", "first_name", "other_names", "email", "phone"]
     ordering_fields = ["surname", "first_name", "joined_date", "category"]
+
+    @action(detail=True, methods=["get"])
+    def person(self, request, pk=None):
+        """The one-profile summary (F16), including the newcomer history."""
+        from members.person import build_person
+        return Response(build_person(member=self.get_object()))
 
     def get_queryset(self):
         from decimal import Decimal
@@ -287,6 +294,13 @@ class BulkAssignSerializer(serializers.Serializer):
     shepherd_id = serializers.IntegerField()
 
 
+def _viewed_location(user):
+    """Auto-assign works on the location being viewed, or every location."""
+    from core.models import Location
+    loc = scope_location_id(user)
+    return Location.objects.filter(id=loc).first() if loc else None
+
+
 class ShepherdAssignmentView(APIView):
     """
     Preview and apply shepherd assignments. Preview never writes, so an
@@ -303,7 +317,7 @@ class ShepherdAssignmentView(APIView):
         serializer.is_valid(raise_exception=True)
         reassign = serializer.validated_data["reassign_everyone"]
 
-        location = None if request.user.is_superuser or not request.user.location_id else request.user.location
+        location = _viewed_location(request.user)
         changes, error = build_assignment_preview(location=location, reassign_everyone=reassign)
         if error:
             return Response({"detail": error}, status=400)
@@ -321,7 +335,7 @@ class ShepherdAssignmentView(APIView):
         since changed."""
         require(request.user, ("members", "can_edit"))
         reassign = bool(request.data.get("reassign_everyone", False))
-        location = None if request.user.is_superuser or not request.user.location_id else request.user.location
+        location = _viewed_location(request.user)
         changes, error = build_assignment_preview(location=location, reassign_everyone=reassign)
         if error:
             return Response({"detail": error}, status=400)
@@ -377,9 +391,10 @@ class BulkAssignShepherdView(APIView):
         shepherd = User.objects.filter(id=data["shepherd_id"], is_active=True).select_related("member").first()
         if not shepherd:
             return Response({"shepherd_id": "No active user with that id."}, status=400)
-        if not shepherd.member_id or shepherd.member.category != Member.Category.WORKER:
+        if not shepherd.can_shepherd:
             return Response(
-                {"shepherd_id": "Only users linked to a member in the Worker category can be shepherds."},
+                {"shepherd_id": "That person is not set up to shepherd others. An administrator can "
+                                "tick Can shepherd others on their account."},
                 status=400,
             )
 
@@ -411,7 +426,7 @@ class EligibleShepherdsView(APIView):
         # A location-limited person always gets their own location's
         # shepherds. Anyone else may ask for one location, so a member's
         # profile only offers shepherds who can actually be assigned there.
-        location = request.query_params.get("location") or None
+        location = request.query_params.get("location") or scope_location_id(request.user)
         if not request.user.is_superuser and request.user.location_id:
             location = request.user.location_id
         shepherds = eligible_shepherds(location)

@@ -9,6 +9,7 @@ Nothing here is UI-cosmetic. A disabled dropdown in the frontend is a
 convenience for honest users; this is the actual boundary.
 """
 from rest_framework.permissions import BasePermission
+from core.viewing import scope_location_id
 
 
 ACTION_TO_PERMISSION_FIELD = {
@@ -117,9 +118,8 @@ class LocationScopedQuerySetMixin:
     def get_queryset(self):
         qs = super().get_queryset()
         user = self.request.user
-        if user.is_superuser or not user.location_id:
-            return qs
-        return qs.filter(location_id=user.location_id)
+        loc = scope_location_id(user)
+        return qs.filter(location_id=loc) if loc else qs
 
 
 def user_has(user, module, flag):

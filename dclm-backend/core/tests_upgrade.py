@@ -540,7 +540,7 @@ class AutoAssignWithNewcomersTestCase(Base):
         worker = Member.objects.create(first_name="Grace", surname="Shepherd",
                                        location=self.bahrain, joined_date=self.today,
                                        category=Member.Category.WORKER)
-        self.shepherd = User.objects.create_user(email="s@t.com", password="x",
+        self.shepherd = User.objects.create_user(can_shepherd=True, email="s@t.com", password="x",
                                                  role=Role.objects.get(name="Administrator"),
                                                  member=worker, location=self.bahrain)
         self.person = self.member("Plain", "Member")
@@ -671,10 +671,10 @@ class EnquiryConversionShepherdTestCase(Base):
         from enquiries.models import Enquiry, EnquirySource
         worker = Member.objects.create(first_name="Grace", surname="Shepherd", location=self.bahrain,
                                        joined_date=self.today, category=Member.Category.WORKER)
-        self.shepherd = User.objects.create_user(email="s@t.com", password="x",
+        self.shepherd = User.objects.create_user(can_shepherd=True, email="s@t.com", password="x",
                                                  role=Role.objects.get(name="Administrator"),
                                                  member=worker, location=self.bahrain)
-        self.qatar_handler = User.objects.create_user(email="qh@t.com", password="x",
+        self.qatar_handler = User.objects.create_user(can_shepherd=True, email="qh@t.com", password="x",
                                                       role=Role.objects.get(name="Administrator"),
                                                       location=self.others)
         src = EnquirySource.objects.create(name="Instagram")
@@ -983,10 +983,10 @@ class MemberShepherdTestCase(Base):
         super().setUp()
         worker = Member.objects.create(first_name="Grace", surname="Worker", location=self.bahrain,
                                        joined_date=self.today, category=Member.Category.WORKER)
-        self.shepherd = User.objects.create_user(email="sh@t.com", password="x",
+        self.shepherd = User.objects.create_user(can_shepherd=True, email="sh@t.com", password="x",
                                                  role=Role.objects.get(name="Administrator"),
                                                  member=worker, location=self.bahrain)
-        self.not_a_shepherd = User.objects.create_user(email="fo@t.com", password="x",
+        self.not_a_shepherd = User.objects.create_user(can_shepherd=False, email="fo@t.com", password="x",
                                                        role=Role.objects.get(name="Administrator"))
         self.person = self.member("Some", "One")
 
@@ -1077,7 +1077,7 @@ class MemberKeepsShepherdTestCase(Base):
     def test_the_newcomers_shepherd_stays_with_them(self):
         worker = Member.objects.create(first_name="Grace", surname="Worker", location=self.bahrain,
                                        joined_date=self.today, category=Member.Category.WORKER)
-        shepherd = User.objects.create_user(email="ks@t.com", password="x",
+        shepherd = User.objects.create_user(can_shepherd=True, email="ks@t.com", password="x",
                                             role=Role.objects.get(name="Administrator"),
                                             member=worker, location=self.bahrain)
         n = self.newcomer("Joy Mensah", stage="attending")
@@ -1088,7 +1088,7 @@ class MemberKeepsShepherdTestCase(Base):
     def test_a_shepherd_from_another_location_is_not_carried_over(self):
         worker = Member.objects.create(first_name="Far", surname="Worker", location=self.others,
                                        joined_date=self.today, category=Member.Category.WORKER)
-        elsewhere = User.objects.create_user(email="fw@t.com", password="x",
+        elsewhere = User.objects.create_user(can_shepherd=True, email="fw@t.com", password="x",
                                              role=Role.objects.get(name="Administrator"),
                                              member=worker, location=self.others)
         n = self.newcomer("Near Visitor", stage="attending")
@@ -1135,7 +1135,7 @@ class NewcomerMovedTestCase(Base):
         def shepherd(email, loc):
             w = Member.objects.create(first_name=email[:3], surname="Worker", location=loc,
                                       joined_date=self.today, category=Member.Category.WORKER)
-            return User.objects.create_user(email=email, password="x", member=w, location=loc,
+            return User.objects.create_user(can_shepherd=True, email=email, password="x", member=w, location=loc,
                                             role=Role.objects.get(name="Administrator"))
         here, there = shepherd("bh@t.com", self.bahrain), shepherd("qa@t.com", self.others)
         n = self.newcomer("Moving Visitor", stage="new")
@@ -1149,18 +1149,18 @@ class NewcomerMovedTestCase(Base):
 
 
 class WorkerLeavesTestCase(Base):
-    """Part 12: when a worker leaves, Reassign everyone moves their people."""
-    def test_reassign_everyone_moves_people_off_a_former_worker(self):
+    """Part 12: when a shepherd stops, unticking them and Reassign everyone moves their people."""
+    def test_reassign_everyone_moves_people_off_someone_unticked(self):
         def shepherd(email, first):
             w = Member.objects.create(first_name=first, surname="Worker", location=self.bahrain,
                                       joined_date=self.today, category=Member.Category.WORKER)
-            return User.objects.create_user(email=email, password="x", member=w, location=self.bahrain,
+            return User.objects.create_user(can_shepherd=True, email=email, password="x", member=w, location=self.bahrain,
                                             role=Role.objects.get(name="Administrator")), w
         leaving, leaving_member = shepherd("lv@t.com", "Leaving")
         staying, _ = shepherd("st@t.com", "Staying")
         people = [self.member(f"P{i}", "Person") for i in range(3)]
         Member.objects.filter(id__in=[p.id for p in people]).update(assigned_to=leaving)
-        Member.objects.filter(id=leaving_member.id).update(category=Member.Category.GENERAL)
+        User.objects.filter(id=leaving.id).update(can_shepherd=False)
         r = self.client.post("/api/members/assign-shepherds/", {"reassign_everyone": True}, format="json")
         self.assertEqual(r.status_code, 200, r.data)
         self.assertFalse(Member.objects.filter(assigned_to=leaving).exists())
@@ -1220,3 +1220,470 @@ class PreflightSchedulingTestCase(Base):
             out = self.preflight()
         self.assertIn("backs it up automatically", out)
         self.assertNotIn("no database backup is scheduled", out)
+
+
+class LockoutWarningTestCase(Base):
+    """F12: warn on the attempt before the lock."""
+    def attempt(self, email, password):
+        self.client.force_authenticate(user=None)
+        return self.client.post("/api/auth/login/", {"email": email, "password": password}, format="json")
+
+    def test_the_fourth_wrong_attempt_warns(self):
+        replies = [self.attempt(self.admin.email, "wrong") for _ in range(4)]
+        self.assertNotIn("warning", replies[2].data)
+        self.assertTrue(replies[3].data.get("warning"))
+        self.assertIn("One more wrong attempt", replies[3].data["detail"])
+        self.assertEqual(self.attempt(self.admin.email, "wrong").status_code, 401)
+        self.assertEqual(self.attempt(self.admin.email, "x").status_code, 429)
+
+    def test_it_warns_for_an_address_with_no_account_too(self):
+        replies = [self.attempt("nobody@nowhere.org", "wrong") for _ in range(4)]
+        self.assertTrue(replies[3].data.get("warning"))
+
+
+class PasswordResetTestCase(Base):
+    """F18: reset by email instead of waiting for an administrator."""
+    def setUp(self):
+        super().setUp()
+        from django.core import mail
+        self.mail = mail
+        self.client.force_authenticate(user=None)
+
+    def request_link(self, email):
+        return self.client.post("/api/auth/password-reset/", {"email": email}, format="json")
+
+    def link_parts(self):
+        import re
+        body = self.mail.outbox[-1].body
+        return re.search(r"uid=([^&\s]+)&token=([^\s]+)", body).groups()
+
+    def test_an_email_with_a_link_is_sent(self):
+        r = self.request_link(self.admin.email)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(len(self.mail.outbox), 1)
+        self.assertIn("reset-password?uid=", self.mail.outbox[0].body)
+
+    def test_the_answer_is_the_same_for_an_unknown_email(self):
+        known = self.request_link(self.admin.email).data
+        unknown = self.request_link("nobody@nowhere.org").data
+        self.assertEqual(known, unknown)
+        self.assertEqual(len(self.mail.outbox), 1)
+
+    def test_a_new_password_signs_in_and_the_link_then_stops_working(self):
+        self.request_link(self.admin.email); uid, token = self.link_parts()
+        body = {"uid": uid, "token": token, "password": "Brand-New-Pass-2026", "password_again": "Brand-New-Pass-2026"}
+        r = self.client.post("/api/auth/password-reset/confirm/", body, format="json")
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertIn("access", r.data)
+        self.admin.refresh_from_db()
+        self.assertTrue(self.admin.check_password("Brand-New-Pass-2026"))
+        again = self.client.post("/api/auth/password-reset/confirm/", body, format="json")
+        self.assertEqual(again.status_code, 400)
+
+    def test_the_password_rules_apply(self):
+        self.request_link(self.admin.email); uid, token = self.link_parts()
+        r = self.client.post("/api/auth/password-reset/confirm/",
+                             {"uid": uid, "token": token, "password": "12345", "password_again": "12345"}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("password", r.data)
+
+    def test_requests_are_limited_per_email(self):
+        for _ in range(5):
+            self.request_link(self.admin.email)
+        self.assertEqual(len(self.mail.outbox), 3)
+
+    def test_a_made_up_link_is_refused(self):
+        r = self.client.post("/api/auth/password-reset/confirm/", {"uid": "MQ", "token": "nope", "check_only": True}, format="json")
+        self.assertEqual(r.status_code, 400)
+
+    def test_it_sends_even_when_digest_notifications_are_off(self):
+        from django.test import override_settings
+        with override_settings(NOTIFICATIONS_ENABLED=False):
+            self.request_link(self.admin.email)
+        self.assertEqual(len(self.mail.outbox), 1)
+
+
+class MyProfileTestCase(Base):
+    """F3: people manage their own account."""
+    def picture(self, size=(900, 600)):
+        import io
+        from PIL import Image
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        buf = io.BytesIO(); Image.new("RGB", size, (30, 80, 160)).save(buf, "PNG")
+        return SimpleUploadedFile("me.png", buf.getvalue(), content_type="image/png")
+
+    def test_details_can_be_corrected(self):
+        r = self.client.patch("/api/auth/me/", {"first_name": "Precious", "last_name": "Anyanwu",
+                              "phone": "+97333000000"}, format="json")
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual((r.data["name"], r.data["phone"]), ("Precious Anyanwu", "+97333000000"))
+
+    def test_an_email_already_used_is_refused(self):
+        User.objects.create_user(email="taken@t.com", password="x")
+        self.assertEqual(self.client.patch("/api/auth/me/", {"email": "taken@t.com"}, format="json").status_code, 400)
+
+    def test_role_and_location_cannot_be_changed_here(self):
+        before = (self.admin.role_id, self.admin.location_id)
+        self.client.patch("/api/auth/me/", {"role": 999, "location": "others"}, format="json")
+        self.admin.refresh_from_db()
+        self.assertEqual((self.admin.role_id, self.admin.location_id), before)
+
+    def test_a_photo_is_stored_as_a_small_square(self):
+        from PIL import Image
+        r = self.client.post("/api/auth/me/photo/", {"photo": self.picture()}, format="multipart")
+        self.assertEqual(r.status_code, 200, r.data)
+        self.admin.refresh_from_db()
+        self.assertEqual(Image.open(self.admin.photo.path).size, (400, 400))
+        self.assertEqual(self.client.delete("/api/auth/me/photo/").status_code, 200)
+        self.admin.refresh_from_db()
+        self.assertFalse(self.admin.photo)
+
+    def test_a_file_that_is_not_a_picture_is_refused(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        bad = SimpleUploadedFile("x.png", b"not an image", content_type="image/png")
+        self.assertEqual(self.client.post("/api/auth/me/photo/", {"photo": bad}, format="multipart").status_code, 400)
+
+    def test_password_change_needs_the_current_one(self):
+        self.admin.set_password("Old-Password-2026"); self.admin.save()
+        bad = self.client.post("/api/auth/me/password/", {"current_password": "wrong",
+                               "new_password": "New-Password-2026", "new_password_again": "New-Password-2026"}, format="json")
+        self.assertEqual(bad.status_code, 400)
+        ok = self.client.post("/api/auth/me/password/", {"current_password": "Old-Password-2026",
+                              "new_password": "New-Password-2026", "new_password_again": "New-Password-2026"}, format="json")
+        self.assertEqual(ok.status_code, 200, ok.data)
+        self.admin.refresh_from_db()
+        self.assertTrue(self.admin.check_password("New-Password-2026"))
+
+
+class ViewingLocationTestCase(Base):
+    """F2: the top bar location picker narrows what is shown, never widens it."""
+    def names(self, header=None):
+        extra = {"HTTP_X_VIEWING_LOCATION": header} if header else {}
+        r = self.client.get("/api/members/?page_size=100", **extra)
+        rows = r.data["results"] if isinstance(r.data, dict) else r.data
+        return {m["first_name"] for m in rows}
+
+    def setUp(self):
+        super().setUp()
+        self.member("Bahraini", "One"); self.member("Qatari", "One", location=self.others)
+
+    def test_everyone_until_a_location_is_picked(self):
+        self.assertEqual(self.names(), {"Bahraini", "Qatari"})
+
+    def test_picking_a_location_narrows_every_list(self):
+        self.assertEqual(self.names("others"), {"Qatari"})
+
+    def test_an_unknown_location_shows_everything(self):
+        self.assertEqual(self.names("atlantis"), {"Bahraini", "Qatari"})
+
+    def test_a_location_limited_person_cannot_widen_or_switch(self):
+        self.admin.location = self.bahrain; self.admin.save()
+        self.assertEqual(self.names("others"), {"Bahraini"})
+
+
+class NotificationsTestCase(Base):
+    """F4: the bell counts what needs attention, red when overdue."""
+    def test_overdue_follow_ups_make_the_bell_red(self):
+        import datetime
+        from newcomers.models import NewcomerTask
+        n = self.newcomer("Late Visitor", stage="new")
+        NewcomerTask.objects.create(newcomer=n, text="Call", due_date=self.today - datetime.timedelta(days=3))
+        r = self.client.get("/api/notifications/")
+        self.assertEqual(r.data["level"], "overdue")
+        self.assertIn("1 newcomer follow-up overdue", [i["label"] for i in r.data["items"]])
+
+    def test_the_bell_follows_the_location_picked(self):
+        import datetime
+        from newcomers.models import NewcomerTask
+        n = self.newcomer("Bahrain Visitor", stage="new")
+        NewcomerTask.objects.create(newcomer=n, text="Call", due_date=self.today - datetime.timedelta(days=1))
+        r = self.client.get("/api/notifications/", HTTP_X_VIEWING_LOCATION="others")
+        self.assertNotIn("newcomer-follow-ups", [i["key"] for i in r.data["items"]])
+
+    def test_nothing_outstanding_means_no_count(self):
+        r = self.client.get("/api/notifications/")
+        self.assertEqual((r.data["total"], r.data["level"]), (0, None))
+
+
+class OneNamePerPersonTestCase(Base):
+    """My profile edited the account's name while the app showed the linked member's."""
+    def test_editing_your_name_changes_the_name_the_app_shows(self):
+        m = self.member("Esther", "Nnamdi")
+        self.admin.member = m; self.admin.first_name, self.admin.last_name = "Grace", "Thomas"; self.admin.save()
+        self.assertEqual(self.client.get("/api/auth/me/").data["first_name"], "Esther")
+        r = self.client.patch("/api/auth/me/", {"first_name": "Esther", "last_name": "Okafor"}, format="json")
+        self.assertEqual(r.data["name"], "Esther Okafor")
+        m.refresh_from_db(); self.assertEqual(m.surname, "Okafor")
+
+
+
+class CanShepherdTickTestCase(Base):
+    """F7: shepherding is a tick on the account, not the Worker category."""
+    def account(self, email, category, tick):
+        m = Member.objects.create(first_name=email[:4], surname="Person", location=self.bahrain,
+                                  joined_date=self.today, category=category)
+        return User.objects.create_user(email=email, password="x", member=m, location=self.bahrain,
+                                        role=Role.objects.get(name="Administrator"), can_shepherd=tick)
+
+    def test_someone_ticked_can_shepherd_whatever_their_category(self):
+        from members.assignment import eligible_shepherds
+        u = self.account("gm@t.com", Member.Category.GENERAL, True)
+        self.assertIn(u, eligible_shepherds(location=self.bahrain))
+
+    def test_a_worker_without_the_tick_cannot(self):
+        from members.assignment import eligible_shepherds
+        u = self.account("wk@t.com", Member.Category.WORKER, False)
+        self.assertNotIn(u, eligible_shepherds(location=self.bahrain))
+
+    def test_assigning_someone_unticked_is_refused_with_a_reason(self):
+        u = self.account("nt@t.com", Member.Category.WORKER, False)
+        m = self.member("Assign", "Me")
+        r = self.client.post("/api/members/bulk-assign-shepherd/", {"member_ids": [m.id], "shepherd_id": u.id}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("Can shepherd others", str(r.data))
+
+
+class OwnFollowUpsTestCase(Base):
+    """F6 and F14: someone who does not oversee sees only their own follow-ups,
+    and the dashboard lists the people, most overdue first."""
+    def setUp(self):
+        super().setUp()
+        import datetime
+        from newcomers.models import NewcomerTask
+        from accounts.models import RolePermission
+        role = Role.objects.create(name="Worker test")
+        for m in ("members", "newcomers"):
+            RolePermission.objects.create(role=role, module=m, can_view=True, can_edit=True)
+        self.worker = User.objects.create_user(email="wk@t.com", password="x", role=role, location=self.bahrain)
+        n1, n2 = self.newcomer("Mine Person", stage="new"), self.newcomer("Other Person", stage="new")
+        NewcomerTask.objects.create(newcomer=n1, text="Visit", due_date=self.today - datetime.timedelta(days=3), assigned_to=self.worker)
+        NewcomerTask.objects.create(newcomer=n2, text="Call", due_date=self.today - datetime.timedelta(days=9), assigned_to=self.admin)
+
+    def test_a_worker_counts_only_their_own(self):
+        self.client.force_authenticate(user=self.worker)
+        items = {i["key"]: i for i in self.client.get("/api/notifications/").data["items"]}
+        self.assertEqual(items["newcomer-follow-ups"]["count"], 1)
+        self.assertIn("of your", items["newcomer-follow-ups"]["label"])
+
+    def test_an_administrator_counts_everyones(self):
+        items = {i["key"]: i for i in self.client.get("/api/notifications/").data["items"]}
+        self.assertEqual(items["newcomer-follow-ups"]["count"], 2)
+
+    def test_the_dashboard_lists_the_people_most_overdue_first(self):
+        rows = self.client.get("/api/dashboard/summary/").data["follow_up_people"]
+        self.assertEqual([r["name"] for r in rows][:2], ["Other Person", "Mine Person"])
+        self.assertEqual(rows[0]["days_overdue"], 9)
+        self.client.force_authenticate(user=self.worker)
+        self.assertEqual([r["name"] for r in self.client.get("/api/dashboard/summary/").data["follow_up_people"]], ["Mine Person"])
+
+
+class ActionableOnlyTestCase(Base):
+    """Waiting items only go to people who can act on them."""
+    def test_view_only_attendance_is_not_told_about_unfilled_sessions(self):
+        from accounts.models import RolePermission
+        MeetingType.objects.create(id="fri-worship", name="Friday Worship", day="Friday", frequency="weekly", detail_level="detailed")
+        AttendanceSession.objects.create(meeting_type_id="fri-worship", location=self.bahrain, date=self.today, mode="in-person", status="pending")
+        role = Role.objects.create(name="Viewer test")
+        RolePermission.objects.create(role=role, module="attendance", can_view=True)
+        viewer = User.objects.create_user(email="vw@t.com", password="x", role=role, location=self.bahrain)
+        self.assertIn("sessions", {i["key"] for i in self.client.get("/api/notifications/").data["items"]})
+        self.client.force_authenticate(user=viewer)
+        self.assertNotIn("sessions", {i["key"] for i in self.client.get("/api/notifications/").data["items"]})
+
+
+class AttendanceChartPeriodTestCase(Base):
+    """F8: the chart opens on the year, grouped by month, with its own period."""
+    def setUp(self):
+        super().setUp()
+        import datetime
+        MeetingType.objects.create(id="fri-worship", name="Friday Worship", day="Friday", frequency="weekly", detail_level="detailed")
+        d = datetime.date(self.today.year, 1, 2)
+        while d <= self.today:
+            AttendanceSession.objects.create(meeting_type_id="fri-worship", location=self.bahrain, date=d,
+                                             mode="in-person", status="filled", men=10, women=20)
+            d += datetime.timedelta(days=7)
+
+    def test_the_default_is_the_year_by_month(self):
+        a = self.client.get("/api/dashboard/summary/").data["attendance"]
+        self.assertEqual((a["period"]["key"], a["grouping"]), ("this-year", "month"))
+        # One bar for each month that has had a service so far. Early in a
+        # month there may be none yet (the test failed on 1 October).
+        months = AttendanceSession.objects.filter(date__year=self.today.year).dates("date", "month").count()
+        self.assertEqual(len(a["trend"]), months)
+        self.assertEqual(a["trend"][0]["adults"], 30)
+
+    def test_a_month_shows_each_service(self):
+        a = self.client.get("/api/dashboard/summary/?chart_period=this-month").data["attendance"]
+        self.assertEqual(a["grouping"], "service")
+
+    def test_the_money_period_is_separate(self):
+        d = self.client.get("/api/dashboard/summary/?period=last-month").data
+        self.assertEqual(d["attendance"]["period"]["key"], "this-year")
+
+
+class FollowUpRowNamesTestCase(Base):
+    """F10: each newcomer follow-up row carries the person's name and shepherd."""
+    def test_the_task_list_names_the_person_and_shepherd(self):
+        from newcomers.models import NewcomerTask
+        n = self.newcomer("Joy Mensah", stage="new")
+        NewcomerTask.objects.create(newcomer=n, text="Visit", due_date=self.today)
+        row = [r for r in self.client.get("/api/newcomer-tasks/").data["results"] if r["newcomer"] == n.id][0]
+        self.assertEqual(row["newcomer_name"], "Joy Mensah")
+        self.assertIn("shepherd_name", row)
+
+
+class OnePersonProfileTestCase(Base):
+    """F16: a member who came as a newcomer keeps the whole story, including
+    open newcomer tasks and check-ins from before they joined."""
+    def setUp(self):
+        super().setUp()
+        import datetime
+        from newcomers.models import NewcomerTask, NewcomerStatusHistory
+        from attendance.models import AttendanceSessionMember
+        MeetingType.objects.create(id="fri-worship", name="Friday Worship", day="Friday", frequency="weekly", detail_level="detailed")
+        self.n = self.newcomer("Kingsley Adeyemi", stage="attending")
+        NewcomerStatusHistory.objects.create(newcomer=self.n, stage="contacted", date=self.today - datetime.timedelta(days=20))
+        NewcomerTask.objects.create(newcomer=self.n, text="Schedule a home visit", due_date=self.today)
+        s = AttendanceSession.objects.create(meeting_type_id="fri-worship", location=self.bahrain,
+                                             date=self.today - datetime.timedelta(days=7), mode="in-person", status="filled", men=5)
+        AttendanceSessionMember.objects.create(session=s, newcomer=self.n)
+        self.client.post(f"/api/newcomers/{self.n.id}/make-member/")
+        self.m = Member.objects.get(from_newcomer=self.n)
+
+    def test_the_member_profile_carries_the_newcomer_story(self):
+        d = self.client.get(f"/api/members/{self.m.id}/person/").data
+        kinds = [e["kind"] for e in d["journey"]]
+        self.assertIn("registered", kinds); self.assertIn("stage", kinds); self.assertIn("member", kinds)
+        self.assertEqual(d["journey"][0]["kind"], "member")  # newest first
+
+    def test_open_newcomer_tasks_are_still_visible(self):
+        d = self.client.get(f"/api/members/{self.m.id}/person/").data
+        self.assertIn("Schedule a home visit", [t["text"] for t in d["open_follow_ups"]])
+
+    def test_check_ins_as_a_newcomer_count(self):
+        d = self.client.get(f"/api/members/{self.m.id}/person/").data
+        self.assertEqual((d["attendance"]["count"], d["attendance"]["recent"][0]["as"]), (1, "newcomer"))
+
+    def test_both_pages_tell_the_same_story(self):
+        a = self.client.get(f"/api/members/{self.m.id}/person/").data
+        b = self.client.get(f"/api/newcomers/{self.n.id}/person/").data
+        self.assertEqual(a["journey"], b["journey"])
+        self.assertEqual((b["member_id"], a["newcomer_id"]), (self.m.id, self.n.id))
+
+    def test_first_came_is_the_earliest_of_registration_and_attendance(self):
+        import datetime
+        d = self.client.get(f"/api/newcomers/{self.n.id}/person/").data
+        self.assertEqual(d["first_came"], (self.today - datetime.timedelta(days=7)).isoformat())
+
+
+class MeetingNamesReadableTestCase(Base):
+    """Q2: manual newcomer entry offers the meetings, so any role can read them."""
+    def test_a_role_without_attendance_can_read_but_not_change_meetings(self):
+        from accounts.models import RolePermission
+        MeetingType.objects.create(id="fri-worship", name="Friday Worship", day="Friday", frequency="weekly", detail_level="detailed")
+        role = Role.objects.create(name="Enquiries test")
+        RolePermission.objects.create(role=role, module="newcomers", can_view=True, can_create=True)
+        u = User.objects.create_user(email="eq@t.com", password="x", role=role, location=self.bahrain)
+        self.client.force_authenticate(user=u)
+        self.assertEqual(self.client.get("/api/meeting-types/").status_code, 200)
+        self.assertIn(self.client.post("/api/meeting-types/", {"id": "x", "name": "X"}, format="json").status_code, (403, 405))
+
+
+class LockSaysSoTestCase(Base):
+    """Manual check: the fifth wrong password says the sign-in is locked, at once."""
+    def test_the_fifth_wrong_attempt_says_too_many_attempts(self):
+        from rest_framework.test import APIClient
+        c = APIClient()
+        msgs = [c.post("/api/auth/login/", {"email": "u@t.com", "password": f"wrong{k}"}, format="json").data.get("detail", "") for k in range(5)]
+        self.assertIn("Forgotten your password?", msgs[3])
+        self.assertIn("Too many attempts", msgs[4])
+
+
+class UndoCheckInTestCase(Base):
+    """Manual check: an usher can undo a check-in by tapping again, and a role
+    without attendance edit cannot check in or undo."""
+    def test_usher_can_undo_a_check_in(self):
+        import datetime
+        from accounts.models import RolePermission
+        MeetingType.objects.create(id="fri-worship", name="Friday Worship", day="Friday", frequency="weekly", detail_level="detailed")
+        s = AttendanceSession.objects.create(meeting_type_id="fri-worship", location=self.bahrain, date=self.today, mode="in-person", status="pending")
+        m = self.member("Tap", "Person")
+        role = Role.objects.create(name="Usher test")
+        RolePermission.objects.create(role=role, module="attendance", can_view=True, can_create=True, can_edit=True)
+        usher = User.objects.create_user(email="us@t.com", password="x", role=role, location=self.bahrain)
+        self.client.force_authenticate(user=usher)
+        self.assertLess(self.client.post(f"/api/attendance-sessions/{s.id}/check_in/", {"member_id": m.id}, format="json").status_code, 300)
+        self.assertLess(self.client.delete(f"/api/attendance-sessions/{s.id}/check_in/", {"member_id": m.id}, format="json").status_code, 300)
+        viewer_role = Role.objects.create(name="Viewer test")
+        RolePermission.objects.create(role=viewer_role, module="attendance", can_view=True)
+        viewer = User.objects.create_user(email="vw2@t.com", password="x", role=viewer_role, location=self.bahrain)
+        self.client.force_authenticate(user=viewer)
+        self.assertEqual(self.client.post(f"/api/attendance-sessions/{s.id}/check_in/", {"member_id": m.id}, format="json").status_code, 403)
+
+
+class RecordKeepsNewcomersTestCase(Base):
+    """Manual check: saving a session with named attendance keeps newcomers' check-ins."""
+    def test_newcomer_check_ins_survive_a_save(self):
+        from attendance.models import AttendanceSessionMember
+        MeetingType.objects.create(id="fri-worship", name="Friday Worship", day="Friday", frequency="weekly", detail_level="detailed")
+        s = AttendanceSession.objects.create(meeting_type_id="fri-worship", location=self.bahrain, date=self.today, mode="in-person", status="pending")
+        n = self.newcomer("Door Visitor", stage="new")
+        AttendanceSessionMember.objects.create(session=s, newcomer=n)
+        m = self.member("Named", "Member")
+        r = self.client.post(f"/api/attendance-sessions/{s.id}/record/", {"men": 3, "women": 2, "track_named": True, "attendee_ids": [m.id]}, format="json")
+        self.assertLess(r.status_code, 300, r.data)
+        self.assertTrue(AttendanceSessionMember.objects.filter(session=s, newcomer=n).exists())
+        self.assertTrue(AttendanceSessionMember.objects.filter(session=s, member=m).exists())
+
+
+class ShepherdLocationTestCase(Base):
+    """Manual check: an account limited to one location shepherds there, even
+    if its linked member record is elsewhere."""
+    def test_account_location_decides(self):
+        from members.assignment import eligible_shepherds
+        m = self.member("Linked", "Elsewhere", location=self.others)
+        u = User.objects.create_user(email="sh@t.com", password="x", role=self.admin.role, location=self.bahrain, can_shepherd=True)
+        u.member = m; u.save()
+        self.assertIn(u, eligible_shepherds(location="bahrain"))
+        self.assertNotIn(u, eligible_shepherds(location="others"))
+
+
+class EditionTestCase(Base):
+    """F22: occasional meetings record an edition name and where it is held."""
+    def setUp(self):
+        super().setUp()
+        self.gck = MeetingType.objects.create(id="gck", name="Global Crusade with Kumuyi (GCK)", day="", frequency="occasional", detail_level="detailed")
+        self.fri = MeetingType.objects.create(id="fri-worship", name="Friday Worship", day="Friday", frequency="weekly", detail_level="detailed")
+
+    def test_an_occasional_session_keeps_its_edition(self):
+        r = self.client.post("/api/attendance-sessions/", {"meeting_type": "gck", "date": str(self.today), "location": "bahrain", "mode": "in-person",
+                                                           "edition_name": " Example Edition ", "edition_place": "Lagos, Nigeria"}, format="json")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual((r.data["edition_name"], r.data["edition_place"]), ("Example Edition", "Lagos, Nigeria"))
+        listed = self.client.get("/api/attendance-sessions/").data
+        rows = listed["results"] if isinstance(listed, dict) else listed
+        self.assertEqual(rows[0]["edition_place"], "Lagos, Nigeria")
+
+    def test_a_weekly_meeting_has_no_edition(self):
+        r = self.client.post("/api/attendance-sessions/", {"meeting_type": "fri-worship", "date": str(self.today), "location": "bahrain", "mode": "in-person",
+                                                           "edition_name": "Not allowed"}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("occasional", str(r.data["edition_name"]))
+
+    def test_recording_updates_the_edition_and_leaves_it_when_not_sent(self):
+        s = AttendanceSession.objects.create(meeting_type=self.gck, location=self.bahrain, date=self.today, mode="in-person", status="pending",
+                                             edition_name="First", edition_place="Abuja")
+        self.client.post(f"/api/attendance-sessions/{s.id}/record/", {"men": 2, "women": 3, "edition_name": "Second", "edition_place": "Lagos"}, format="json")
+        s.refresh_from_db(); self.assertEqual((s.edition_name, s.edition_place, s.status), ("Second", "Lagos", "filled"))
+        self.client.post(f"/api/attendance-sessions/{s.id}/record/", {"men": 4, "women": 3}, format="json")
+        s.refresh_from_db(); self.assertEqual((s.edition_name, s.men), ("Second", 4))
+
+
+class StableSessionOrderTestCase(Base):
+    """Manual walk: same-date sessions list newest first, so paging is stable."""
+    def test_same_date_sessions_newest_first(self):
+        MeetingType.objects.create(id="min", name="Ministerial Renewal", day="", frequency="occasional", detail_level="simple")
+        ids = [AttendanceSession.objects.create(meeting_type_id="min", location=self.bahrain, date=self.today, mode="in-person", status="pending").id for _ in range(3)]
+        d = self.client.get("/api/attendance-sessions/?ordering=-date").data
+        rows = d["results"] if isinstance(d, dict) else d
+        self.assertEqual([r["id"] for r in rows if r["id"] in ids], sorted(ids, reverse=True))

@@ -30,9 +30,9 @@ class AssignmentEngineTestCase(APITestCase):
             joined_date=datetime.date(2018, 1, 1), category=Member.Category.WORKER)
         self.m2 = Member.objects.create(surname="Osei", first_name="Sarah", location=self.bahrain,
             joined_date=datetime.date(2017, 1, 1), category=Member.Category.WORKER)
-        self.w1 = User.objects.create_user(email="grace@test.com", password="x", role=role,
+        self.w1 = User.objects.create_user(can_shepherd=True, email="grace@test.com", password="x", role=role,
             first_name="Grace", last_name="Thomas", member=self.m1)
-        self.w2 = User.objects.create_user(email="sarah@test.com", password="x", role=role,
+        self.w2 = User.objects.create_user(can_shepherd=True, email="sarah@test.com", password="x", role=role,
             first_name="Sarah", last_name="Osei", member=self.m2)
         self.source = NewcomerSource.objects.create(name="Church website")
 
@@ -70,12 +70,12 @@ class AssignmentEngineTestCase(APITestCase):
         for c in changes:
             self.assertIn(c["to_id"], worker_ids)
 
-    def test_error_when_no_workers_exist(self):
-        Member.objects.filter(category=Member.Category.WORKER).delete()
+    def test_error_when_nobody_can_shepherd(self):
+        User.objects.update(can_shepherd=False)
         self._member("Somebody")
         changes, err = build_assignment_preview()
         self.assertEqual(changes, [])
-        self.assertIn("No Workers available", err)
+        self.assertIn("Can shepherd others", err)
 
     # --- Only-unassigned vs reassign-everyone ---
 
@@ -239,7 +239,7 @@ class EligibleShepherdsEndpointTestCase(APITestCase):
 
         worker = Member.objects.create(surname="Osei", first_name="Sarah", location=self.bahrain,
             joined_date=datetime.date(2020, 1, 1), category=Member.Category.WORKER)
-        self.worker_user = User.objects.create_user(email="sarah@t.com", password="x", role=role)
+        self.worker_user = User.objects.create_user(can_shepherd=True, email="sarah@t.com", password="x", role=role)
         self.worker_user.member = worker
         self.worker_user.save()
 

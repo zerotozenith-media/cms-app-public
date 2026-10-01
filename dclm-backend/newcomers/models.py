@@ -68,6 +68,9 @@ class Newcomer(models.Model):
     is_first_timer = models.BooleanField(default=False)
     is_new_resident = models.BooleanField(default=False)  # independent of is_first_timer , can both be true
     wants_visit = models.BooleanField(default=False)
+    # F19: "Keep in touch with me with a short word of encouragement", ticked
+    # by default on the form. Newcomers added before this was asked are False.
+    keep_in_touch = models.BooleanField(default=True)
     wants_to_know_more = models.BooleanField(default=False)
     wants_salvation_info = models.BooleanField(default=False)
     invited_by_member = models.ForeignKey(

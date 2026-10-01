@@ -1,8 +1,8 @@
 import { useState, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
-import logoBadge from '../assets/logo-badge.png';
+import { AuthLayout } from '../components/auth/AuthLayout';
 
 /**
  * A real login form , deliberately NOT the demo's "click your account"
@@ -20,23 +20,28 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [website, setWebsite] = useState(''); // honeypot , real users never see or fill this
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const formLoadedAt = useRef(new Date().toISOString());
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setWarning(false);
     setSubmitting(true);
     try {
       await login(email, password, { website, form_loaded_at: formLoadedAt.current });
       const from = (location.state as { from?: string })?.from || '/';
       navigate(from, { replace: true });
     } catch (err: any) {
+      const data = err?.response?.data;
+      setWarning(Boolean(data?.warning));
       if (err?.response?.status === 429) {
         // The server says how long to wait.
-        setError(err?.response?.data?.detail ?? 'Too many attempts. Please wait a few minutes and try again.');
+        setError(data?.detail ?? 'Too many attempts. Please wait a few minutes and try again.');
       } else {
-        setError('Invalid email or password.');
+        // On the attempt before a lock the server adds a warning.
+        setError(data?.detail ?? 'Invalid email or password.');
       }
     } finally {
       setSubmitting(false);
@@ -44,12 +49,9 @@ export function LoginPage() {
   }
 
   return (
-    <div className="login-screen">
-      <div className="login-card">
-        <img className="login-logo" src={logoBadge} alt="DCLM Bahrain" />
-        <h2>Sign in to DCLM Bahrain CMS</h2>
-        <p className="login-sub">Enter your email and password to continue.</p>
-
+    <AuthLayout>
+        <h1>Welcome back</h1>
+        <p className="auth-sub">Sign in with the email your account was created with.</p>
         <form onSubmit={handleSubmit}>
           <div className="field">
             <label htmlFor="email">Email</label>
@@ -90,19 +92,17 @@ export function LoginPage() {
             />
           </div>
 
-          {error && (
-            <p style={{ color: 'var(--red)', fontSize: '.85rem', margin: '4px 0 14px' }}>{error}</p>
-          )}
+          {error && (warning
+            ? <div className="auth-warning" role="alert">{error}</div>
+            : <p className="auth-error" role="alert">{error}</p>)}
 
           <Button type="submit" disabled={submitting} style={{ width: '100%', justifyContent: 'center' }}>
             {submitting ? 'Signing in…' : 'Sign in'}
           </Button>
         </form>
 
-        <p className="login-note">
-          Trouble signing in? Contact your Administrator to confirm your account is active.
-        </p>
-      </div>
-    </div>
+        <div style={{ marginTop: 16 }}><Link className="auth-link" to="/forgot-password">Forgotten your password?</Link></div>
+        <p className="auth-note">No account yet? Ask an administrator.</p>
+    </AuthLayout>
   );
 }

@@ -33,7 +33,7 @@ class ReviewEditsTestCase(APITestCase):
         for name in ["Grace", "Sarah"]:
             m = Member.objects.create(surname="T", first_name=name, location=self.bahrain,
                                       joined_date=today, category=Member.Category.WORKER)
-            u = User.objects.create_user(email=f"{name}@t.com", password="x",
+            u = User.objects.create_user(can_shepherd=True, email=f"{name}@t.com", password="x",
                                          role=admin_role, member=m, location=self.bahrain)
             self.shepherds.append(u)
 

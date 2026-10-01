@@ -11,6 +11,17 @@ export interface HelpTopic {
 }
 
 export const HELP_TOPICS: Record<string, HelpTopic> = {
+  fuCounts: { title: 'The numbers', body: 'How many people in each journey have a message due today. Tap a journey to see only them.' },
+  fuReplied: { title: 'Have they replied?', body: "If they have written back since your last message, send a personal reply instead. Today's planned message moves to tomorrow, so nothing is lost." },
+  fuSwap: { title: 'Use another message', body: 'Choose another message from the bank, one of your saved messages, or write your own.' },
+  fuSkip: { title: 'Skip today', body: 'Nothing is sent today. Their plan carries on at the next planned day.' },
+  fuEditor: { title: 'Writing a good message', body: 'Keep it to one or two sentences, end with one easy question, and offer only one next step.' },
+  fuPlan: { title: 'Standard or Daily', body: 'Standard spaces messages a few days apart, as set by the plan for their journey. Daily sends one every day. From their third visit, newcomers receive Belonging messages.' },
+  fuStop: { title: 'Stop messages', body: 'Stops all planned messages. You can still message them yourself at any time, and restart later.' },
+  fuFinal: { title: 'Final gentle message', body: 'Their last planned message. After it, only personal messages from you.' },
+  fuBelonging: { title: 'Belonging', body: 'They have visited three times, so they now receive messages about belonging: house fellowship, serving and membership.' },
+  fuSteps: { title: 'In-person steps', body: 'The discipler\'s steps alongside the messages for a new convert. Tick each one when done.' },
+  fuKeepInTouch: { title: 'Keep in touch', body: 'Ticked, they receive a short word of encouragement from the person following them up. They can ask to stop at any time.' },
   shepherd: {
     title: 'Assigned shepherd',
     body: 'The worker responsible for checking on this person if they miss a service. When an absence is detected, the follow-up task goes to them automatically. Someone with no shepherd still gets a task, it just shows as Unassigned so it can be picked up.',
@@ -21,7 +32,7 @@ export const HELP_TOPICS: Record<string, HelpTopic> = {
   },
   reassignEveryone: {
     title: 'Reassign everyone',
-    body: 'By default auto-assign only fills in people who have no shepherd, so pairings someone chose deliberately are left alone. Reassign everyone ignores that and recalculates from scratch, which can move people who were paired on purpose. Useful when a worker leaves the church and their people need redistributing.',
+    body: 'By default auto-assign only fills in people who have no shepherd, so pairings someone chose deliberately are left alone. Reassign everyone ignores that and recalculates from scratch, which can move people who were paired on purpose. Useful when a shepherd stops and their people need redistributing.',
   },
   absenceTracking: {
     title: 'Counts toward absence follow-up',

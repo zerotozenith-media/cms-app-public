@@ -18,6 +18,20 @@ import type { Giving, Expense } from '../../types/finance';
 import { useAuth } from '../../context/AuthContext';
 
 
+/**
+ * F9: pressing the pencil on an entry lower down filled the form far above,
+ * off-screen, so it seemed to do nothing. Bring the form into view and put
+ * the cursor in its first box once it has been filled.
+ */
+function bringFormIntoView(firstFieldId: string) {
+  setTimeout(() => {
+    const el = document.getElementById(firstFieldId);
+    if (!el) return;
+    el.closest('.card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    (el as HTMLInputElement).focus({ preventScroll: true });
+  }, 50);
+}
+
 export function FinancePage() {
   // Remittance is a monthly act, not a property of each entry, so it
   // gets its own tab rather than a field on the giving form.
@@ -88,6 +102,7 @@ export function FinancePage() {
 
   function startGivingEdit(g: Giving) {
     setGivingEditId(g.id);
+    bringFormIntoView('g-date');
     setGDate(g.date);
     setGFund(String(g.fund));
     setGMethod(String(g.method));
@@ -137,6 +152,7 @@ export function FinancePage() {
 
   function startExpenseEdit(x: Expense) {
     setExpenseEditId(x.id);
+    bringFormIntoView('e-date');
     setEDate(x.date);
     setECategory(String(x.category));
     setEAmount(String(x.amount));
@@ -239,8 +255,8 @@ export function FinancePage() {
       )}
 
       {(canCreate || givingEditId || expenseEditId) && <div className="grid g2 section-gap">
-        <div className="card">
-          <h3>{givingEditId ? 'Edit giving entry' : 'Record giving'}</h3>
+        <div className={`card${givingEditId ? ' editing-card' : ''}`}>
+          <h3>{givingEditId ? 'Edit giving entry' : 'Record giving'}{givingEditId ? <span className="editing-tag">Editing</span> : null}</h3>
           <form onSubmit={handleGivingSubmit}>
             <div className="form-row">
               <div className="field">
@@ -288,8 +304,8 @@ export function FinancePage() {
           </form>
         </div>
 
-        <div className="card">
-          <h3>{expenseEditId ? 'Edit expense entry' : 'Record expense'}</h3>
+        <div className={`card${expenseEditId ? ' editing-card' : ''}`}>
+          <h3>{expenseEditId ? 'Edit expense entry' : 'Record expense'}{expenseEditId ? <span className="editing-tag">Editing</span> : null}</h3>
           <form onSubmit={handleExpenseSubmit}>
             <div className="form-row">
               <div className="field">

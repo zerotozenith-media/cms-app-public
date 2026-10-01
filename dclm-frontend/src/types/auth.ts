@@ -21,6 +21,7 @@ export interface AuthUser {
   role: string | null;
   location: string | null;
   location_name: string | null;
+  photo?: string | null;
 }
 
 export interface LoginResponse {

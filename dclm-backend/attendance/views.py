@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from accounts.audit import log_audit
 from accounts.permissions import ModulePermission, LocationScopedQuerySetMixin
 from .models import Fellowship, MeetingType, AttendanceSession, AttendanceSessionMember
+from core.viewing import scope_location_id
 from .serializers import (
     FellowshipSerializer, MeetingTypeSerializer, AttendanceSessionSerializer, AttendanceSessionMemberSerializer, RecordAttendanceSerializer,
 )
@@ -20,6 +21,15 @@ class MeetingTypeViewSet(viewsets.ModelViewSet):
     church_wide = True
     module = "attendance"
     permission_classes = [ModulePermission]
+
+    def get_permissions(self):
+        # Anyone signed in can read the meetings, as with locations: forms
+        # such as manual newcomer entry offer them. The enquiries role was
+        # refused, leaving that dropdown empty. Changes still need permission.
+        from rest_framework.permissions import SAFE_METHODS, IsAuthenticated
+        if self.request.method in SAFE_METHODS:
+            return [IsAuthenticated()]
+        return super().get_permissions()
     queryset = MeetingType.objects.all()
     serializer_class = MeetingTypeSerializer
     filter_backends = [filters.SearchFilter]
@@ -42,6 +52,14 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
     serializer_class = AttendanceSessionSerializer
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ["date", "total_computed"]
+
+    class _StableOrdering(filters.OrderingFilter):
+        """Sessions on the same date had no fixed order, so paging could repeat
+        or skip one (found in the manual walk). Ties now go newest first."""
+        def get_ordering(self, request, queryset, view):
+            ordering = list(super().get_ordering(request, queryset, view) or ["-date"])
+            return ordering if "-id" in ordering or "id" in ordering else ordering + ["-id"]
+    filter_backends = [_StableOrdering]
 
     def get_queryset(self):
         from django.db.models import F
@@ -181,6 +199,10 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
                           "online_youth_girls", "online_children_boys",
                           "online_children_girls", "new_comers", "new_converts"]:
                 setattr(session, field, data[field])
+            if session.meeting_type.frequency == MeetingType.Frequency.OCCASIONAL:
+                for f in ("edition_name", "edition_place"):
+                    if f in data:
+                        setattr(session, f, (data[f] or "").strip())
             if session.fellowship_id:
                 session.lesson = data.get("lesson", "")
                 if data.get("led_by"):
@@ -206,13 +228,25 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
                 # of detail. Individually logging every checked-in member
                 # would be noise, not signal , named attendance is explicitly
                 # supplementary data (Batch 0.2), not the audited headline event.
-                AttendanceSessionMember.objects.filter(session=session).delete()
+                # Only members' ticks are replaced. Newcomers checked in at the
+                # door are kept: wiping them lost their visits, readiness and
+                # follow-up stage (found in the manual check).
+                AttendanceSessionMember.objects.filter(session=session, member__isnull=False).delete()
                 AttendanceSessionMember.objects.bulk_create([
                     AttendanceSessionMember(session=session, member_id=mid)
                     for mid in data["attendee_ids"]
                 ])
 
         return Response(AttendanceSessionSerializer(session).data)
+
+    def get_permissions(self):
+        # Manual check: undoing a check-in by tapping again was refused for
+        # ushers, because the general rule treats any DELETE as deleting a
+        # record. check_in applies its own rule (edit attendance) inside.
+        if getattr(self, "action", None) == "check_in":
+            from rest_framework.permissions import IsAuthenticated
+            return [IsAuthenticated()]
+        return super().get_permissions()
 
     @action(detail=True, methods=["post", "delete", "patch"])
     def check_in(self, request, pk=None):
@@ -290,8 +324,9 @@ class FellowshipViewSet(viewsets.ModelViewSet):
         from django.db.models import Q
         qs = super().get_queryset()
         user = self.request.user
-        if not user.is_superuser and user.location_id:
-            qs = qs.filter(Q(location_id=user.location_id) | Q(location__isnull=True))
+        loc = scope_location_id(user)
+        if loc:
+            qs = qs.filter(Q(location_id=loc) | Q(location__isnull=True))
         return qs
 
     def perform_destroy(self, instance):
@@ -305,3 +340,19 @@ class FellowshipViewSet(viewsets.ModelViewSet):
             })
         log_audit(self.request.user, "Deleted", "Fellowship", instance.name, "")
         instance.delete()
+
+
+
+from rest_framework.decorators import api_view, permission_classes as _pc
+from rest_framework.permissions import AllowAny as _AllowAny
+from rest_framework.response import Response as _Response
+
+
+@api_view(["GET"])
+@_pc([_AllowAny])
+def public_meetings(request):
+    """Meeting names only, for the public QR registration form's "Meeting"
+    question. It was refused before sign-in, so the list was always empty."""
+    from .models import MeetingType
+    rows = MeetingType.objects.order_by("name").values("id", "name")
+    return _Response([{"id": r["id"], "name": r["name"]} for r in rows])

@@ -78,6 +78,9 @@ export interface AttendanceSession {
   led_by: number | null;
   led_by_name: string | null;
   lesson: string;
+  // F22: an occasional meeting's edition.
+  edition_name: string;
+  edition_place: string;
   id: number;
   meeting_type: string;
   meeting_type_name: string;
@@ -113,6 +116,8 @@ export interface RecordAttendancePayload {
   new_converts?: number;
   led_by?: number | null;
   lesson?: string;
+  edition_name?: string;
+  edition_place?: string;
   men: number;
   women: number;
   youth_boys: number;

@@ -9,6 +9,7 @@ from accounts.audit import log_audit
 from accounts.permissions import ModulePermission
 from .models import Service, Department, Testimony, WeeklyNote, Report
 from .pdf import render_report_pdf
+from core.viewing import scope_location_id
 from .serializers import (
     ServiceSerializer, DepartmentSerializer, TestimonySerializer,
     WeeklyNoteSerializer, ReportSerializer, GenerateReportSerializer,
@@ -89,8 +90,8 @@ class ReportViewSet(viewsets.ModelViewSet):
         qs = super().get_queryset()
         # A location-limited person sees their own location's reports only.
         user = self.request.user
-        if not user.is_superuser and user.location_id:
-            qs = qs.filter(location_id=user.location_id)
+        if scope_location_id(user):
+            qs = qs.filter(location_id=scope_location_id(user))
         year = self.request.query_params.get("year")
         if year:
             qs = qs.filter(period_year=year)

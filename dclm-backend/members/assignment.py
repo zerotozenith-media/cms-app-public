@@ -3,7 +3,7 @@ Shepherd assignment rules, kept separate from the views so the logic can
 be tested on its own and reused by any caller.
 
 Confirmed design:
-  1. Only members in the Worker category can be shepherds.
+  1. Only accounts ticked "Can shepherd others" in Admin can be shepherds.
   2. Household first, so families are not split across different workers.
   3. Then load balancing, by how many people a worker already carries.
      Deliberately counts people shepherded rather than open tasks, since
@@ -23,18 +23,25 @@ SETTING_AUTO_ASSIGN_NEWCOMERS = "auto_assign_newcomers"
 
 def eligible_shepherds(location=None):
     """
-    A shepherd is a User account, not a bare Member record, since tasks
-    are assigned to whoever logs in. "Worker only" is therefore checked
-    through the member record that user is linked to: an active account
-    whose linked member sits in the Worker category.
+    Who people can be assigned to: active accounts ticked "Can shepherd
+    others" in Admin (F7). This used to follow the Worker member category,
+    but a shepherd need not be an approved Worker, and a Worker need not
+    shepherd.
+
+    An account limited to one location shepherds there, whatever location
+    its member record shows: it cannot even see people elsewhere (found in
+    the manual check). An account covering every location shepherds at its
+    member record's location, or anywhere if it has none.
     """
-    qs = User.objects.filter(
-        is_active=True,
-        member__isnull=False,
-        member__category=Member.Category.WORKER,
-    ).select_related("member")
+    from django.db.models import Q
+    qs = User.objects.filter(is_active=True, can_shepherd=True).select_related("member")
     if location:
-        qs = qs.filter(member__location=location)
+        loc = getattr(location, "pk", location)
+        qs = qs.filter(
+            Q(location_id=loc)
+            | Q(location__isnull=True, member__location_id=loc)
+            | Q(location__isnull=True, member__isnull=True)
+        )
     return list(qs)
 
 
@@ -70,8 +77,8 @@ def build_assignment_preview(location=None, reassign_everyone=False):
     shepherds = eligible_shepherds(location)
     if not shepherds:
         return [], (
-            "No Workers available to act as shepherds. Set at least one member "
-            "to the Worker category first."
+            "Nobody is set up to shepherd here yet. In Admin, tick Can shepherd "
+            "others on at least one account first."
         )
 
     by_id = {s.id: s for s in shepherds}

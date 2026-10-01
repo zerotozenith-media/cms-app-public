@@ -1,3 +1,5 @@
+import { ChartTipBox, useChartTip } from './ChartTip';
+
 /**
  * Attendance as grouped bars.
  *
@@ -25,6 +27,7 @@ export interface BarSeries {
 export function GroupedBars({ groups, series }: { groups: BarGroup[]; series: BarSeries[] }) {
   // A group nobody attends is left out entirely. Saturday Workers Meeting
   // showing empty Youth and Children entries was noise.
+  const { ref, tip, show, hide } = useChartTip();
   const shown = series.filter((s) => groups.some((g) => (g.values[s.key] ?? 0) > 0));
   if (!groups.length || !shown.length) {
     return <div className="empty">Nothing recorded for this meeting and period.</div>;
@@ -33,19 +36,25 @@ export function GroupedBars({ groups, series }: { groups: BarGroup[]; series: Ba
   const max = Math.max(1, ...groups.flatMap((g) => shown.map((s) => g.values[s.key] ?? 0)));
   const top = Math.ceil(max * 1.12);
 
+  const groupLines = (g: BarGroup) => [
+    ...shown.map((s) => `${s.name} ${g.values[s.key] ?? 0}`),
+    `Total ${shown.reduce((n, s) => n + (g.values[s.key] ?? 0), 0)}`,
+  ];
+
   return (
-    <div className="gbars">
+    <div className="gbars chart-wrap" ref={ref} onPointerLeave={(e) => { if (e.pointerType === 'mouse') hide(); }}>
       <div className="gbars-plot">
         <div className="gbars-axis">
           {[top, Math.round(top / 2), 0].map((v) => <span key={v}>{v}</span>)}
         </div>
         <div className="gbars-cols">
           {groups.map((g) => (
-            <div className="gbar-group" key={g.label}>
+            <div className={`gbar-group${tip?.key === g.label ? ' active' : ''}`} key={g.label}
+              onPointerEnter={(e) => { if (e.pointerType === 'mouse') show(e, g.label, g.label, groupLines(g)); }}
+              onClick={(e) => show(e, g.label, g.label, groupLines(g))}>
               <div className="gbar-set">
                 {shown.map((s) => (
                   <span key={s.key} className="gbar"
-                    title={`${s.name}: ${g.values[s.key] ?? 0}`}
                     style={{
                       height: `${((g.values[s.key] ?? 0) / top) * 100}%`,
                       background: s.color,
@@ -57,6 +66,7 @@ export function GroupedBars({ groups, series }: { groups: BarGroup[]; series: Ba
           ))}
         </div>
       </div>
+      <ChartTipBox tip={tip} />
       <div className="gbars-legend">
         {shown.map((s) => (
           <span className="gbl" key={s.key}>

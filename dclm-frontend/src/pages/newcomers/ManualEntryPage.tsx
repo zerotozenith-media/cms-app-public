@@ -31,6 +31,7 @@ export function ManualEntryPage() {
         is_first_timer: values.is_first_timer, is_new_resident: values.is_new_resident,
         wants_visit: values.wants_visit, wants_to_know_more: values.wants_to_know_more,
         wants_salvation_info: values.wants_salvation_info, invited_by_name: values.invited_by_name,
+        keep_in_touch: values.keep_in_touch,
       });
       navigate(`/newcomers/${created.id}`);
     } catch {
@@ -44,6 +45,7 @@ export function ManualEntryPage() {
         <div className="tabs">
           <button className="tab" onClick={() => navigate('/newcomers')}>Pipeline</button>
           <button className="tab" onClick={() => navigate('/newcomers/follow-up')}>Follow-up</button>
+          <button className="tab" onClick={() => navigate('/newcomers/messages')}>Messages</button>
           <button className="tab" onClick={() => navigate('/newcomers/qr')}>QR Registration</button>
           <button className="tab active">Manual Entry</button>
         </div>

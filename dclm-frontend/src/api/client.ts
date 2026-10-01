@@ -1,3 +1,4 @@
+import { getViewingLocation } from './viewing';
 import axios, { type InternalAxiosRequestConfig } from 'axios';
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
@@ -29,6 +30,9 @@ apiClient.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  // F2: narrows what the server returns to the location picked in the top bar.
+  const viewing = getViewingLocation();
+  if (viewing) config.headers['X-Viewing-Location'] = viewing;
   return config;
 });
 
@@ -69,3 +73,12 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   },
 );
+
+
+/** A stored file's address. The server may give a path such as
+ *  /media/..., which lives on the API's host, not the app's. */
+export function mediaUrl(url?: string | null): string | null {
+  if (!url) return null;
+  if (/^https?:\/\//.test(url)) return url;
+  try { return new URL(url, API_BASE_URL).toString(); } catch { return url; }
+}

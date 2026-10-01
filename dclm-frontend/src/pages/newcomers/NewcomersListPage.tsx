@@ -107,6 +107,7 @@ export function NewcomersListPage() {
         <div className="tabs">
           <button className="tab active">Pipeline</button>
           <button className="tab" onClick={() => navigate('/newcomers/follow-up')}>Follow-up</button>
+          <button className="tab" onClick={() => navigate('/newcomers/messages')}>Messages</button>
           <button className="tab" onClick={() => navigate('/newcomers/qr')}>QR Registration</button>
           <button className="tab" onClick={() => navigate('/newcomers/manual')}>Manual Entry</button>
         </div>

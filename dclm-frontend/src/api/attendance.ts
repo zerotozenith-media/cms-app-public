@@ -6,9 +6,10 @@ import type {
   AttendanceSessionMember, CheckInMode, Fellowship,
 } from '../types/attendance';
 
-export function useMeetingTypes() {
+export function useMeetingTypes(opts: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ['meeting-types'],
+    enabled: opts.enabled ?? true,
     queryFn: async () => {
       const resp = await apiClient.get<PaginatedResponse<MeetingType> | MeetingType[]>('/meeting-types/');
       return Array.isArray(resp.data) ? resp.data : resp.data.results;

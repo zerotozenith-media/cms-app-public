@@ -45,6 +45,7 @@ export function RolePermissionMatrix({ role, readOnly = false }: { role: Role; r
                   <td data-label={ACTION_LABELS[action]} key={action}>
                     <input
                       type="checkbox"
+                      aria-label={`${ACTION_LABELS[action]} ${moduleName.charAt(0).toUpperCase()}${moduleName.slice(1)}`}
                       checked={existing ? Boolean(existing[action as keyof typeof existing]) : false}
                       disabled={readOnly}
                       onChange={(e) => toggle(moduleName, action, e.target.checked)}

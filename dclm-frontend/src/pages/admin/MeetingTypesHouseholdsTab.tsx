@@ -66,7 +66,15 @@ export function MeetingTypesHouseholdsTab() {
 
   async function handleAddMeeting(e: React.FormEvent) {
     e.preventDefault();
-    await createMeetingType.mutateAsync({ id: mtId, name: mtName, day: mtDay, frequency: mtFreq, detail_level: mtLevel });
+    setMeetingError('');
+    try {
+      await createMeetingType.mutateAsync({ id: mtId, name: mtName, day: mtDay, frequency: mtFreq, detail_level: mtLevel });
+    } catch (err: any) {
+      const d = err?.response?.data ?? {};
+      const first = Object.values(d)[0];
+      setMeetingError(first ? String(([] as any[]).concat(first)[0]) : 'The meeting type could not be added.');
+      return;
+    }
     setMtId(''); setMtName(''); setMtDay('');
     setShowMeetingForm(false);
   }
@@ -107,7 +115,7 @@ export function MeetingTypesHouseholdsTab() {
         </label>
         <div className="muted" style={{ fontSize: '.78rem', marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
           Auto-assign pairs households to the same shepherd first, then balances the rest by how many
-          people each Worker already carries. Only Workers can be shepherds.
+          people each shepherd already carries. Only accounts ticked Can shepherd others can be shepherds.
           Run it from <b>Members, Auto-assign</b>.
         </div>
       </div>
@@ -118,7 +126,7 @@ export function MeetingTypesHouseholdsTab() {
             <h3>Meeting types</h3>
             {churchWide && <a className="btn sm" onClick={() => setShowMeetingForm(!showMeetingForm)}><Icon name="plus" size={14} /> Add</a>}
           </div>
-          {meetingError && <p className="form-error">{meetingError}</p>}
+          {meetingError && <p className="form-error" role="alert">{meetingError}</p>}
           {showMeetingForm && (
             <div className="form-card editing">
               <form onSubmit={handleAddMeeting}>
@@ -133,7 +141,11 @@ export function MeetingTypesHouseholdsTab() {
                 <div className="form-row g3">
                   <div className="field">
                     <label htmlFor="mt-day">Day</label>
-                    <input id="mt-day" value={mtDay} onChange={(e) => setMtDay(e.target.value)} placeholder="e.g. Sunday or –" />
+                    {/* A dropdown, since a weekly meeting needs a real day of the week. */}
+                    <select id="mt-day" value={mtDay} onChange={(e) => setMtDay(e.target.value)}>
+                      <option value="">No fixed day</option>
+                      {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((d) => <option key={d} value={d}>{d}</option>)}
+                    </select>
                   </div>
                   <div className="field">
                     <label htmlFor="mt-level">Level</label>
@@ -196,7 +208,7 @@ export function MeetingTypesHouseholdsTab() {
                     </td>
                     <td data-label="Collects an offering">
                       <label className="tick">
-                        <input type="checkbox" checked={m.collects_offering} disabled={!churchWide}
+                        <input type="checkbox" checked={m.collects_offering} disabled={!churchWide} aria-label={`Collect an offering at ${m.name}`}
                           onChange={(e) => saveMeeting({ id: m.id, collects_offering: e.target.checked })} />
                         {m.collects_offering
                           ? <Badge color="green">Yes</Badge>
@@ -289,7 +301,7 @@ export function MeetingTypesHouseholdsTab() {
                 <td data-label="Sessions recorded">{f.session_count}</td>
                 <td className="td-actions">
                   {canRemoveFellowship && (
-                  <button className="icon-btn" title="Remove"
+                  <button className="icon-btn" title="Remove" aria-label={`Remove ${f.name}`}
                     onClick={async () => {
                       setFellowshipError('');
                       try { await deleteFellowship.mutateAsync(f.id); }

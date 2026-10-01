@@ -1,3 +1,4 @@
+import { Skeleton } from '../../components/ui/Skeleton';
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSession, useCheckIn, useCheckOut, useSetCheckInMode } from '../../api/attendance';
@@ -21,6 +22,9 @@ export function LiveCheckInPage() {
   const setMode = useSetCheckInMode(sessionId);
 
   const [query, setQuery] = useState('');
+  // A tap that fails says so, rather than leaving the row silently unchanged.
+  const [tapError, setTapError] = useState('');
+  const failed = (e: any) => setTapError(e?.response?.data?.detail || 'That tap was not saved. Check your connection and tap again.');
 
   // Who is already checked in, by member id, so a row can render its
   // state without scanning the attendee array on every keystroke.
@@ -41,7 +45,7 @@ export function LiveCheckInPage() {
     return out;
   }, [roster, query]);
 
-  if (loadingSession || loadingRoster) return <div className="card">Loading…</div>;
+  if (loadingSession || loadingRoster) return <Skeleton shape="list" />;
   if (!session) return <div className="card">Session not found.</div>;
 
   const checkedCount = session.attendees.length;
@@ -52,12 +56,14 @@ export function LiveCheckInPage() {
     // Each tap is its own request. Several ushers on different doors work
     // the same session at once, so nothing is batched into a form that
     // could overwrite someone else's taps on submit.
-    if (attendeeByMember.has(member.id)) checkOut.mutate(member.id);
-    else checkIn.mutate({ memberId: member.id });
+    setTapError('');
+    if (attendeeByMember.has(member.id)) checkOut.mutate(member.id, { onError: failed });
+    else checkIn.mutate({ memberId: member.id }, { onError: failed });
   }
 
   return (
     <>
+      {tapError && <p className="form-error" role="alert">{tapError}</p>}
       <a className="backlink" onClick={() => navigate(`/attendance/${sessionId}`)}>
         ← Back to session details
       </a>
@@ -101,6 +107,7 @@ export function LiveCheckInPage() {
                   <div
                     key={m.id}
                     className={`checkin-row${att ? ' checked' : ''}`}
+                    aria-pressed={!!att}
                     onClick={() => toggle(m)}
                     role="button"
                     tabIndex={0}
@@ -120,7 +127,7 @@ export function LiveCheckInPage() {
                         className="btn sm outline"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setMode.mutate({ memberId: m.id, mode: online ? 'in-person' : 'online' });
+                          setMode.mutate({ memberId: m.id, mode: online ? 'in-person' : 'online' }, { onError: failed });
                         }}
                       >
                         {online ? 'Mark in person' : 'Mark online'}

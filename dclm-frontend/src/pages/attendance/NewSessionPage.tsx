@@ -21,18 +21,32 @@ export function NewSessionPage() {
   const [date, setDate] = useState(today);
   const [location, setLocation] = useState('');
   const [mode, setMode] = useState('in-person');
+  // F22: occasional meetings, such as GCK, have their own edition each time.
+  const [editionName, setEditionName] = useState('');
+  const [editionPlace, setEditionPlace] = useState('');
+  const [error, setError] = useState('');
 
   if (meetingTypes && !meetingType && meetingTypes.length) setMeetingType(meetingTypes[0].id);
   if (locations && !location && locations.length) setLocation(locations[0].id);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const created = await createSession.mutateAsync({
-      meeting_type: meetingType, date, location, mode,
-      ...(isFellowship && fellowship !== '' ? { fellowship } : {}),
-    });
-    navigate(`/attendance/${created.id}`);
+    setError('');
+    try {
+      const created = await createSession.mutateAsync({
+        meeting_type: meetingType, date, location, mode,
+        ...(isFellowship && fellowship !== '' ? { fellowship } : {}),
+        ...(isOccasional ? { edition_name: editionName, edition_place: editionPlace } : {}),
+      });
+      navigate(`/attendance/${created.id}`);
+    } catch (err: any) {
+      const d = err?.response?.data ?? {};
+      const first = Object.values(d)[0];
+      setError(first ? String(([] as any[]).concat(first)[0]) : 'The session could not be created. Try again.');
+    }
   }
+
+  const isOccasional = meetingTypes?.find((m) => m.id === meetingType)?.frequency === 'occasional';
 
   if (!meetingTypes || !locations) return null;
 
@@ -51,6 +65,18 @@ export function NewSessionPage() {
               {meetingTypes.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           </div>
+          {isOccasional && (
+            <div className="form-row">
+              <div className="field">
+                <label htmlFor="session-edition">Edition name</label>
+                <input id="session-edition" value={editionName} onChange={(e) => setEditionName(e.target.value)} maxLength={120} placeholder="The theme or title of this edition" />
+              </div>
+              <div className="field">
+                <label htmlFor="session-edition-place">Where it is held</label>
+                <input id="session-edition-place" value={editionPlace} onChange={(e) => setEditionPlace(e.target.value)} maxLength={120} placeholder="Host city or venue" />
+              </div>
+            </div>
+          )}
           <div className="form-row">
           {isFellowship && (
             <div className="field">
@@ -84,6 +110,7 @@ export function NewSessionPage() {
               <option value="online">Online</option>
             </select>
           </div>
+          {error && <p className="form-error" role="alert">{error}</p>}
           <Button type="submit" disabled={createSession.isPending}>
             {createSession.isPending ? 'Creating…' : 'Create session'}
           </Button>

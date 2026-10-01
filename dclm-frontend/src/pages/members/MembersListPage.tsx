@@ -190,6 +190,13 @@ export function MembersListPage() {
             }}
           />
         )}
+        {/* A refusal, such as nobody being set up to shepherd, says why. */}
+        {previewMode && preview.isError && (
+          <div className="assign-preview" role="alert">
+            {(preview.error as any)?.response?.data?.detail ?? 'Auto-assign could not work out a proposal. Try again.'}
+            <div style={{ marginTop: 10 }}><button className="btn sm ghost" onClick={() => setPreviewMode(null)}>Close</button></div>
+          </div>
+        )}
         {previewMode && preview.data && preview.data.changes.length === 0 && (
           <div className="assign-preview">
             Nothing to assign. Everyone in scope already has a shepherd.

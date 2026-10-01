@@ -1,3 +1,4 @@
+import { Skeleton } from '../../components/ui/Skeleton';
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useMember, useUpdateMember, useDeleteMember, useMoveCategory } from '../../api/members';
@@ -9,6 +10,12 @@ import { Badge } from '../../components/ui/Badge';
 import { Icon } from '../../components/ui/Icon';
 import { fmt } from '../../lib/format';
 import type { Household, Member } from '../../types/members';
+import { usePerson } from '../../api/person';
+import { PersonMessages } from '../../components/person/PersonMessages';
+
+const longDate = (d?: string | null) =>
+  d ? new Date(`${d}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '–';
+import { AttendanceList, JourneyTimeline, MilestoneChips, OpenFollowUps, PersonStats, PersonTabs, initialsOf } from '../../components/person/PersonParts';
 import { useAuth } from '../../context/AuthContext';
 import { useLocationName } from '../../api/locations';
 
@@ -34,7 +41,7 @@ export function MemberProfilePage() {
   const { id } = useParams();
   const memberId = Number(id);
   const navigate = useNavigate();
-  const { data: member, isLoading } = useMember(memberId);
+  const { data: member, isLoading, isError } = useMember(memberId);
   const { data: locations } = useMyLocations();
   const updateMember = useUpdateMember(memberId);
   // Who looks after this person, shown on the profile and changeable here.
@@ -72,7 +79,16 @@ export function MemberProfilePage() {
     enabled: !!member?.household,
   });
 
-  if (isLoading || !member) return <div className="card">Loading…</div>;
+  const { data: person } = usePerson('members', memberId);
+  // Someone at another location, or deleted: say so, rather than a page that
+  // waits for ever.
+  if (isError) return (
+    <div className="card empty">
+      This person could not be found. They may be at another location, or no longer recorded.
+      <div style={{ marginTop: 10 }}><button className="btn sm outline" onClick={() => navigate('/members')}>Back to members</button></div>
+    </div>
+  );
+  if (isLoading || !member) return <Skeleton shape="profile" />;
 
   function startEdit() {
     setFormValues(toFormValues(member!));
@@ -102,9 +118,10 @@ export function MemberProfilePage() {
       const d = err?.response?.data ?? {};
       const first = Object.entries(d)[0] as [string, any] | undefined;
       const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-      setEditError(first
-        ? `${cap(first[0].replace(/_/g, ' '))}: ${cap(String([].concat(first[1])[0]))}`
-        : 'Could not save the changes.');
+      const msg = first ? String([].concat(first[1])[0]) : '';
+      setEditError(first?.[0] === 'phone' && msg.includes('already exists')
+        ? 'This phone number already belongs to another member.'
+        : first ? `${cap(first[0].replace(/_/g, ' '))}: ${cap(msg)}` : 'Could not save the changes.');
     }
   }
 
@@ -122,135 +139,121 @@ export function MemberProfilePage() {
 
   const availableCategories = CATEGORIES.filter((c) => c !== member.category);
 
+  const phoneDigits = (member.phone || '').replace(/[^0-9]/g, '');
+  const householdCard = household ? (
+    <>
+      <div style={{ fontWeight: 700, color: 'var(--blue-deep)' }}>{household.name}</div>
+      <div className="muted" style={{ fontSize: '.86rem', marginTop: 2 }}>{household.address}</div>
+      <div className="muted" style={{ fontSize: '.86rem' }}>{household.phone}</div>
+      {householdMembers && householdMembers.length > 0 ? (
+        <div className="section-gap">
+          <div className="muted" style={{ fontSize: '.78rem', marginBottom: 6 }}>Other household members</div>
+          {householdMembers.map((hm) => (
+            <div key={hm.id} style={{ padding: '6px 0', borderBottom: '1px solid var(--line)', fontSize: '.9rem' }}>
+              <a onClick={() => navigate(`/members/${hm.id}`)} style={{ color: 'var(--blue)', cursor: 'pointer', fontWeight: 600 }}>{hm.full_name}</a>{' '}
+              <span className="muted">· {hm.category}</span>
+            </div>
+          ))}
+        </div>
+      ) : <div className="muted section-gap" style={{ fontSize: '.85rem' }}>No other members linked to this household yet.</div>}
+    </>
+  ) : <div className="empty">Not linked to a household. Use the pencil to add one.</div>;
+
+  const tabs = [
+    { key: 'overview', label: 'Overview', body: (
+      <>
+        {person && <PersonStats p={person} since={person.first_came ?? member.joined_date} />}
+        {canEdit && (
+          <div className="field">
+            <label htmlFor="move-category">Move to category</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <select id="move-category" className="selectbox" value={moveTarget || availableCategories[0]} onChange={(e) => setMoveTarget(e.target.value)}>
+                {availableCategories.map((cat) => <option key={cat}>{cat}</option>)}
+              </select>
+              <button className="btn sm" onClick={handleMove} disabled={moveCategory.isPending}>Move</button>
+            </div>
+          </div>
+        )}
+        <h4 className="section-gap" style={{ margin: '14px 0 8px' }}>Household</h4>
+        {householdCard}
+      </>
+    ) },
+    { key: 'journey', label: 'Journey', body: person ? (<><MilestoneChips p={person} /><JourneyTimeline p={person} /></>) : null },
+    { key: 'followups', label: 'Follow-ups', body: person ? (
+      <OpenFollowUps p={person} onOpen={(t) => navigate(t.kind === 'newcomer' ? `/newcomers/${person.newcomer_id}` : '/members?tab=follow-up')} />
+    ) : null },
+    { key: 'attendance', label: 'Attendance', body: person ? <AttendanceList p={person} /> : null },
+    ...(hasPermission('newcomers', 'view') ? [{ key: 'messages', label: 'Messages', body: <PersonMessages kind="member" id={memberId} /> }] : []),
+    ...(hasPermission('finance', 'view') ? [{ key: 'giving', label: 'Giving', body: (
+      <>
+        <div className="kpi2-value" style={{ fontSize: '1.3rem' }}>{fmt(member.total_given)}</div>
+        <div className="muted" style={{ fontSize: '.82rem' }}>Total given, linked to this member</div>
+      </>
+    ) }] : []),
+  ];
+
   return (
     <>
       <a className="backlink" onClick={() => navigate('/members')}>← Back to members</a>
-      <div className="grid g2">
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <h3 style={{ fontSize: '1.15rem' }}>
-              {member.full_name}
-              {member.other_names && (
-                <span className="muted" style={{ fontSize: '.85rem', fontWeight: 600 }}> {member.other_names}</span>
-              )}
-            </h3>
-            <div className="row-actions">
-              {canEdit && (
-                <button className="icon-btn edit" title="Edit" onClick={startEdit}>
-                  <Icon name="edit" size={15} />
-                </button>
-              )}
-              {canDelete && (
-                <button className="icon-btn" title="Delete member" onClick={handleDelete}>
-                  <Icon name="trash" size={15} />
-                </button>
-              )}
+      {/* F16: one profile for a person, before and after membership. */}
+      <div className="person-grid">
+        <div className="card person-side">
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+            <div className="big-av">{initialsOf(member.full_name)}</div>
+            <div className="row-actions" style={{ marginLeft: 'auto' }}>
+              {canEdit && <button className="icon-btn edit" title="Edit" aria-label="Edit" onClick={startEdit}><Icon name="edit" size={15} /></button>}
+              {canDelete && <button className="icon-btn" title="Delete member" aria-label="Delete member" onClick={handleDelete}><Icon name="trash" size={15} /></button>}
             </div>
           </div>
-          <div className="muted" style={{ margin: '4px 0 14px' }}>
-            {locationName(member.location)} · Joined {member.joined_date}
+          <div className="pname">
+            {member.full_name}
+            {member.other_names && <span className="muted" style={{ fontSize: '.85rem', fontWeight: 600 }}> {member.other_names}</span>}
+          </div>
+          <div className="person-chips">
+            <Badge color="green">Member</Badge>
+            <Badge color={categoryBadgeColor(member.category)}>{member.category}</Badge>
+            <Badge color="blue">{locationName(member.location)}</Badge>
           </div>
 
           {editing && formValues && locations && (
-            <div className="form-card editing">
-              <MemberFormFields
-                values={formValues}
-                onChange={setFormValues}
-                locations={locations}
-                excludeMemberId={memberId}
-                showCategoryAndJoined={false}
-              />
+            <div className="form-card editing section-gap">
+              <MemberFormFields values={formValues} onChange={setFormValues} locations={locations}
+                excludeMemberId={memberId} showCategoryAndJoined={false} />
               {editError && <p className="form-error" role="alert">{editError}</p>}
-              <button className="btn sm" onClick={saveEdit} disabled={updateMember.isPending}>
-                Save changes
-              </button>
+              <button className="btn sm" onClick={saveEdit} disabled={updateMember.isPending}>Save changes</button>
               <button className="btn sm ghost" onClick={() => setEditing(false)}>Cancel</button>
             </div>
           )}
 
-          <div><Badge color={categoryBadgeColor(member.category)}>{member.category}</Badge></div>
-
-          <div className="section-gap" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: '.9rem' }}>
-            <div><span className="muted">Gender</span><div>{member.gender || '–'}</div></div>
-            <div><span className="muted">Date of birth</span><div>{member.date_of_birth || '–'}</div></div>
-            <div><span className="muted">Phone</span><div>{member.phone || '–'}</div></div>
-            <div><span className="muted">Email</span><div>{member.email || '–'}</div></div>
-          </div>
-
-          <div className="field section-gap">
-            <label htmlFor="member-shepherd">Shepherd</label>
-            {canEdit ? (
-              <select id="member-shepherd" value={member.assigned_to ?? ''}
-                onChange={(e) => changeShepherd(e.target.value)}>
-                <option value="">No shepherd</option>
-                {(shepherds ?? []).map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            ) : <div>{member.assigned_to_name || 'No shepherd'}</div>}
-            {shepherdError && <p className="form-error" role="alert">{shepherdError}</p>}
-          </div>
-
-          {canEdit && <div className="field section-gap">
-            <label htmlFor="move-category">Move to category</label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <select id="move-category" className="selectbox" value={moveTarget || availableCategories[0]} onChange={(e) => setMoveTarget(e.target.value)}>
-                {availableCategories.map((c) => <option key={c}>{c}</option>)}
-              </select>
-              <button className="btn sm" onClick={handleMove} disabled={moveCategory.isPending}>Move</button>
+          {phoneDigits && (
+            <div className="person-acts">
+              <a href={`tel:${member.phone}`}>Call</a>
+              <a href={`https://wa.me/${phoneDigits}`} target="_blank" rel="noreferrer">WhatsApp</a>
             </div>
-          </div>}
-        </div>
-
-        <div>
-          <div className="card">
-            <h3>Household</h3>
-            {household ? (
-              <>
-                <div style={{ fontWeight: 700, color: 'var(--blue-deep)' }}>{household.name}</div>
-                <div className="muted" style={{ fontSize: '.86rem', marginTop: 2 }}>{household.address}</div>
-                <div className="muted" style={{ fontSize: '.86rem' }}>{household.phone}</div>
-                {householdMembers && householdMembers.length > 0 ? (
-                  <div className="section-gap">
-                    <div className="muted" style={{ fontSize: '.78rem', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6 }}>
-                      Other household members
-                    </div>
-                    {householdMembers.map((hm) => (
-                      <div key={hm.id} style={{ padding: '6px 0', borderBottom: '1px solid var(--line)', fontSize: '.9rem' }}>
-                        <a onClick={() => navigate(`/members/${hm.id}`)} style={{ color: 'var(--blue)', cursor: 'pointer', fontWeight: 600 }}>
-                          {hm.full_name}
-                        </a>{' '}
-                        <span className="muted">· {hm.category}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="muted section-gap" style={{ fontSize: '.85rem' }}>No other members linked to this household yet.</div>
-                )}
-              </>
-            ) : (
-              <div className="empty">Not linked to a household. Use Edit to add one.</div>
-            )}
-          </div>
-
-          <div className="card section-gap">
-            <h3>Movement history</h3>
-            {member.category_history.length ? (
-              member.category_history.map((h) => (
-                <div key={h.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--line)', fontSize: '.86rem' }}>
-                  <b>{h.from_category}</b> → <b>{h.to_category}</b>
-                  <div className="muted">{h.changed_date}</div>
-                </div>
-              ))
-            ) : (
-              <div className="empty">No movement recorded yet.</div>
-            )}
-          </div>
-
-          <div className="card section-gap">
-            <h3>Giving</h3>
-            <div className="kpi2-value" style={{ fontSize: '1.3rem' }}>{fmt(member.total_given)}</div>
-            <div className="muted" style={{ fontSize: '.82rem' }}>Total given, linked to this member</div>
+          )}
+          <div className="person-facts">
+            <div className="pf"><span>Phone</span><span>{member.phone || '–'}</span></div>
+            <div className="pf"><span>Email</span><span style={{ wordBreak: 'break-all' }}>{member.email || '–'}</span></div>
+            <div className="pf"><span>Gender</span><span>{member.gender || '–'}</span></div>
+            <div className="pf"><span>Date of birth</span><span>{member.date_of_birth ? longDate(member.date_of_birth) : '–'}</span></div>
+            <div className="pf">
+              <label htmlFor="member-shepherd" style={{ color: 'var(--muted)', fontWeight: 400 }}>Shepherd</label>
+              {canEdit ? (
+                <select id="member-shepherd" className="selectbox" style={{ maxWidth: 170 }} value={member.assigned_to ?? ''}
+                  onChange={(e) => changeShepherd(e.target.value)}>
+                  <option value="">No shepherd</option>
+                  {(shepherds ?? []).map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              ) : <b>{member.assigned_to_name || 'No shepherd'}</b>}
+            </div>
+            {shepherdError && <p className="form-error" role="alert">{shepherdError}</p>}
+            <div className="pf"><span>Household</span><span>{household?.name ?? 'None'}</span></div>
+            <div className="pf"><span>Member since</span><span>{longDate(member.joined_date)}</span></div>
+            {person?.first_came && <div className="pf"><span>First came</span><span>{longDate(person.first_came)}</span></div>}
+            {person?.how_came && <div className="pf"><span>How they came</span><span>{person.how_came}</span></div>}
           </div>
         </div>
+        <PersonTabs tabs={tabs} />
       </div>
     </>
   );

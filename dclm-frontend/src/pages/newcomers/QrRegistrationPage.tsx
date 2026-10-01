@@ -19,6 +19,7 @@ export function QrRegistrationPage() {
         <div className="tabs">
           <button className="tab" onClick={() => navigate('/newcomers')}>Pipeline</button>
           <button className="tab" onClick={() => navigate('/newcomers/follow-up')}>Follow-up</button>
+          <button className="tab" onClick={() => navigate('/newcomers/messages')}>Messages</button>
           <button className="tab active">QR Registration</button>
           <button className="tab" onClick={() => navigate('/newcomers/manual')}>Manual Entry</button>
         </div>

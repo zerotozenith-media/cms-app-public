@@ -1,3 +1,5 @@
+import { Skeleton } from '../../components/ui/Skeleton';
+import { PersonMessages } from '../../components/person/PersonMessages';
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -44,7 +46,7 @@ export function EnquiryProfilePage() {
   const [convertLocation, setConvertLocation] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  if (isLoading) return <div className="card">Loading…</div>;
+  if (isLoading) return <Skeleton shape="profile" />;
   if (!enquiry) return <div className="card">Enquiry not found.</div>;
 
   // Narrowed once here: the guards above prove it is defined, but
@@ -144,6 +146,19 @@ export function EnquiryProfilePage() {
             </div>
           )}
         </div>
+
+        {hasPermission('newcomers', 'view') && (
+          <div className="card">
+            <h3>Follow-up messages</h3>
+            {enquiry.converted_newcomer ? (
+              <>
+                {/* Once they attend, their messages carry on as a newcomer. */}
+                <p className="muted" style={{ marginTop: 0 }}>Now a newcomer. Their messages continue on the Newcomers journey.</p>
+                <PersonMessages kind="newcomer" id={enquiry.converted_newcomer} />
+              </>
+            ) : <PersonMessages kind="enquiry" id={enquiry.id} />}
+          </div>
+        )}
 
         <div className="card">
           <h3>Follow-up</h3>

@@ -78,6 +78,7 @@ class AttendanceSessionSerializer(serializers.ModelSerializer):
         "online_children_boys", "online_children_girls", "online_total",
         "in_person_total", "new_comers", "new_converts",
         "fellowship", "fellowship_name", "led_by", "led_by_name", "lesson",
+        "edition_name", "edition_place",
         ]
         read_only_fields = ["id", "status"]
         # status is deliberately read-only here too , the only correct way
@@ -85,6 +86,13 @@ class AttendanceSessionSerializer(serializers.ModelSerializer):
         # status='filled' together with the headcounts, atomically.
 
     def validate(self, attrs):
+        # F22: only occasional meetings have editions.
+        mt = attrs.get("meeting_type") or getattr(self.instance, "meeting_type", None)
+        for f in ("edition_name", "edition_place"):
+            if f in attrs:
+                attrs[f] = (attrs[f] or "").strip()
+                if attrs[f] and mt and mt.frequency != MeetingType.Frequency.OCCASIONAL:
+                    raise serializers.ValidationError({f: f"{mt.name} meets every week, so it has no edition. Editions are for occasional meetings such as GCK."})
         # Server-side enforcement of the detailed/simple rule (Batch 0.2):
         # a "simple" meeting only ever has Men/Women , reject youth/children
         # counts rather than silently accepting and ignoring them.
@@ -129,6 +137,8 @@ class RecordAttendanceSerializer(serializers.Serializer):
     # Only meaningful for a house fellowship.
     led_by = serializers.IntegerField(required=False, allow_null=True, default=None)
     lesson = serializers.CharField(required=False, allow_blank=True, default="")
+    edition_name = serializers.CharField(required=False, allow_blank=True, max_length=120)
+    edition_place = serializers.CharField(required=False, allow_blank=True, max_length=120)
 
     # What was collected, by fund. Only accepted when the meeting is
     # marked as collecting an offering in Admin.

@@ -17,6 +17,7 @@ from rest_framework.response import Response
 from accounts.audit import log_audit
 from accounts.permissions import ModulePermission
 from finance.models import Expense, Fund, Giving, Remittance, RemittanceLine
+from core.viewing import scope_location_id
 
 
 class RemittanceLineSerializer(serializers.ModelSerializer):
@@ -98,7 +99,7 @@ def remittance_location(request):
     if not user.is_superuser and user.location_id:
         return user.location
     wanted = request.query_params.get("location") or (
-        request.data.get("location") if hasattr(request.data, "get") else None)
+        request.data.get("location") if hasattr(request.data, "get") else None) or scope_location_id(user)
     if wanted:
         loc = Location.objects.filter(id=wanted).first()
         if loc:
@@ -117,7 +118,7 @@ class RemittanceViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if not user.is_superuser and user.location_id:
             return qs.filter(location_id=user.location_id)
-        wanted = self.request.query_params.get("location")
+        wanted = self.request.query_params.get("location") or scope_location_id(user)
         return qs.filter(location_id=wanted) if wanted else qs
 
     def perform_create(self, serializer):

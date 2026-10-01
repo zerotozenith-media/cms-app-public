@@ -9,6 +9,9 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from core.views import health_check
 from accounts.views import LoginView, LogoutView
+from accounts.password_reset import PasswordResetRequestView, PasswordResetConfirmView
+from accounts.profile import MeView, MyPhotoView, MyPasswordView
+from core.outstanding import NotificationSummaryView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -16,6 +19,12 @@ urlpatterns = [
     path("api/auth/login/", LoginView.as_view(), name="login"),
     path("api/auth/logout/", LogoutView.as_view(), name="logout"),
     path("api/auth/token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
+    path("api/auth/password-reset/", PasswordResetRequestView.as_view(), name="password-reset"),
+    path("api/auth/password-reset/confirm/", PasswordResetConfirmView.as_view(), name="password-reset-confirm"),
+    path("api/auth/me/", MeView.as_view(), name="me"),
+    path("api/auth/me/photo/", MyPhotoView.as_view(), name="my-photo"),
+    path("api/auth/me/password/", MyPasswordView.as_view(), name="my-password"),
+    path("api/notifications/", NotificationSummaryView.as_view(), name="notifications"),
     path("api/", include("members.urls")),
     path("api/", include("attendance.urls")),
     path("api/", include("newcomers.urls")),
@@ -23,6 +32,8 @@ urlpatterns = [
     path("api/", include("finance.urls")),
     path("api/", include("goals.urls")),
     path("api/", include("reports.urls")),
+    path("api/", include("followup.urls")),
+    path("api/", include("service.urls")),
     path("api/", include("accounts.urls")),
     path("api/", include("core.urls")),
 ]

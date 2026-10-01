@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAdminUsers, useCreateUser, useDeleteUser, useRoles, useCreateRole, useDeleteRole } from '../../api/admin';
+import { useAdminUsers, useCreateUser, useDeleteUser, useUpdateUser, useRoles, useCreateRole, useDeleteRole } from '../../api/admin';
 import { useMyLocations } from '../../api/locations';
 import { RolePermissionMatrix } from '../../components/admin/RolePermissionMatrix';
 import { Badge } from '../../components/ui/Badge';
@@ -18,6 +18,9 @@ export function UsersRolesTab() {
   const { data: roles } = useRoles();
   const { data: locations } = useMyLocations();
   const createUser = useCreateUser();
+  const updateUser = useUpdateUser();
+  const canEditUser = hasPermission('admin', 'edit');
+  const [canShepherd, setCanShepherd] = useState(false);
   const deleteUser = useDeleteUser();
   const createRole = useCreateRole();
   const deleteRole = useDeleteRole();
@@ -41,7 +44,7 @@ export function UsersRolesTab() {
     setUserError(null);
     try {
       await createUser.mutateAsync({
-        email, first_name: firstName, last_name: lastName, password,
+        email, first_name: firstName, last_name: lastName, password, can_shepherd: canShepherd,
         // Someone limited to one location adds accounts there. The box showed
         // their location but sent none, which the server refused.
         role: Number(role), location: location || me?.location || null,
@@ -79,7 +82,7 @@ export function UsersRolesTab() {
   const selectedRole = roles?.find((r) => r.id === selectedRoleId);
 
   return (
-    <div className="grid g2">
+    <div className="grid g2 admin-users-grid">
       <div className="card">
         <div className="toolbar" style={{ marginBottom: 10 }}>
           <h3>Users</h3>
@@ -125,6 +128,11 @@ export function UsersRolesTab() {
                   </select>
                 </div>
               </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0 12px', fontSize: '.88rem' }}>
+                <input type="checkbox" checked={canShepherd} onChange={(e) => setCanShepherd(e.target.checked)} style={{ width: 16, height: 16 }} />
+                Can shepherd others
+                <span className="muted" style={{ fontSize: '.8rem' }}>People can be assigned to them to follow up, whatever their member category.</span>
+              </label>
               {userError && <p style={{ color: 'var(--red)', fontSize: '.85rem', marginBottom: 10 }}>{userError}</p>}
               <button className="btn sm" type="submit" disabled={createUser.isPending}>Add user</button>
               <button className="btn sm ghost" type="button" onClick={() => setShowUserForm(false)}>Cancel</button>
@@ -138,7 +146,15 @@ export function UsersRolesTab() {
               {(users ?? []).map((u) => (
                 <tr key={u.id}>
                   <td data-label="Name">{u.full_name}<div className="muted" style={{ fontSize: '.78rem' }}>{u.email}</div></td>
-                  <td data-label="Role">{u.role_name ? <Badge color="blue">{u.role_name}</Badge> : <span className="muted">–</span>}</td>
+                  <td data-label="Role">
+                    {u.role_name ? <Badge color="blue">{u.role_name}</Badge> : <span className="muted">–</span>}
+                    <label className="shepherd-tick" title="Can shepherd others: people can be assigned to them to follow up">
+                      <input type="checkbox" aria-label={`${u.full_name} can shepherd others`} checked={!!u.can_shepherd}
+                        disabled={!canEditUser || updateUser.isPending}
+                        onChange={(e) => updateUser.mutate({ id: u.id, can_shepherd: e.target.checked })} />
+                      Shepherd
+                    </label>
+                  </td>
                   <td data-label="Location">{u.location_name ?? 'All locations'}</td>
                   <td className="td-actions">
                     {canDeleteUser && <button className="icon-btn" title="Delete user" aria-label="Delete user" onClick={() => handleDeleteUser(u.id)}><Icon name="trash" size={14} /></button>}

@@ -81,6 +81,15 @@ class User(AbstractUser):
         help_text="Optional link when a staff user is also a congregant (Batch 0.6, Finding 1).",
     )
 
+    # For My profile. The photo is shrunk to a small square when uploaded,
+    # and shown in place of the initials wherever the app shows this person.
+    phone = models.CharField(max_length=30, blank=True, default="")
+    photo = models.ImageField(upload_to="profile-photos/%Y/", null=True, blank=True)
+    # Whether people can be assigned to this person to follow up. A duty, set
+    # in Admin, separate from the member category: a shepherd need not be an
+    # approved Worker, and a Worker need not shepherd.
+    can_shepherd = models.BooleanField(default=False)
+
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
 

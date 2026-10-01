@@ -57,7 +57,7 @@ export function AuditLogTab() {
       </div>
 
       <div className="card section-gap">
-        <h3>Login security</h3>
+        <h3>Sign-in attempts</h3>
         <p className="muted" style={{ fontSize: '.84rem', marginBottom: 10 }}>
           Every login attempt, successful or not: honeypot triggers, rate-limited submissions, and account
           lockouts are all recorded here for review.

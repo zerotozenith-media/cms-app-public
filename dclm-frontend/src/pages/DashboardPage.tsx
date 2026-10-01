@@ -1,3 +1,4 @@
+import { ServiceNote } from '../components/service/ServiceBadge';
 /**
  * The dashboard.
  *
@@ -6,11 +7,15 @@
  * than restating that this is the dashboard. Each card appears only when
  * the viewer may see its module.
  */
+import { Skeleton } from '../components/ui/Skeleton';
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useOutstanding } from '../api/notifications';
 import { useAuth } from '../context/AuthContext';
 import { useDashboardSummary } from '../api/dashboard';
 import { RingChart } from '../components/charts/RingChart';
+import { TestimonySlider } from '../components/dashboard/TestimonySlider';
+import { ChartTipBox, useChartTip } from '../components/charts/ChartTip';
 import { DonutChart } from '../components/charts/DonutChart';
 import { GroupedBars } from '../components/charts/GroupedBars';
 import { Icon } from '../components/ui/Icon';
@@ -34,34 +39,65 @@ const SERIES = [
 ];
 
 /** Stated in words beside the colour, because colour alone had no key. */
-const GOAL_COLOUR = { 'on-track': 'var(--green)', behind: 'var(--amber)', attention: 'var(--red)' };
+// Same rule as the Goals page: green from 90% of target, blue from 60%, red below.
+const ringColour = (pct: number) => (pct >= 90 ? 'var(--green)' : pct >= 60 ? 'var(--blue)' : 'var(--red)');
 
 function greeting() {
   const h = new Date().getHours();
   return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
 }
 
-function relative(days: number) {
-  if (days > 0) return { text: `${days} day${days === 1 ? '' : 's'} over`, late: true };
-  if (days === 0) return { text: 'Due today', late: false };
-  const n = Math.abs(days);
-  return { text: `Due in ${n} day${n === 1 ? '' : 's'}`, late: false };
+
+function ringLines(g: { current: number; target: number; pct: number; not_started?: boolean }) {
+  return g.not_started ? ['Not started'] : [`${g.current} of ${g.target}`, `${g.pct}% of the target`];
+}
+
+function attLabel(t: { date: string }, grouping?: string) {
+  const d = new Date(`${t.date}T00:00:00`);
+  return grouping === 'month'
+    ? d.toLocaleDateString('en-GB', { month: 'short' })
+    : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
+function dueText(t: { days_overdue: number; due_date: string }) {
+  if (t.days_overdue) return `${t.days_overdue} day${t.days_overdue === 1 ? '' : 's'} overdue`;
+  const d = new Date(`${t.due_date}T00:00:00`);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  if (d.getTime() === today.getTime()) return 'Due today';
+  return `Due ${d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}`;
+}
+
+function todayLabel() {
+  return new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
 export function DashboardPage() {
+  const { data: outstanding } = useOutstanding();
+  const goalTip = useChartTip();
   const denied = (useLocation().state as { denied?: string } | null)?.denied;
   const { user, hasPermission } = useAuth();
   const navigate = useNavigate();
   const [period, setPeriod] = useState<DashPeriod>('this-month');
   const [meeting, setMeeting] = useState('fri-worship');
-  const { data, isLoading, isError } = useDashboardSummary(period, meeting);
+  const [chartPeriod, setChartPeriod] = useState<DashPeriod>('this-year');
+  const [attView, setAttView] = useState<'chart' | 'table'>('chart');
+  const { data, isLoading, isError } = useDashboardSummary(period, meeting, chartPeriod);
 
-  if (isLoading) return <div className="card">Loading…</div>;
+  if (isLoading) return <Skeleton shape="dashboard" />;
   if (isError || !data) {
     return <div className="card">Could not load the dashboard. Please try again.</div>;
   }
 
   const firstName = (user?.name || '').split(' ')[0];
+  // Only jobs this person can do. A button that leads to a refusal is worse
+  // than no button. An odd last one spans the row.
+  const actions = [
+    { label: 'New session', to: '/attendance/new', ok: hasPermission('attendance', 'create') },
+    { label: 'Add member', to: '/members/new', ok: hasPermission('members', 'create') },
+    { label: 'Add newcomer', to: '/newcomers/manual', ok: hasPermission('newcomers', 'create') },
+    { label: 'Add testimony', to: '/reports?tab=testimonies', ok: hasPermission('reports', 'create') },
+    { label: 'Record giving', to: '/finance', ok: hasPermission('finance', 'create') },
+  ].filter((a) => a.ok);
   const funds = (data.giving_by_fund ?? []).map((f, i) => ({
     label: f.fund, value: f.value, color: FUND_PALETTE[i % FUND_PALETTE.length],
   }));
@@ -76,30 +112,41 @@ export function DashboardPage() {
           If you need it, ask an administrator to check your role.
         </p>
       )}
-      <div className="dash-hero">
-        <div className="dash-hero-text">
-          <h2>{greeting()}{firstName ? `, ${firstName}` : ''}</h2>
-          <p>{data.banner.message}</p>
+      {/* F5, option B: a plain greeting, what needs attention, and the
+          buttons this person can use. The blue block repeated the menu's
+          colour and left none to signal what matters. */}
+      <div className="dash-greeting">
+        <div className="muted dash-date">{todayLabel()}</div>
+        <h2>{greeting()}{firstName ? `, ${firstName}` : ''}</h2>
+      </div>
+      <ServiceNote />
+      <div className={`dash-top${actions.length ? '' : ' single'}`}>
+        <div className="card dash-attention">
+          <h3>Needs your attention</h3>
+          {outstanding && outstanding.items.length > 0 ? (
+            outstanding.items.map((it) => (
+              <button key={it.key} className={`attn-row ${it.level}`} onClick={() => navigate(it.link)}>
+                <span className="attn-dot" aria-hidden="true" />
+                <span className="attn-label">{it.label}</span>
+                <span className="attn-chev" aria-hidden="true">›</span>
+              </button>
+            ))
+          ) : (
+            <p className="attn-clear"><Icon name="check" size={16} /> Nothing needs your attention</p>
+          )}
         </div>
-        <div className="hero-actions">
-          {/* Only jobs this person can do. A button that leads to a refusal
-              is worse than no button. */}
-          {hasPermission('attendance', 'create') && (
-            <button className="btn-light-hero" onClick={() => navigate('/attendance/new')}>
-              <Icon name="plus" size={15} /> New session
-            </button>
-          )}
-          {hasPermission('members', 'create') && (
-            <button className="btn-light-hero" onClick={() => navigate('/members/new')}>
-              <Icon name="plus" size={15} /> Add member
-            </button>
-          )}
-          {hasPermission('reports', 'create') && (
-            <button className="btn-light-hero" onClick={() => navigate('/reports?tab=testimonies')}>
-              <Icon name="plus" size={15} /> Add testimony
-            </button>
-          )}
-        </div>
+        {actions.length > 0 && (
+          <div className="card dash-actions">
+            <h3>Quick actions</h3>
+            <div className="qa-grid">
+              {actions.map((a) => (
+                <button key={a.label} className="qa-btn" onClick={() => navigate(a.to)}>
+                  <Icon name="plus" size={14} /> {a.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="toolbar dash-period">
@@ -150,11 +197,6 @@ export function DashboardPage() {
             <div className="stat stat-link" onClick={() => navigate('/newcomers')}>
               <div className="stat-top-row">
                 <span className="ic-badge sm amber"><Icon name="userplus" size={17} /></span>
-                {fu && fu.overdue + fu.this_week > 0 && (
-                  <span className={`badge ${fu.overdue ? 'red' : 'amber'}`}>
-                    {fu.overdue + fu.this_week} due
-                  </span>
-                )}
               </div>
               <div className="label">Newcomers in the pipeline</div>
               <div className="value">{data.newcomers_in_pipeline ?? 0}</div>
@@ -181,7 +223,7 @@ export function DashboardPage() {
         {data.finance_access && (
           <div className="card">
             <h3>Giving by fund</h3>
-            <p className="card-sub">{data.period.label}. Total {fmt(data.giving_total ?? 0)}.</p>
+            <p className="card-sub">{data.period.label}.</p>
             {funds.length
               ? <DonutChart data={funds} size={128} showCentreTotal={false} />
               : <div className="empty">No giving recorded for this period.</div>}
@@ -193,20 +235,43 @@ export function DashboardPage() {
 
         {data.attendance_access && att && (
           <div className="card">
-            <div className="toolbar" style={{ marginBottom: 4 }}>
-              <h3 style={{ flex: 'none' }}>Attendance</h3>
-              <select className="selectbox" value={meeting} aria-label="Which meeting"
-                style={{ width: 'auto', minWidth: 210 }}
-                onChange={(e) => setMeeting(e.target.value)}>
-                {(data.meetings ?? []).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-              </select>
+            <div className="toolbar" style={{ marginBottom: 8 }}>
+              <h3 style={{ flex: 1 }}>Attendance</h3>
+              <div className="viewtoggle" role="group" aria-label="Show as">
+                <button className={attView === 'chart' ? 'on' : ''} onClick={() => setAttView('chart')}>Chart</button>
+                <button className={attView === 'table' ? 'on' : ''} onClick={() => setAttView('table')}>Table</button>
+              </div>
+            </div>
+            <div className="att-filters">
+              <label>Service
+                <select className="selectbox" value={meeting} onChange={(e) => setMeeting(e.target.value)}>
+                  {(data.meetings ?? []).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </label>
+              <label>Period
+                <select className="selectbox" value={chartPeriod} onChange={(e) => setChartPeriod(e.target.value as DashPeriod)}>
+                  {PERIODS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                </select>
+              </label>
             </div>
             <p className="card-sub">
-              {data.period.label}. Average {att.average}{att.target ? `, target ${att.target}` : ''}.
+              {att.period?.label ?? ''}. {att.grouping === 'month' ? 'Average per service each month. ' : ''}
+              Average {att.average}{att.target ? `, target ${att.target}` : ''}.
             </p>
-            <GroupedBars
-              groups={att.trend.map((t) => ({ label: t.date.slice(5), values: t as any }))}
-              series={SERIES} />
+            {attView === 'chart' ? (
+              <GroupedBars groups={att.trend.map((t) => ({ label: attLabel(t, att.grouping), values: t as any }))} series={SERIES} />
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table className="house-table">
+                  <thead><tr><th>{att.grouping === 'month' ? 'Month' : 'Date'}</th><th>Adults</th><th>Youth</th><th>Children</th><th>Online</th><th>Total</th></tr></thead>
+                  <tbody>
+                    {att.trend.map((t) => (
+                      <tr key={t.date}><td>{attLabel(t, att.grouping)}</td><td>{t.adults}</td><td>{t.youth}</td><td>{t.children}</td><td>{t.online}</td><td><b>{t.total}</b></td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
             <a className="card-link-hint" onClick={() => navigate('/attendance')}>
               Go to Attendance →
             </a>
@@ -217,33 +282,21 @@ export function DashboardPage() {
       <div className="grid g2 section-gap">
         {data.newcomers_access && fu && (
           <div className="card">
-            <div className="toolbar" style={{ marginBottom: 12 }}>
-              <h3 style={{ flex: 'none' }}>Follow-ups due</h3>
-              {fu.overdue
-                ? <span className="badge red">{fu.overdue} overdue</span>
-                : <span className="badge green">None overdue</span>}
-            </div>
-            <div className="fu-counts">
-              <div className="fu-count red"><b>{fu.overdue}</b><span>Overdue</span></div>
-              <div className="fu-count amber"><b>{fu.this_week}</b><span>This week</span></div>
-              <div className="fu-count plain"><b>{fu.later}</b><span>Later</span></div>
-            </div>
-            {fu.urgent.length ? fu.urgent.map((t) => {
-              const r = relative(t.days);
-              return (
-                <div className="fu-row" key={`${t.newcomer_id}-${t.text}`}
-                  onClick={() => navigate(`/newcomers/${t.newcomer_id}`)}>
-                  <span className={`av-sm ${r.late ? 'red' : 'amber'}`}>{t.newcomer_name.charAt(0)}</span>
-                  <div className="fu-main">
-                    <b>{t.newcomer_name}</b>
-                    <span className="muted">{t.text}</span>
-                  </div>
-                  <span className={`fu-when ${r.late ? 'late' : ''}`}>{r.text}</span>
+            {/* F14: the people, most overdue first, members and newcomers
+                together. The counts were already shown twice elsewhere. */}
+            <h3 style={{ marginBottom: 8 }}>Follow-ups due</h3>
+            {(data.follow_up_people ?? []).length ? (data.follow_up_people ?? []).map((t) => (
+              <div className="fu-row" key={`${t.link}-${t.task}`} onClick={() => navigate(t.link)}>
+                <span className={`av-sm ${t.days_overdue ? 'red' : 'amber'}`}>{t.name.charAt(0)}</span>
+                <div className="fu-main">
+                  <b>{t.name}</b>
+                  <span className="muted">{t.task}</span>
                 </div>
-              );
-            }) : <div className="empty">Nothing outstanding.</div>}
-            <a className="card-link-hint" onClick={() => navigate('/newcomers?tab=followup')}>
-              See all {fu.overdue + fu.this_week + fu.later} →
+                <span className={`fu-when ${t.days_overdue ? 'late' : ''}`}>{dueText(t)}</span>
+              </div>
+            )) : <div className="empty">Nothing outstanding.</div>}
+            <a className="card-link-hint" onClick={() => navigate('/newcomers/follow-up')}>
+              See all follow-ups →
             </a>
           </div>
         )}
@@ -251,12 +304,19 @@ export function DashboardPage() {
         {data.goals_access && (
           <div className="card">
             <h3>Short-term goals</h3>
-            <p className="card-sub">Green on track, amber behind, red needs attention.</p>
+            <p className="card-sub">Green from 90% of target, blue from 60%, red below.</p>
+            {/* The tooltip wraps the grid, not its rows, so the rows keep the
+                grid's spacing. Inside it they collapsed and the rings touched. */}
+            <div className="chart-wrap" ref={goalTip.ref}
+              onPointerLeave={(e) => { if (e.pointerType === 'mouse') goalTip.hide(); }}>
+            <ChartTipBox tip={goalTip.tip} />
             <div className="goalgrid">
               {(data.short_term_goals ?? []).map((g) => (
                 <div className="goalrow" key={g.id}>
-                  <div className="ring-wrap" style={{ width: 54, height: 54, flex: 'none' }}>
-                    <RingChart pct={g.pct} size={54} stroke={6} color={GOAL_COLOUR[g.status]} />
+                  <div className="ring-wrap" style={{ width: 54, height: 54, flex: 'none', cursor: 'pointer' }}
+                    onPointerEnter={(e) => { if (e.pointerType === 'mouse') goalTip.show(e, String(g.id), g.name, ringLines(g)); }}
+                    onClick={(e) => goalTip.show(e, String(g.id), g.name, ringLines(g))}>
+                    <RingChart pct={g.pct} size={54} stroke={6} color={ringColour(g.pct)} />
                   </div>
                   <div style={{ minWidth: 0 }}>
                     <div className="goal-name">{g.name}</div>
@@ -267,6 +327,7 @@ export function DashboardPage() {
                   </div>
                 </div>
               ))}
+              </div>
             </div>
             <a className="card-link-hint" onClick={() => navigate('/goals')}>See all goals →</a>
           </div>
@@ -280,15 +341,12 @@ export function DashboardPage() {
               <h3 style={{ flex: 'none' }}>Recent testimonies</h3>
               <span className="muted" style={{ fontSize: '.78rem' }}>{data.testimonies.count} recorded</span>
             </div>
-            {data.testimonies.recent.length ? data.testimonies.recent.map((t, i) => (
-              <div className={`quote${i === 0 ? ' accent' : ''}`} key={i}>
-                <p>{t.text}</p>
-                <span className="muted">{t.by || 'Unnamed'} · {t.date}</span>
-              </div>
-            )) : <div className="empty">None recorded yet.</div>}
-            <a className="card-link-hint" onClick={() => navigate('/reports?tab=testimonies')}>
-              Add a testimony →
-            </a>
+            <TestimonySlider items={data.testimonies.recent} />
+            {hasPermission('reports', 'create') && (
+              <a className="card-link-hint" onClick={() => navigate('/reports?tab=testimonies')}>
+                Add a testimony →
+              </a>
+            )}
           </div>
         )}
 
@@ -319,9 +377,6 @@ export function DashboardPage() {
           <div className="card">
             <div className="toolbar" style={{ marginBottom: 12 }}>
               <h3 style={{ flex: 'none' }}>Enquiries awaiting a reply</h3>
-              {data.enquiries_waiting.count
-                ? <span className="badge amber">{data.enquiries_waiting.count} waiting</span>
-                : <span className="badge green">All answered</span>}
             </div>
             {data.enquiries_waiting.oldest.length ? data.enquiries_waiting.oldest.map((e) => (
               <div className="fu-row" key={e.id} onClick={() => navigate(`/enquiries/${e.id}`)}>

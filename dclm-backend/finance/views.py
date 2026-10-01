@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 from accounts.audit import log_audit
 from accounts.permissions import ModulePermission, LocationScopedQuerySetMixin
 from .models import Fund, PaymentMethod, ExpenseCategory, Project, Giving, Expense
+from core.viewing import scope_location_id
 from .serializers import (
     FundSerializer, PaymentMethodSerializer, ExpenseCategorySerializer,
     ProjectSerializer, GivingSerializer, ExpenseSerializer,
@@ -132,9 +133,8 @@ class ExpenseViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
 
 
 def _location_filter(queryset, user):
-    if user.is_superuser or not user.location_id:
-        return queryset
-    return queryset.filter(location_id=user.location_id)
+    loc = scope_location_id(user)
+    return queryset.filter(location_id=loc) if loc else queryset
 
 
 class FinanceSummaryView(APIView):

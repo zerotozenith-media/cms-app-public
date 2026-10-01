@@ -95,6 +95,13 @@ class NewcomerViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
         instance.delete()
 
     @action(detail=True, methods=["get"])
+    def person(self, request, pk=None):
+        """The one-profile summary (F16): journey, milestones, open follow-ups, check-ins."""
+        from members.person import build_person
+        n = self.get_object()
+        return Response(build_person(member=getattr(n, "became_member", None), newcomer=n))
+
+    @action(detail=True, methods=["get"])
     def journey(self, request, pk=None):
         """The whole history in order, for the travel map on the profile."""
         from .journey import build_journey
@@ -237,7 +244,7 @@ class NewcomerTaskViewSet(LocationScopedMixin, viewsets.ModelViewSet):
     location_lookup = "newcomer__location_id"
     module = "newcomers"
     permission_classes = [ModulePermission]
-    queryset = NewcomerTask.objects.select_related("newcomer", "assigned_to")
+    queryset = NewcomerTask.objects.select_related("newcomer", "newcomer__assigned_to", "newcomer__assigned_to__member", "assigned_to", "assigned_to__member")
     serializer_class = NewcomerTaskSerializer
 
     filter_backends = [filters.OrderingFilter]
@@ -380,7 +387,7 @@ def public_newcomer_registration(request):
             prayer_request=data["prayer_request"], meeting_attended=data["meeting_attended"],
             is_first_timer=data["is_first_timer"], is_new_resident=data["is_new_resident"],
             wants_visit=data["wants_visit"], wants_to_know_more=data["wants_to_know_more"],
-            wants_salvation_info=data["wants_salvation_info"],
+            wants_salvation_info=data["wants_salvation_info"], keep_in_touch=data["keep_in_touch"],
             invited_by_member=invited_by_member, invited_by_name=data["invited_by_name"],
         )
         create_auto_tasks(newcomer)

@@ -28,15 +28,15 @@ from finance.models import Expense, Giving
 from goals.calculations import compute_goal_value
 from goals.models import Goal
 from newcomers.models import Newcomer, NewcomerTask
+from core.viewing import scope_location_id
 
 
 PERIODS = {"this-month", "last-month", "this-year", "last-year"}
 
 
 def _location_filter(queryset, user, field="location_id"):
-    if user.is_superuser or not user.location_id:
-        return queryset
-    return queryset.filter(**{field: user.location_id})
+    loc = scope_location_id(user)
+    return queryset.filter(**{field: loc}) if loc else queryset
 
 
 def resolve_period(key, today=None):
@@ -100,8 +100,13 @@ class DashboardSummaryView(APIView):
         }
 
         if user_can_view_module(user, "attendance"):
+            # The chart has its own period, the year by default (F8): a month
+            # holds only four or five services, too few to see a trend.
+            c_key = request.query_params.get("chart_period") or "this-year"
+            c_start, c_end, c_label = resolve_period(c_key)
             data.update(self._attendance_section(
-                user, start, end, request.query_params.get("meeting") or "fri-worship"))
+                user, c_start, c_end, request.query_params.get("meeting") or "fri-worship"))
+            data["attendance"]["period"] = {"key": c_key, "label": c_label}
         else:
             data["attendance_access"] = False
 
@@ -126,6 +131,8 @@ class DashboardSummaryView(APIView):
             data["testimonies_access"] = False
 
         data["banner"] = self._banner(user, data)
+        from core.outstanding import follow_up_people
+        data["follow_up_people"] = follow_up_people(user)
         return Response(data)
 
     # ---------------------------------------------------------- attendance
@@ -152,6 +159,21 @@ class DashboardSummaryView(APIView):
         trend = [{"date": d, **g, "total": sum(g.values())} for d, g in by_date.items()]
         totals = [t["total"] for t in trend]
 
+        # Over more than two months, one group per month, each the average per
+        # service that month (F8). Drawing every service squeezed 38 Fridays
+        # into the card, with the dates on top of each other.
+        grouping = "service"
+        if (end - start).days > 62 and trend:
+            grouping = "month"
+            months = {}
+            for t in trend:
+                months.setdefault(t["date"][:7], []).append(t)
+            trend = []
+            for ym, rows in months.items():
+                avg = {k: round(sum(r[k] for r in rows) / len(rows)) for k in ("adults", "youth", "children", "online")}
+                trend.append({"date": f"{ym}-01", "month": ym, "services": len(rows), **avg,
+                              "total": sum(avg.values())})
+
         # The latest service is every location's session on the most recent
         # date, summed. Taking the single newest session would count only
         # one location and understate the service for anyone who can see
@@ -170,6 +192,7 @@ class DashboardSummaryView(APIView):
                 "meeting_id": mt.id if mt else None,
                 "meeting_name": mt.name if mt else "",
                 "trend": trend,
+                "grouping": grouping,
                 "average": round(sum(totals) / len(totals)) if totals else 0,
                 "latest": latest_total,
                 "target": mt.effective_target if mt else None,
@@ -329,12 +352,14 @@ class DashboardSummaryView(APIView):
     # ---------------------------------------------------------- testimonies
     def _testimonies_section(self, user):
         from reports.models import Testimony
-        recent = Testimony.objects.order_by("-date")[:2]
+        # The ten most recent for the slider (F15). Two was too few.
+        recent = Testimony.objects.select_related("service").order_by("-date", "-id")[:10]
         return {"testimonies_access": True, "testimonies": {
             "count": Testimony.objects.count(),
             "recent": [{
                 "text": t.text,
                 "by": "Anonymous" if t.is_anonymous else (t.member_name or ""),
+                "service": t.service.name if t.service_id else "",
                 "date": t.date.isoformat(),
             } for t in recent],
         }}

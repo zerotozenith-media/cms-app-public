@@ -71,7 +71,7 @@ export function PublicRegistrationPage() {
         </p>
 
         <form onSubmit={handleSubmit}>
-          <IntakeFormFields values={values} onChange={setValues} />
+          <IntakeFormFields values={values} onChange={setValues} publicForm />
 
           {/* Honeypot , hidden from real visitors, a bot reading the DOM may still fill it */}
           <div style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, overflow: 'hidden' }} aria-hidden="true">

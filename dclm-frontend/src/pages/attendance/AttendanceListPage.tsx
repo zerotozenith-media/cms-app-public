@@ -236,7 +236,8 @@ export function AttendanceListPage() {
               {(sessions?.results ?? []).map((s) => (
                 <tr key={s.id} className="clickable" onClick={() => navigate(`/attendance/${s.id}`)}>
                   <td data-label="Date">{s.date}</td>
-                  <td data-label="Meeting">{s.meeting_type_name}{s.fellowship_name ? <span className="muted"> · {s.fellowship_name}</span> : null}</td>
+                  <td data-label="Meeting">{s.meeting_type_name}{s.fellowship_name ? <span className="muted"> · {s.fellowship_name}</span> : null}
+                    {(s.edition_name || s.edition_place) && <div className="muted" style={{ fontSize: '.8rem' }}>{[s.edition_name, s.edition_place].filter(Boolean).join(', ')}</div>}</td>
                   <td data-label="Location">{locationName(s.location)}</td>
                   <td data-label="Mode" style={{ textTransform: 'capitalize' }}>{s.mode.replace('-', ' ')}</td>
                   <td data-label="Total">{s.status === 'filled' ? s.total : '–'}</td>

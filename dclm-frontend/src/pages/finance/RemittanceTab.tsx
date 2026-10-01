@@ -4,6 +4,7 @@
  * Remittance happens once a month, not each time money is received, so
  * this is its own tab rather than a field on every giving entry.
  */
+import { Skeleton } from '../../components/ui/Skeleton';
 import { useEffect, useState } from 'react';
 import { Badge } from '../../components/ui/Badge';
 import { Icon } from '../../components/ui/Icon';
@@ -124,7 +125,7 @@ function RemitForm({ month, location, onClose }: { month: string; location: stri
     }
   }, [existing?.id]);
 
-  if (isLoading || !proposal) return <div className="card">Loading…</div>;
+  if (isLoading || !proposal) return <Skeleton shape="form" />;
 
   // Start from what was recorded if there is any, otherwise from the
   // figure worked out for the month.
@@ -231,7 +232,7 @@ function RemitForm({ month, location, onClose }: { month: string; location: stri
               <Icon name="alert" size={14} /> This differs from the figure
               worked out by {money(Math.abs(difference))}
             </div>
-            <input className="cell-input" value={note} onChange={(e) => setNote(e.target.value)}
+            <input className="cell-input" value={note} onChange={(e) => setNote(e.target.value)} aria-label="Why the amount sent differs"
               style={{ marginTop: 8 }}
               placeholder="Why? For example, a member covered this month's rent" />
           </div>
