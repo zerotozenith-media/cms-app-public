@@ -239,7 +239,7 @@ export function AttendanceListPage() {
                   <td data-label="Meeting">{s.meeting_type_name}{s.fellowship_name ? <span className="muted"> · {s.fellowship_name}</span> : null}
                     {(s.edition_name || s.edition_place) && <div className="muted" style={{ fontSize: '.8rem' }}>{[s.edition_name, s.edition_place].filter(Boolean).join(', ')}</div>}</td>
                   <td data-label="Location">{locationName(s.location)}</td>
-                  <td data-label="Mode" style={{ textTransform: 'capitalize' }}>{s.mode.replace('-', ' ')}</td>
+                  <td data-label="Mode">{({ 'in-person': 'In person', online: 'Online', 'in-person-and-online': 'In person and online' } as Record<string, string>)[s.mode] ?? s.mode}</td>
                   <td data-label="Total">{s.status === 'filled' ? s.total : '–'}</td>
                   <td data-label="Status">
                     {s.status === 'filled' ? <Badge color="green">Filled</Badge> : <Badge color="amber">Pending</Badge>}

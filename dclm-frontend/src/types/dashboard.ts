@@ -30,6 +30,7 @@ export interface GoalSummary {
 }
 
 export interface DashboardSummary {
+  by_location?: import('../components/dashboard/ByLocationCard').ByLocationRow[];
   follow_up_people?: { name: string; task: string; due_date: string; days_overdue: number; link: string }[];
   period: { start: string; end: string; label: string };
   banner: { message: string; has_outstanding: boolean };
@@ -43,6 +44,7 @@ export interface DashboardSummary {
     trend: AttendancePoint[];
     average: number;
     latest: number;
+    latest_by_location?: { location: string; total: number; date: string }[];
     target: number | null;
   };
   meetings?: { id: string; name: string }[];

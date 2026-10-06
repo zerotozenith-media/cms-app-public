@@ -11,6 +11,7 @@ the old HTML version could not do, which is anything visual. Numbers in
 a table say what happened; a trend line says whether it is improving.
 """
 import io
+from decimal import Decimal
 from pathlib import Path
 
 from reportlab.lib import colors
@@ -179,6 +180,9 @@ def attendance_chart(width, labels, series):
     chart.lines[0].strokeWidth = 2.2
     chart.lineLabelFormat = "%d"
     chart.lineLabels.fontSize = 8
+    chart.lineLabels.fontName = "Helvetica"
+    chart.categoryAxis.labels.fontName = "Helvetica"
+    chart.valueAxis.labels.fontName = "Helvetica"
     chart.lineLabels.fillColor = DEEP
     chart.lineLabels.dy = 7
     d.add(chart)
@@ -222,6 +226,84 @@ def expense_bars(width, data, labels):
     chart.barWidth = 8
     chart.groupSpacing = 12
     d.add(chart)
+    return d
+
+
+# ------------------------------------------------------------ by location
+# Issue 3: each location side by side in the all-locations report.
+LOC_COLOURS = [colors.HexColor("#1C4E9E"), colors.HexColor("#B7791F"), colors.HexColor("#1E9E64"), colors.HexColor("#8E44AD")]
+FUND_COLOURS = [colors.HexColor("#1F4E79"), colors.HexColor("#4F8FD6"), colors.HexColor("#9CC3EE"), colors.HexColor("#C9D9EE"), colors.HexColor("#7FA7D9")]
+
+
+def _legend(d, items, x, y):
+    for i, (label, col) in enumerate(items):
+        d.add(Rect(x + i * 110, y, 8, 8, fillColor=col, strokeColor=None))
+        d.add(String(x + i * 110 + 12, y + 1, label, fontSize=8, fillColor=INK, fontName="Helvetica"))
+
+
+def location_trend_chart(width, months, rows):
+    """Friday Worship average by location, month by month, bars side by side."""
+    d = Drawing(width, 175)
+    chart = VerticalBarChart()
+    chart.x, chart.y, chart.width, chart.height = 30, 22, width - 50, 120
+    chart.data = [r["trend"] for r in rows]
+    chart.categoryAxis.categoryNames = months
+    chart.categoryAxis.labels.fontSize = 8
+    chart.categoryAxis.labels.fillColor = MUTED
+    top = max([max(r["trend"]) for r in rows] + [10])
+    chart.valueAxis.valueMin, chart.valueAxis.valueMax = 0, top * 1.2
+    chart.valueAxis.valueStep = max(10, int(top / 4 / 10 + 1) * 10)
+    chart.valueAxis.labels.fontSize = 8
+    chart.valueAxis.labels.fillColor = MUTED
+    chart.barLabelFormat = lambda v: str(int(v)) if v else ""
+    chart.barLabels.fontSize = 7
+    chart.barLabels.fontName = "Helvetica"
+    chart.barLabels.nudge = 6
+    chart.categoryAxis.labels.fontName = "Helvetica"
+    chart.valueAxis.labels.fontName = "Helvetica"
+    for i in range(len(rows)):
+        chart.bars[i].fillColor = LOC_COLOURS[i % len(LOC_COLOURS)]
+        chart.bars[i].strokeColor = None
+    d.add(chart)
+    _legend(d, [(r["location"], LOC_COLOURS[i % len(LOC_COLOURS)]) for i, r in enumerate(rows)], 30, 160)
+    return d
+
+
+def _hbar_row(d, y, label, parts, scale, x0, note):
+    d.add(String(0, y + 4, label, fontSize=9, fillColor=INK, fontName="Helvetica"))
+    x = x0
+    for v, col in parts:
+        w = float(v) * scale
+        if w > 0:
+            d.add(Rect(x, y, w, 13, fillColor=col, strokeColor=None))
+            x += w
+    d.add(String(x + 5, y + 3, note, fontSize=8, fillColor=INK, fontName="Helvetica"))
+
+
+def location_fund_bars(width, rows):
+    """Giving by location, each bar split by fund."""
+    funds = sorted({f for r in rows for f in r["funds"]})
+    colour = {f: FUND_COLOURS[i % len(FUND_COLOURS)] for i, f in enumerate(funds)}
+    top = max([float(r["giving"]) for r in rows] + [1])
+    h = 24 * len(rows) + 22
+    d = Drawing(width, h)
+    x0, scale = 85, (width - 85 - 110) / top
+    for i, r in enumerate(rows):
+        _hbar_row(d, h - 30 - i * 24, r["location"], [(r["funds"].get(f, 0), colour[f]) for f in funds], scale, x0, f"BHD {float(r['giving']):,.2f}")
+    _legend(d, [(f, colour[f]) for f in funds], x0, 2)
+    return d
+
+
+def location_income_expense(width, rows):
+    """Giving and expenses by location, one pair of bars each."""
+    top = max([max(float(r["giving"]), float(r["expenses"])) for r in rows] + [1])
+    h = 36 * len(rows) + 6
+    d = Drawing(width, h)
+    x0, scale = 85, (width - 85 - 150) / top
+    for i, r in enumerate(rows):
+        y = h - 18 - i * 36
+        _hbar_row(d, y, r["location"], [(r["giving"], colors.HexColor("#1E9E64"))], scale, x0, f"Giving BHD {float(r['giving']):,.2f}")
+        _hbar_row(d, y - 15, "", [(r["expenses"], colors.HexColor("#D6202C"))], scale, x0, f"Expenses BHD {float(r['expenses']):,.2f}")
     return d
 
 
@@ -418,11 +500,12 @@ def build_report_pdf(ctx):
 
     # ---- contents ----
     story.append(heading("Contents", W))
-    toc = [
-        ("1", "Executive Summary"), ("2", "Attendance"), ("3", "Finance"),
-        ("4", "Newcomers and Follow-up"), ("5", "Testimonies"), ("6", "Challenges"),
-        ("7", "Goals and Growth"), ("8", "Conclusion"),
-    ]
+    # Sections are numbered in order, so an all-locations report's By
+    # location page (issue 3) fits after the summary without gaps.
+    titles = ["Executive Summary"] + (["By location"] if ctx.get("by_location") else []) + [
+        "Attendance", "Finance", "Newcomers and Follow-up", "Testimonies", "Challenges", "Goals and Growth", "Conclusion"]
+    numbered = {t: f"{i}. {t}" for i, t in enumerate(titles, 1)}
+    toc = [(str(i), t) for i, t in enumerate(titles, 1)]
     t = Table([[n, Paragraph(label, S["TocItem"])] for n, label in toc],
               colWidths=[1.1 * cm, W - 1.1 * cm])
     t.setStyle(TableStyle([
@@ -435,7 +518,7 @@ def build_report_pdf(ctx):
     story.append(t)
 
     # ---- 1. executive summary ----
-    story.append(heading("1. Executive Summary", W))
+    story.append(heading(numbered["Executive Summary"], W))
     story.append(kpi_row([
         ("Friday Worship, average", str(ctx["fw_average"]), "#082C69"),
         ("Giving", money(ctx["income_total"]), "#1E9E64"),
@@ -455,7 +538,29 @@ def build_report_pdf(ctx):
         f"<b>{ctx['newcomers_visiting']}</b> have returned.", S["Body"]))
 
     # ---- 2. attendance ----
-    story.append(heading("2. Attendance", W))
+    if ctx.get("by_location"):
+        bl = ctx["by_location"]; rows = bl["rows"]
+        story.append(heading(numbered["By location"], W))
+        story.append(Paragraph("Each location's figures for the month, with the church's total.", S["Body"]))
+        story.append(Spacer(1, 8))
+        total = lambda k: sum((r[k] for r in rows), Decimal("0") if k in ("giving", "expenses", "net") else 0)
+        head = lambda t: Paragraph(f"<b>{t}</b>", S["Cell"])
+        table = data_table(
+            [head(t) for t in ["Location", "Friday Worship average", "Giving (BHD)", "Expenses (BHD)", "Net (BHD)", "Newcomers"]],
+            [[r["location"], str(r["fw_average"]) if r["fw_services"] else "None recorded", f"{float(r['giving']):,.2f}",
+              f"{float(r['expenses']):,.2f}", f"{float(r['net']):,.2f}", str(r["newcomers"])] for r in rows]
+            + [["Total", "", f"{float(total('giving')):,.2f}", f"{float(total('expenses')):,.2f}", f"{float(total('net')):,.2f}", str(total("newcomers"))]],
+            [W * 0.18, W * 0.19, W * 0.15, W * 0.16, W * 0.14, W * 0.18])
+        table.setStyle(TableStyle([("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"), ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#D9D9D9"))]))
+        story.append(table)
+        for title, chart in (
+                (f"Friday Worship average by location, {bl['months'][0]} to {bl['months'][-1]}.", location_trend_chart(W, bl["months"], rows)),
+                ("Giving by location and fund.", location_fund_bars(W, rows)),
+                ("Giving and expenses by location.", location_income_expense(W, rows))):
+            # The title stays with its chart, never alone at a page's foot.
+            story.append(KeepTogether([Spacer(1, 12), Paragraph(f"<b>{title}</b>", S["Body"]), chart]))
+
+    story.append(heading(numbered["Attendance"], W))
     if len(ctx["trend_values"]) >= 2:
         story.append(attendance_chart(W, ctx["trend_labels"], ctx["trend_values"]))
         story.append(Spacer(1, 6))
@@ -498,7 +603,7 @@ def build_report_pdf(ctx):
             aligns={4: "CENTER", 5: "CENTER", 6: "RIGHT"}))
 
     # ---- 3. finance ----
-    story.append(heading("3. Finance", W))
+    story.append(heading(numbered["Finance"], W))
     story.append(kpi_row([
         ("Income", money(ctx["income_total"]), "#1E9E64"),
         ("Expenses", money(ctx["expense_total"]), "#D6202C"),
@@ -535,7 +640,7 @@ def build_report_pdf(ctx):
         story.append(Paragraph("No giving recorded this period.", S["Muted"]))
 
     # ---- 4. newcomers ----
-    story.append(heading("4. Newcomers and Follow-up", W))
+    story.append(heading(numbered["Newcomers and Follow-up"], W))
     story.append(kpi_row([
         ("Registered", str(ctx["newcomers_registered"]), "#082C69"),
         ("Contacted", str(ctx["newcomers_contacted"]), "#082C69"),
@@ -555,7 +660,7 @@ def build_report_pdf(ctx):
         story.append(Paragraph("No newcomers registered this period.", S["Muted"]))
 
     # ---- 5. testimonies ----
-    story.append(heading("5. Testimonies", W))
+    story.append(heading(numbered["Testimonies"], W))
     if ctx["testimonies"]:
         for t_ in ctx["testimonies"]:
             story.append(Paragraph(f'<i>"{t_["text"]}"</i>', S["Quote"]))
@@ -564,7 +669,7 @@ def build_report_pdf(ctx):
         story.append(Paragraph("None recorded this period.", S["Muted"]))
 
     # ---- 6. challenges ----
-    story.append(heading("6. Challenges", W))
+    story.append(heading(numbered["Challenges"], W))
     if ctx["notes"]:
         story.append(data_table(
             ["Department", "Raised"],
@@ -574,7 +679,7 @@ def build_report_pdf(ctx):
         story.append(Paragraph("None recorded this period.", S["Muted"]))
 
     # ---- 7. goals ----
-    story.append(heading("7. Goals and Growth", W))
+    story.append(heading(numbered["Goals and Growth"], W))
     if ctx["goals"]:
         rows = [[Paragraph(g["name"], S["Body"]), g["horizon"],
                  f"{g['current']}{g['unit']} / {g['target']}{g['unit']}",
@@ -600,7 +705,7 @@ def build_report_pdf(ctx):
         story.append(Paragraph("No goals set.", S["Muted"]))
 
     # ---- 8. conclusion ----
-    story.append(heading("8. Conclusion", W))
+    story.append(heading(numbered["Conclusion"], W))
     if ctx.get("other_additions"):
         story.append(Paragraph(ctx["other_additions"], S["Body"]))
         story.append(Spacer(1, 6))

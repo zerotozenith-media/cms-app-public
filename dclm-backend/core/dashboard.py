@@ -130,10 +130,34 @@ class DashboardSummaryView(APIView):
         else:
             data["testimonies_access"] = False
 
+        # Issue 3: with every location in view, each location's share.
+        if not scope_location_id(user):
+            data["by_location"] = self._by_location(user, start, end, data)
+
         data["banner"] = self._banner(user, data)
         from core.outstanding import follow_up_people
         data["follow_up_people"] = follow_up_people(user)
         return Response(data)
+
+    # ---------------------------------------------------------- by location
+    def _by_location(self, user, start, end, data):
+        """Each location's giving, expenses, newcomers and latest Friday Worship,
+        for the dashboard's By location card when every location is in view."""
+        from core.models import Location
+        latest = {r["location"]: r for r in (data.get("attendance") or {}).get("latest_by_location", [])}
+        rows = []
+        for loc in Location.objects.order_by("name"):
+            row = {"location": loc.name}
+            if user_can_view_module(user, "finance"):
+                row["giving"] = float(Giving.objects.filter(location=loc, date__gte=start, date__lte=end).aggregate(t=Sum("amount"))["t"] or 0)
+                row["expenses"] = float(Expense.objects.filter(location=loc, date__gte=start, date__lte=end).aggregate(t=Sum("amount"))["t"] or 0)
+            if user_can_view_module(user, "newcomers"):
+                row["newcomers"] = Newcomer.objects.filter(location=loc, created_at__gte=start, created_at__lte=end).count()
+            if user_can_view_module(user, "attendance"):
+                row["worship_latest"] = latest.get(loc.name, {}).get("total", 0)
+                row["worship_date"] = latest.get(loc.name, {}).get("date")
+            rows.append(row)
+        return rows
 
     # ---------------------------------------------------------- attendance
     def _attendance_section(self, user, start, end, meeting_id):
@@ -182,8 +206,16 @@ class DashboardSummaryView(APIView):
             AttendanceSession.objects.filter(meeting_type=mt, status="filled",
                                              date__lte=timezone.localdate()), user
         ) if mt else AttendanceSession.objects.none()
-        last_date = scoped.order_by("-date").values_list("date", flat=True).first()
-        latest_total = sum(s.total for s in scoped.filter(date=last_date)) if last_date else 0
+        # Issue 3: each location's latest service, added up. Summing only the
+        # most recent date counted just the location that filled in last, so
+        # All locations showed Qatar's 63 instead of the church's 126.
+        latest_by_location = []
+        for loc_id in scoped.order_by().values_list("location_id", flat=True).distinct():
+            s = scoped.filter(location_id=loc_id).order_by("-date", "-id").first()
+            same_day = scoped.filter(location_id=loc_id, date=s.date)
+            latest_by_location.append({"location": s.location.name, "total": sum(x.total for x in same_day), "date": s.date.isoformat()})
+        latest_by_location.sort(key=lambda r: r["location"])
+        latest_total = sum(r["total"] for r in latest_by_location)
 
 
         return {
@@ -195,6 +227,7 @@ class DashboardSummaryView(APIView):
                 "grouping": grouping,
                 "average": round(sum(totals) / len(totals)) if totals else 0,
                 "latest": latest_total,
+                "latest_by_location": latest_by_location,
                 "target": mt.effective_target if mt else None,
             },
             "meetings": [{"id": m.id, "name": m.name}

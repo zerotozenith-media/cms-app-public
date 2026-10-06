@@ -134,7 +134,7 @@ def todays_entry(enrolment, today=None):
     """What the Today's messages card needs for one person."""
     today = today or timezone.localdate()
     day = plan_day(enrolment, today)
-    done = enrolment.log.filter(on_date=today).first()
+    done = enrolment.log.filter(on_date=today, extra=False).first()
     if enrolment.status != Enrolment.Status.ACTIVE and not done:
         return None
     tpl = due_template(enrolment, day) if not done or done.template_id is None else done.template

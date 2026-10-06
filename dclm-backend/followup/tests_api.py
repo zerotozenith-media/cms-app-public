@@ -10,21 +10,26 @@ from newcomers.models import MilestoneType
 from .models import Enrolment, MessageTemplate
 
 
+def _setup_people(self):
+    role = Role.objects.create(name="Follow-up test")
+    for m, e in (("newcomers", True), ("members", False)):
+        RolePermission.objects.create(role=role, module=m, can_view=True, can_edit=e, can_create=e)
+    self.shep = User.objects.create_user(email="s@t.com", password="x", role=role, location=self.bahrain, can_shepherd=True)
+    self.other = User.objects.create_user(email="o@t.com", password="x", role=role, location=self.bahrain, can_shepherd=True)
+    crole = Role.objects.create(name="Coordinator test")
+    for m in ("newcomers", "members", "admin"):
+        RolePermission.objects.create(role=crole, module=m, can_view=True, can_edit=True, can_create=True)
+    self.coord = User.objects.create_user(email="c@t.com", password="x", role=crole, location=self.bahrain)
+    self.mine = self.newcomer("Mine Newcomer", stage="new"); self.mine.assigned_to = self.shep; self.mine.save()
+    self.theirs = self.newcomer("Their Newcomer", stage="new"); self.theirs.assigned_to = self.other; self.theirs.save()
+    self.qatar = self.newcomer("Qatar Newcomer", stage="new", location=self.others)
+
+
+
 class FollowUpApiTestCase(Base):
     def setUp(self):
         super().setUp()
-        role = Role.objects.create(name="Follow-up test")
-        for m, e in (("newcomers", True), ("members", False)):
-            RolePermission.objects.create(role=role, module=m, can_view=True, can_edit=e, can_create=e)
-        self.shep = User.objects.create_user(email="s@t.com", password="x", role=role, location=self.bahrain, can_shepherd=True)
-        self.other = User.objects.create_user(email="o@t.com", password="x", role=role, location=self.bahrain, can_shepherd=True)
-        crole = Role.objects.create(name="Coordinator test")
-        for m in ("newcomers", "members", "admin"):
-            RolePermission.objects.create(role=crole, module=m, can_view=True, can_edit=True, can_create=True)
-        self.coord = User.objects.create_user(email="c@t.com", password="x", role=crole, location=self.bahrain)
-        self.mine = self.newcomer("Mine Newcomer", stage="new"); self.mine.assigned_to = self.shep; self.mine.save()
-        self.theirs = self.newcomer("Their Newcomer", stage="new"); self.theirs.assigned_to = self.other; self.theirs.save()
-        self.qatar = self.newcomer("Qatar Newcomer", stage="new", location=self.others)
+        _setup_people(self)
 
     def as_(self, u):
         self.client.force_authenticate(user=u)
@@ -191,3 +196,62 @@ class OneJourneyAfterRestartTestCase(Base):
             self.client.post(f"/api/followup/enrolments/{e.id}/{a}/", body, format="json")
         self.client.post("/api/followup/start/", {"journey": "converts", "newcomer": n.id}, format="json")
         self.assertEqual(list(Enrolment.objects.filter(newcomer=n, status="active").values_list("journey", flat=True)), ["converts"])
+
+
+class SendAnyDayTestCase(Base):
+    """Kay: a message on any day, besides the plan."""
+    as_ = FollowUpApiTestCase.as_
+
+    def setUp(self):
+        Base.setUp(self)
+        _setup_people(self)
+    def test_an_extra_message_never_takes_the_planned_ones_place(self):
+        self.as_(self.shep)
+        e = Enrolment.objects.get(newcomer=self.mine)
+        r = self.client.post(f"/api/followup/enrolments/{e.id}/send/", {"text": "*Hello*"}, format="json")
+        self.assertEqual(r.status_code, 201)
+        today = self.client.get("/api/followup/today/").data["results"][0]
+        self.assertIsNone(today["done"])          # the planned message is still to send
+        self.assertEqual(self.client.post(f"/api/followup/enrolments/{e.id}/record/", {"kind": "planned", "text": "Hi"}, format="json").status_code, 200)
+        kinds = [(l.kind, l.extra) for l in e.log.order_by("id")]
+        self.assertEqual(kinds, [("own", True), ("planned", False)])
+
+    def test_from_the_bank_empty_and_someone_elses_person(self):
+        self.as_(self.shep)
+        e = Enrolment.objects.get(newcomer=self.mine)
+        t = MessageTemplate.objects.filter(journey="any").first()
+        d = self.client.post(f"/api/followup/enrolments/{e.id}/send/", {"text": "From the bank", "template": t.id}, format="json").data
+        self.assertEqual(d["enrolments"][0]["log"][0]["theme"], t.theme)
+        self.assertEqual(d["person"]["first"], "Mine")
+        self.assertEqual(self.client.post(f"/api/followup/enrolments/{e.id}/send/", {"text": "  "}, format="json").status_code, 400)
+        theirs = Enrolment.objects.get(newcomer=self.theirs)
+        self.assertEqual(self.client.post(f"/api/followup/enrolments/{theirs.id}/send/", {"text": "x"}, format="json").status_code, 403)
+
+
+class StartManyTestCase(Base):
+    """Kay: choose which newcomers start receiving messages."""
+    as_ = FollowUpApiTestCase.as_
+
+    def setUp(self):
+        Base.setUp(self)
+        _setup_people(self)
+        Enrolment.objects.filter(newcomer__in=[self.mine, self.theirs, self.qatar]).delete()
+
+    def test_list_start_and_location(self):
+        self.as_(self.coord)
+        names = [r["name"] for r in self.client.get("/api/followup/start-many/").data["results"]]
+        self.assertEqual(sorted(names), ["Mine Newcomer", "Their Newcomer"])     # Qatar's is not offered
+        r = self.client.post("/api/followup/start-many/", {"newcomers": [self.mine.id, self.qatar.id]}, format="json")
+        self.assertEqual(r.data["started"], 1)                                   # Qatar's refused quietly
+        self.assertTrue(Enrolment.objects.filter(newcomer=self.mine, status="active").exists())
+        self.assertFalse(Enrolment.objects.filter(newcomer=self.qatar).exists())
+        self.assertNotIn("Mine Newcomer", [r["name"] for r in self.client.get("/api/followup/start-many/").data["results"]])
+
+    def test_view_only_cannot_start(self):
+        from accounts.models import Role, RolePermission, User
+        role = Role.objects.create(name="Viewer only")
+        RolePermission.objects.create(role=role, module="newcomers", can_view=True)
+        u = User.objects.create_user(email="vo@t.com", password="x", role=role, location=self.bahrain)
+        self.as_(u)
+        self.assertEqual(self.client.get("/api/followup/start-many/").status_code, 403)
+        self.assertEqual(self.client.post("/api/followup/start-many/", {"newcomers": [self.mine.id]}, format="json").status_code, 403)

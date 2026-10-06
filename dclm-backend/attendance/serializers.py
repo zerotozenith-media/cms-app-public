@@ -9,7 +9,7 @@ class MeetingTypeSerializer(serializers.ModelSerializer):
         model = MeetingType
         fields = ["id", "name", "day", "frequency", "detail_level", "monthly_target",
                   "counts_for_absence", "start_time", "audience", "collects_offering",
-                  "generates_sessions", "effective_target"]
+                  "generates_sessions", "effective_target", "usual_mode"]
         read_only_fields = ["generates_sessions", "effective_target"]
 
     # Short forms people naturally type, written out in full so the weekly
@@ -139,6 +139,7 @@ class RecordAttendanceSerializer(serializers.Serializer):
     lesson = serializers.CharField(required=False, allow_blank=True, default="")
     edition_name = serializers.CharField(required=False, allow_blank=True, max_length=120)
     edition_place = serializers.CharField(required=False, allow_blank=True, max_length=120)
+    mode = serializers.ChoiceField(required=False, choices=["in-person", "online", "in-person-and-online"])
 
     # What was collected, by fund. Only accepted when the meeting is
     # marked as collecting an offering in Admin.
@@ -231,7 +232,7 @@ def _schedule_first_session(fellowship):
     for loc in places:
         AttendanceSession.objects.get_or_create(
             meeting_type=mt, location=loc, date=date, fellowship=fellowship,
-            defaults={"mode": AttendanceSession.Mode.IN_PERSON,
+            defaults={"mode": mt.usual_mode,
                       "status": AttendanceSession.Status.PENDING})
         for plain in AttendanceSession.objects.filter(
                 meeting_type=mt, location=loc, date=date, fellowship__isnull=True,

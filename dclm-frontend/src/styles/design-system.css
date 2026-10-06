@@ -795,9 +795,14 @@
   .topbar .right{gap:2px}
   .tb-loc{padding:0 8px;gap:4px;min-height:36px}
   .tb-left .page-title{font-size:1rem}
-  /* All locations is the default, so a phone shows just the pin and keeps
-     room for the page title. A picked location shows its name. */
-  .tb-loc:not(.narrowed) .tb-loc-name{display:none}
+  /* Issue 1: a phone always shows just the pin, so a chosen location's
+     name never squeezes the page title. A dot on the pin means a location
+     is chosen. Tapping still lists the locations, with the chosen one ticked. */
+  .tb-loc .tb-loc-name,.tb-loc svg:last-of-type:not(:first-of-type){display:none}
+  .tb-loc{position:relative;width:38px;padding:0;justify-content:center}
+  .tb-loc.narrowed::after{content:'';position:absolute;top:-2px;right:-2px;width:10px;height:10px;border-radius:50%;background:var(--blue);border:2px solid #fff}
+  /* The page title wraps onto two lines rather than being cut off. */
+  .tb-left .page-title{white-space:normal;overflow:hidden;text-overflow:clip;font-size:.95rem;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
   .tb-loc-name{max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .tb-loc svg:last-child{display:none}
   .tb-left{gap:6px}
@@ -1016,3 +1021,60 @@
 .svc-pop a{display:inline-block;margin-top:8px;font-weight:700;color:var(--blue)}
 
 @media (max-width:600px){.team-tip{left:-60px;top:100%;transform:none}}
+
+/* Issue 2: one compact grid of In person and Online headcounts. */
+.hc-grid{display:grid;gap:8px 10px;align-items:center;margin:4px 0 12px}
+.hc-head{font-size:.85rem;color:var(--blue,#0B3C91)}
+.hc-label{font-weight:700;font-size:.88rem;margin:0}
+.hc-grid input{width:100%;min-width:0;box-sizing:border-box}
+
+/* Issue 1: the narrowest phones get slightly smaller round controls in the
+   top bar, so the page title always fits on two lines. */
+@media (max-width:380px){
+  .topbar{padding-left:8px;padding-right:8px}
+  .tb-loc{width:32px;min-height:32px}
+  .tb-service-btn{min-width:34px;min-height:34px}
+  .tb-service-btn .level-badge{width:30px!important;height:30px!important;padding:5px!important}
+  .tb-bell{width:34px;height:34px;min-width:34px}
+  .tb-badge{width:32px;height:32px;min-width:32px;font-size:.75rem}
+  .tb-left .page-title{font-size:.9rem}
+}
+
+/* Issue 3: the dashboard's By location card. */
+.bl-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px}
+.bl-title{font-size:.86rem}
+.bl-row{display:flex;align-items:center;gap:10px;font-size:.85rem;margin:6px 0}
+.bl-name{width:92px;flex:none}
+.bl-track{height:10px;border-radius:5px;background:var(--sky);flex:1;min-width:30px;overflow:hidden}
+.bl-track span{display:block;height:100%;border-radius:5px}
+.bl-value{width:120px;text-align:right;white-space:nowrap;flex:none}
+.bl-total{font-size:.8rem}
+@media (max-width:900px){.bl-grid{grid-template-columns:1fr;gap:12px}}
+
+/* Tips placed from the screen's edges (Kay: cut off on phones). */
+.help-pop{max-width:none;z-index:90}
+.help-pop.phone{padding:13px 15px}
+.help-pop.phone .help-pop-title{font-size:.95rem;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.help-pop.phone .help-pop-body{font-size:.92rem;line-height:1.55}
+.help-pop-close{background:none;border:0;font-size:1.3rem;line-height:1;color:var(--muted);cursor:pointer;min-width:36px;min-height:36px;margin:-8px -8px -8px 0}
+
+/* Kay: on phones, tabs ran off the screen with no sign of the rest, such
+   as Attendance and Messages on a profile. Every tab bar now wraps, so all
+   tabs are always in view. */
+@media (max-width:600px){
+  .person-tabs{flex-wrap:wrap;overflow-x:visible;row-gap:2px}
+  .person-tabs button{flex:0 0 auto}
+  .tabs{flex-wrap:wrap;overflow-x:visible;row-gap:6px}
+}
+.pm-send{border:1px solid #9FC0EA;border-radius:12px;padding:12px 14px;margin:12px 0;background:#fff}
+.fu-headrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.fu-headrow .btn{margin-left:auto}
+.fu-start{max-width:640px;margin-bottom:16px}
+.fu-start-row{display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line);cursor:pointer;font-size:.9rem}
+.fu-start-row.all{display:flex;font-weight:700;border-top:0}
+.fu-start-row input{width:18px;height:18px}
+.fu-start-note{background:#FEF3C7;color:#92400E;border-radius:10px;padding:8px 10px;font-size:.84rem;margin:10px 0 0}
+/* A comfortable tap target for dismissing the service ladder note. */
+.service-note button[aria-label="Dismiss"]{min-width:40px;min-height:40px;display:inline-flex;align-items:center;justify-content:center}
+/* The headcount grid's boxes match every other box in the app. */
+.hc-grid input{border:1.5px solid var(--line);border-radius:9px;padding:.6rem .75rem;background:var(--sky-2);font:inherit}
+.hc-grid input:focus{outline:2px solid #7FB0F5;outline-offset:1px;background:#fff}

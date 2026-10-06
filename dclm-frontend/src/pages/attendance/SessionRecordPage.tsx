@@ -1,6 +1,6 @@
 import { Skeleton } from '../../components/ui/Skeleton';
 import { useQuery } from '@tanstack/react-query';
-import { useState, useEffect, useRef } from 'react';
+import { Fragment, useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSession, useDeleteSession, useRecordSession, useMeetingTypes } from '../../api/attendance';
 import { apiClient } from '../../api/client';
@@ -47,7 +47,7 @@ export function SessionRecordPage() {
   // Online attendance, kept separate. Any meeting can be hybrid and a
   // total showing only the room understates the month.
   const [online, setOnline] = useState(EMPTY_COUNTS);
-  const [onlineOpen, setOnlineOpen] = useState(false);
+  const [mode, setMode] = useState('in-person-and-online');
   const [newComers, setNewComers] = useState(0);
   const [newConverts, setNewConverts] = useState(0);
   const [ledBy, setLedBy] = useState<number | ''>('');
@@ -78,7 +78,15 @@ export function SessionRecordPage() {
       men: session.men, women: session.women, youth_boys: session.youth_boys,
       youth_girls: session.youth_girls, children_boys: session.children_boys, children_girls: session.children_girls,
     });
+    // Saved online numbers were never loaded, so reopening a session showed
+    // them as 0, and saving it again wiped them (found writing the manual).
+    const s = session as any;
+    setOnline({
+      men: s.online_men ?? 0, women: s.online_women ?? 0, youth_boys: s.online_youth_boys ?? 0,
+      youth_girls: s.online_youth_girls ?? 0, children_boys: s.online_children_boys ?? 0, children_girls: s.online_children_girls ?? 0,
+    });
     setTrackNamed(session.track_named);
+    setMode(session.mode);
     setEditionName(session.edition_name ?? '');
     setEditionPlace(session.edition_place ?? '');
     // Members only: newcomers checked in at the door have no member number,
@@ -111,6 +119,8 @@ export function SessionRecordPage() {
   const inPerson = Object.values(counts).reduce((a, b) => a + b, 0);
   const onlineCount = Object.values(online).reduce((a, b) => a + b, 0);
   const total = inPerson + onlineCount;
+  const showInPerson = mode !== 'online' || inPerson > 0;
+  const showOnline = mode !== 'in-person' || onlineCount > 0;
   const isFellowship = !!session?.fellowship;
   const isOccasional = meetingTypes?.find((t) => t.id === session?.meeting_type)?.frequency === 'occasional';
   const { hasPermission } = useAuth();
@@ -151,6 +161,7 @@ export function SessionRecordPage() {
     try {
     await recordSession.mutateAsync({
       ...counts,
+      mode,
       online_men: online.men, online_women: online.women,
       online_youth_boys: online.youth_boys, online_youth_girls: online.youth_girls,
       online_children_boys: online.children_boys, online_children_girls: online.children_girls,
@@ -175,7 +186,7 @@ export function SessionRecordPage() {
               {session.meeting_type_name}
               {session.fellowship_name ? ` · ${session.fellowship_name}` : ''} · {session.date}
             </h3>
-            <div className="muted" style={{ marginBottom: (session.edition_name || session.edition_place) ? 4 : 16 }}>{locationName(session.location)} · {session.mode === 'in-person' ? 'In person' : session.mode.replace('-', ' ')}</div>
+            <div className="muted" style={{ marginBottom: (session.edition_name || session.edition_place) ? 4 : 16 }}>{locationName(session.location)} · {({ 'in-person': 'In person', online: 'Online', 'in-person-and-online': 'In person and online' } as Record<string, string>)[session.mode] ?? session.mode}</div>
             {(session.edition_name || session.edition_place) && (
               <div style={{ fontWeight: 600, marginBottom: 16 }}>{[session.edition_name, session.edition_place].filter(Boolean).join(', ')}</div>
             )}
@@ -206,42 +217,35 @@ export function SessionRecordPage() {
               </div>
             </div>
           )}
-          <div className="followup-guide">
-            <div className="followup-guide-title"><Icon name="users" size={14} /> In person</div>
-            <div className="followup-guide-note">Everyone physically in the room.</div>
+          {/* Issue 2: the mode, then one compact grid of In person and Online.
+              A column shows when the mode uses it, or when it already holds
+              numbers, so a changed mode never hides recorded figures. */}
+          <div className="field" style={{ maxWidth: 320 }}>
+            <label htmlFor="session-mode">Mode</label>
+            <select id="session-mode" value={mode} onChange={(e) => setMode(e.target.value)}>
+              <option value="in-person-and-online">In person and online</option>
+              <option value="online">Online</option>
+              <option value="in-person">In person</option>
+            </select>
           </div>
-          {fields.map(([key, label]) => (
-            <div className="field" key={key}>
-              <label htmlFor={`session-count-${key}`}>{label}</label>
-              <input
-                id={`session-count-${key}`}
-                type="number" min={0} value={counts[key]}
-                onChange={(e) => setCounts({ ...counts, [key]: Number(e.target.value) || 0 })}
-              />
-            </div>
-          ))}
-
-          <button type="button" className="followup-guide"
-            style={{ width: '100%', textAlign: 'left', cursor: 'pointer', border: 0 }}
-            onClick={() => setOnlineOpen(!onlineOpen)}>
-            <div className="followup-guide-title">
-              <Icon name="grid" size={14} /> Joining online
-              <span className="muted" style={{ fontWeight: 400, fontSize: '.78rem', marginLeft: 6 }}>
-                {onlineOpen || onlineCount ? '' : '(tap to add)'}
-              </span>
-            </div>
-            <div className="followup-guide-note">Leave blank when nobody joined remotely.</div>
-          </button>
-          {(onlineOpen || onlineCount > 0) && fields.map(([key, label]) => (
-            <div className="field" key={`online-${key}`}>
-              <label htmlFor={`session-online-${key}`}>{label} online</label>
-              <input
-                id={`session-online-${key}`}
-                type="number" min={0} value={online[key]}
-                onChange={(e) => setOnline({ ...online, [key]: Number(e.target.value) || 0 })}
-              />
-            </div>
-          ))}
+          <div className="hc-grid" style={{ gridTemplateColumns: `1.3fr${showInPerson ? ' 1fr' : ''}${showOnline ? ' 1fr' : ''}` }}>
+            <span />
+            {showInPerson && <b className="hc-head">In person</b>}
+            {showOnline && <b className="hc-head">Online</b>}
+            {fields.map(([key, label]) => (
+              <Fragment key={key}>
+                <label className="hc-label" htmlFor={showInPerson ? `session-count-${key}` : `session-online-${key}`}>{label}</label>
+                {showInPerson && (
+                  <input id={`session-count-${key}`} type="number" min={0} value={counts[key]} aria-label={`${label} in person`}
+                    onChange={(e) => setCounts({ ...counts, [key]: Number(e.target.value) || 0 })} />
+                )}
+                {showOnline && (
+                  <input id={`session-online-${key}`} type="number" min={0} value={online[key]} aria-label={`${label} online`}
+                    onChange={(e) => setOnline({ ...online, [key]: Number(e.target.value) || 0 })} />
+                )}
+              </Fragment>
+            ))}
+          </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderTop: '1px solid var(--line)', marginTop: 6, fontWeight: 800 }}>
             <span>Total{onlineCount > 0 && (

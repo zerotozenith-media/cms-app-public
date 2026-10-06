@@ -20,13 +20,13 @@ export function NewSessionPage() {
   const isFellowship = meetingType === 'fri-house';
   const [date, setDate] = useState(today);
   const [location, setLocation] = useState('');
-  const [mode, setMode] = useState('in-person');
+  const [mode, setMode] = useState('online');
   // F22: occasional meetings, such as GCK, have their own edition each time.
   const [editionName, setEditionName] = useState('');
   const [editionPlace, setEditionPlace] = useState('');
   const [error, setError] = useState('');
 
-  if (meetingTypes && !meetingType && meetingTypes.length) setMeetingType(meetingTypes[0].id);
+  if (meetingTypes && !meetingType && meetingTypes.length) { setMeetingType(meetingTypes[0].id); setMode(meetingTypes[0].usual_mode ?? 'online'); }
   if (locations && !location && locations.length) setLocation(locations[0].id);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -61,7 +61,7 @@ export function NewSessionPage() {
         <form onSubmit={handleSubmit}>
           <div className="field">
             <label htmlFor="session-meeting">Meeting</label>
-            <select id="session-meeting" value={meetingType} onChange={(e) => setMeetingType(e.target.value)}>
+            <select id="session-meeting" value={meetingType} onChange={(e) => { setMeetingType(e.target.value); setMode(meetingTypes.find((m) => m.id === e.target.value)?.usual_mode ?? 'online'); }}>
               {meetingTypes.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           </div>
@@ -106,8 +106,9 @@ export function NewSessionPage() {
           <div className="field">
             <label htmlFor="session-mode">Mode</label>
             <select id="session-mode" value={mode} onChange={(e) => setMode(e.target.value)}>
-              <option value="in-person">In person</option>
+              <option value="in-person-and-online">In person and online</option>
               <option value="online">Online</option>
+              <option value="in-person">In person</option>
             </select>
           </div>
           {error && <p className="form-error" role="alert">{error}</p>}

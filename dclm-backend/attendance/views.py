@@ -199,6 +199,9 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
                           "online_youth_girls", "online_children_boys",
                           "online_children_girls", "new_comers", "new_converts"]:
                 setattr(session, field, data[field])
+            # The session's mode can be changed, for example a week moved online.
+            if data.get("mode"):
+                session.mode = data["mode"]
             if session.meeting_type.frequency == MeetingType.Frequency.OCCASIONAL:
                 for f in ("edition_name", "edition_place"):
                     if f in data:

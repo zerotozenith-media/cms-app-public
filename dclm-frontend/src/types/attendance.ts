@@ -19,6 +19,7 @@ export interface Fellowship {
 }
 
 export interface MeetingType {
+  usual_mode?: 'in-person-and-online' | 'online' | 'in-person';
   /** Who is expected, and so who is followed up when absent. */
   audience: MeetingAudience;
   /** Whether the session form asks for an offering. Set in Admin rather
@@ -118,6 +119,7 @@ export interface RecordAttendancePayload {
   lesson?: string;
   edition_name?: string;
   edition_place?: string;
+  mode?: string;
   men: number;
   women: number;
   youth_boys: number;

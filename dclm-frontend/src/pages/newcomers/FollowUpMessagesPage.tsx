@@ -1,6 +1,8 @@
 import { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '../../api/client';
 import { useBank, useFollowUpAction, useSaved, useToday, type BankRow, type TodayEntry } from '../../api/journeys';
 import { HelpMark } from '../../components/ui/HelpMark';
 import { Skeleton } from '../../components/ui/Skeleton';
@@ -46,16 +48,23 @@ export function NewcomerTabs({ active }: { active: string }) {
 export function FollowUpMessagesPage() {
   const { data, isLoading, isError } = useToday();
   const [filter, setFilter] = useState<string>('all');
+  const { hasPermission } = useAuth();
+  const canStart = hasPermission('newcomers', 'edit');
+  const [starting, setStarting] = useState(false);
   const rows = data?.results ?? [];
   const count = (k: string) => rows.filter((r) => !r.done && (k === 'all' || r.journey === k)).length;
   const shown = rows.filter((r) => filter === 'all' || r.journey === filter);
   return (
     <>
       <NewcomerTabs active="Messages" />
-      <h2 className="section-gap" style={{ marginBottom: 2 }}>Today's messages</h2>
+      <div className="fu-headrow">
+        <h2 className="section-gap" style={{ marginBottom: 2 }}>Today's messages</h2>
+        {canStart && <button className="btn sm outline" onClick={() => setStarting(!starting)} aria-expanded={starting}>Start messages</button>}
+      </div>
       <p className="muted" style={{ marginTop: 0 }}>
         {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}. Sent from your own WhatsApp.
       </p>
+      {starting && <StartPanel onClose={() => setStarting(false)} />}
       <div className="fu-chips" role="group" aria-label="Show a journey">
         {(['all', ...JOURNEY_ORDER] as string[]).map((k) => (
           <button key={k} className={filter === k ? 'on' : ''} onClick={() => setFilter(k)}>
@@ -169,8 +178,8 @@ function MessageCard({ entry }: { entry: TodayEntry }) {
   );
 }
 
-function SwapPanel({ entry, vars, onPick, onOwn }: {
-  entry: TodayEntry; vars: { nextService: string; sender: string };
+export function SwapPanel({ entry, vars, onPick, onOwn }: {
+  entry: { journey: string; person: { first: string } }; vars: { nextService: string; sender: string };
   onPick: (html: string, theme: string, id: number | null, kind: 'planned' | 'own') => void; onOwn: () => void;
 }) {
   const { data: bank } = useBank();
@@ -244,6 +253,47 @@ export function EditorModal({ title, start, onClose, onUse }: { title: string; s
           <button className="btn sm" onClick={() => { const h = cleanHTML(ed.current?.innerHTML ?? ''); if (save) act.mutate({ url: '/followup/saved/', body: { html: h } }); onUse(h); }}>Use this message</button>
           <button className="btn sm ghost" onClick={onClose}>Cancel</button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Kay: choose which newcomers start receiving messages. */
+function StartPanel({ onClose }: { onClose: () => void }) {
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery({ queryKey: ['followup-startable'],
+    queryFn: async () => (await apiClient.get<{ results: { id: number; name: string; stage: string; shepherd: string; has_phone: boolean }[] }>('/followup/start-many/')).data });
+  const rows = data?.results ?? [];
+  const [picked, setPicked] = useState<Set<number> | null>(null);
+  const chosen = picked ?? new Set(rows.map((r) => r.id));
+  const [err, setErr] = useState('');
+  const start = useMutation({
+    mutationFn: async () => (await apiClient.post('/followup/start-many/', { newcomers: [...chosen] })).data,
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['followup-today'] }); qc.invalidateQueries({ queryKey: ['followup-startable'] }); qc.invalidateQueries({ queryKey: ['notifications'] }); onClose(); },
+    onError: (e: any) => setErr(e?.response?.data?.detail || 'Messages could not be started. Try again.'),
+  });
+  const toggle = (id: number) => { const s = new Set(chosen); if (s.has(id)) s.delete(id); else s.add(id); setPicked(s); };
+  return (
+    <div className="card fu-start">
+      <h3 style={{ marginBottom: 2 }}>Start messages</h3>
+      <p className="muted" style={{ marginTop: 0, fontSize: '.86rem' }}>Newcomers not yet on a journey. Each starts on day 1 today, sent from their shepherd's WhatsApp.</p>
+      {isLoading ? <p className="muted">Loading.</p> : rows.length === 0 ? <p className="muted">Every current newcomer is already on a journey.</p> : (
+        <>
+          <label className="fu-start-row all"><input type="checkbox" checked={chosen.size === rows.length} onChange={(e) => setPicked(e.target.checked ? new Set(rows.map((r) => r.id)) : new Set())} /> Select all ({rows.length})</label>
+          {rows.map((r) => (
+            <label className="fu-start-row" key={r.id}>
+              <input type="checkbox" checked={chosen.has(r.id)} onChange={() => toggle(r.id)} />
+              <span><b>{r.name}</b><br /><span className="muted">{r.stage}, {r.shepherd ? `shepherd ${r.shepherd}` : 'no shepherd yet'}</span></span>
+              <span className="muted">{r.has_phone ? 'Phone on file' : 'No phone'}</span>
+            </label>
+          ))}
+          <p className="fu-start-note">They were not asked at registration about keeping in touch. Start only those you know are happy to hear from us.</p>
+        </>
+      )}
+      {err && <p className="form-error" role="alert">{err}</p>}
+      <div className="fu-acts">
+        {rows.length > 0 && <button className="btn sm" disabled={chosen.size === 0 || start.isPending} onClick={() => start.mutate()}>Start messages for {chosen.size}</button>}
+        <button className="btn sm ghost" onClick={onClose}>Cancel</button>
       </div>
     </div>
   );

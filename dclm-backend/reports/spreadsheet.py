@@ -252,10 +252,43 @@ def build_spreadsheet(ctx):
         note.font = Font(name=FONT, size=9.5, italic=True, color=MUTED)
     hs.freeze_panes = hs.cell(row=hstart, column=2)
 
+    sheets = [ws, fs, hs]
+    # Issue 3: the all-locations report gets each location side by side,
+    # with the same figures as the PDF's By location page.
+    if ctx.get("by_location"):
+        bl = ctx["by_location"]
+        ls = wb.create_sheet("By location", 0)
+        ls.sheet_view.showGridLines = False
+        for col, w in {"A": 3, "B": 18, "C": 22, "D": 16, "E": 16, "F": 14, "G": 13}.items():
+            ls.column_dimensions[col].width = w
+        r = 2
+        r = _title(ls, r, "By location", 6)
+        sub = ls.cell(row=r, column=2, value=ctx["period_label"])
+        sub.font = Font(name=FONT, size=10, color=MUTED)
+        r += 2
+        r = _section(ls, r, "EACH LOCATION FOR THE MONTH", 6)
+        r = _header_row(ls, r, ["Location", "Friday Worship average", "Giving (BHD)", "Expenses (BHD)", "Net (BHD)", "Newcomers"])
+        first = r
+        for i, row in enumerate(bl["rows"]):
+            _data_row(ls, r, [row["location"], row["fw_average"] if row["fw_services"] else "None recorded", float(row["giving"]),
+                              float(row["expenses"]), float(row["net"]), row["newcomers"]], money_cols=(4, 5, 6), band=i % 2 == 1)
+            r += 1
+        last = r - 1
+        _data_row(ls, r, ["Total", "", f"=SUM(D{first}:D{last})", f"=SUM(E{first}:E{last})", f"=SUM(F{first}:F{last})", f"=SUM(G{first}:G{last})"],
+                  money_cols=(4, 5, 6), bold=True)
+        r += 3
+        r = _section(ls, r, "FRIDAY WORSHIP AVERAGE BY MONTH", 6)
+        r = _header_row(ls, r, ["Location"] + bl["months"])
+        for i, row in enumerate(bl["rows"]):
+            _data_row(ls, r, [row["location"]] + row["trend"], band=i % 2 == 1)
+            r += 1
+        sheets.insert(0, ls)
+        _page_setup(ls, landscape=False)
+
     _page_setup(ws, landscape=True)
     _page_setup(fs, landscape=False)
     _page_setup(hs, landscape=True)
-    for sheet in (ws, fs, hs):
+    for sheet in sheets:
         sheet.print_area = sheet.dimensions
 
     buffer = io.BytesIO()

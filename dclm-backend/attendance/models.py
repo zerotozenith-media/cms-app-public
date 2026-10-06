@@ -54,6 +54,12 @@ class MeetingType(models.Model):
         max_length=20, choices=Audience.choices, default=Audience.EVERYONE,
         help_text="Who is expected at this meeting, and so who is followed up when absent.",
     )
+    # How this meeting is usually held. Weekly sessions are created this way,
+    # and each session can still be changed, for example a week moved online.
+    usual_mode = models.CharField(
+        max_length=20, default="online",
+        choices=[("in-person-and-online", "In person and online"), ("online", "Online"), ("in-person", "In person")],
+        help_text="How this meeting is usually held.")
     collects_offering = models.BooleanField(
         default=False,
         help_text="Whether the session form asks for an offering. Set here rather "
@@ -157,6 +163,9 @@ class AttendanceSession(models.Model):
     class Mode(models.TextChoices):
         IN_PERSON = "in-person", "In person"
         ONLINE = "online", "Online"
+        # Kay: every meeting has people joining online, and some meet in
+        # person too, such as the Friday Worship Service.
+        BOTH = "in-person-and-online", "In person and online"
 
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
@@ -165,7 +174,7 @@ class AttendanceSession(models.Model):
     meeting_type = models.ForeignKey("attendance.MeetingType", on_delete=models.PROTECT, related_name="sessions")
     date = models.DateField()
     location = models.ForeignKey("core.Location", on_delete=models.PROTECT, related_name="attendance_sessions")
-    mode = models.CharField(max_length=10, choices=Mode.choices)
+    mode = models.CharField(max_length=24, choices=Mode.choices)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
     track_named = models.BooleanField(default=False)
 

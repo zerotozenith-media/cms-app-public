@@ -155,7 +155,10 @@ def gather_report_data(period_year, period_month, other_additions, generated_by,
         pct = round(float(current) / float(g.target) * 100) if g.target else 0
         goals.append({"name": g.name, "horizon": g.horizon, "current": current, "target": g.target, "unit": g.unit, "pct": pct})
 
+    by_location = _by_location(period_year, period_month) if location is None else []
+
     return {
+        "by_location": by_location,
         "period_label": period_label,
         "generated_date": datetime.date.today().isoformat(),
         "generated_by_name": display_name(generated_by),
@@ -187,6 +190,37 @@ def gather_report_data(period_year, period_month, other_additions, generated_by,
         "other_additions": other_additions,
         "scope_label": f"{location.name} only" if location else "All locations",
     }
+
+
+def _by_location(period_year, period_month):
+    """Issue 3: each location's month, side by side, for the all-locations
+    report. Also six months of Friday Worship averages, for the chart."""
+    from core.models import Location
+    start, end = _month_bounds(period_year, period_month)
+    months = []
+    y, m = period_year, period_month
+    for _ in range(6):
+        months.insert(0, (y, m))
+        y, m = (y, m - 1) if m > 1 else (y - 1, 12)
+    rows = []
+    for loc in Location.objects.order_by("name"):
+        fw = [s.total for s in AttendanceSession.objects.filter(location=loc, meeting_type__id="fri-worship", status="filled", date__gte=start, date__lte=end)]
+        trend = []
+        for yy, mm in months:
+            a, b = _month_bounds(yy, mm)
+            t = [s.total for s in AttendanceSession.objects.filter(location=loc, meeting_type__id="fri-worship", status="filled", date__gte=a, date__lte=b)]
+            trend.append(round(sum(t) / len(t)) if t else 0)
+        giving = Giving.objects.filter(location=loc, date__gte=start, date__lte=end)
+        funds = {r["fund__name"]: r["t"] for r in giving.values("fund__name").annotate(t=Sum("amount"))}
+        g = sum(funds.values(), Decimal("0"))
+        e = Expense.objects.filter(location=loc, date__gte=start, date__lte=end).aggregate(t=Sum("amount"))["t"] or Decimal("0")
+        rows.append({
+            "location": loc.name, "fw_average": round(sum(fw) / len(fw)) if fw else 0, "fw_services": len(fw),
+            "giving": g, "funds": funds, "expenses": e, "net": g - e,
+            "newcomers": Newcomer.objects.filter(location=loc, created_at__gte=start, created_at__lte=end).count(),
+            "trend": trend,
+        })
+    return {"rows": rows, "months": [calendar.month_abbr[mm] for _, mm in months]} if len(rows) > 1 else []
 
 
 def render_report_pdf(period_year, period_month, other_additions, generated_by, location=None):

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useFollowUpAction, usePersonFollowUp, type PersonEnrolment } from '../../api/journeys';
 import { HelpMark } from '../ui/HelpMark';
+import { EditorModal, SwapPanel } from '../../pages/newcomers/FollowUpMessagesPage';
+import { blankHTML, cleanHTML, toWhatsApp, waLink } from '../../lib/whatsapp';
 import { Skeleton } from '../ui/Skeleton';
 
 /**
@@ -35,7 +37,7 @@ export function PersonMessages({ kind, id }: { kind: 'newcomer' | 'member' | 'en
 
   return (
     <div className="pm">
-      {current ? <Current e={current} /> : (
+      {current ? <Current e={current} person={data.person} /> : (
         <div className="pm-none">
           <p className="muted" style={{ marginTop: 0 }}>No follow-up messages are running for this person.</p>
           {canStart && defaultJourney && (
@@ -64,7 +66,8 @@ export function PersonMessages({ kind, id }: { kind: 'newcomer' | 'member' | 'en
   );
 }
 
-function Current({ e }: { e: PersonEnrolment }) {
+function Current({ e, person }: { e: PersonEnrolment; person?: { first: string; phone: string } }) {
+  const [sending, setSending] = useState(false);
   const act = useFollowUpAction();
   const base = `/followup/enrolments/${e.id}`;
   const running = e.status === 'active';
@@ -84,11 +87,15 @@ function Current({ e }: { e: PersonEnrolment }) {
           ))}
         </div>
         {e.can_act && (running ? (
-          <span className="pm-stop"><button className="btn sm ghost" onClick={() => act.mutate({ url: `${base}/stop/` })} disabled={act.isPending}>Stop messages</button><HelpMark topic="fuStop" /></span>
+          <span className="pm-stop">
+            <button className="btn sm" onClick={() => setSending(!sending)} aria-expanded={sending}>Send a message</button>
+            <button className="btn sm ghost" onClick={() => act.mutate({ url: `${base}/stop/` })} disabled={act.isPending}>Stop messages</button><HelpMark topic="fuStop" />
+          </span>
         ) : (
           <button className="btn sm outline pm-stop" onClick={() => act.mutate({ url: `${base}/restart/` })} disabled={act.isPending}>Restart messages</button>
         ))}
       </div>
+      {sending && <SendAny e={e} person={person ?? { first: '', phone: '' }} onDone={() => setSending(false)} />}
       <p className="muted pm-pace">{running ? (e.plan === 'daily' ? 'A message every day.' : PACE[e.journey]) : `Stopped. ${e.ended_reason}`}</p>
       {e.strip.length > 0 && (
         <div className="pm-strip">
@@ -130,5 +137,56 @@ function StepBox({ when, what, done, disabled, onSave }: { when: string; what: s
         onChange={(ev) => { const v = ev.target.checked; setOn(v); onSave(v, () => setOn(!v)); }} />
       <span><b>{when}</b><br />{what}</span>
     </label>
+  );
+}
+
+/**
+ * Kay: send a message on any day, besides the plan. Choose from the bank, a
+ * saved message, or write one, check it, send it in WhatsApp, then confirm.
+ * It is recorded in their journey and their plan carries on unchanged.
+ */
+function SendAny({ e, person, onDone }: { e: PersonEnrolment; person: { first: string; phone: string }; onDone: () => void }) {
+  const { user } = useAuth();
+  const sender = user?.name || 'Your shepherd';
+  const act = useFollowUpAction();
+  const [editing, setEditing] = useState<null | { html: string; template: number | null; title: string }>(null);
+  const [ready, setReady] = useState<null | { html: string; template: number | null }>(null);
+  const [asked, setAsked] = useState(false);
+  const [err, setErr] = useState('');
+  const vars = { nextService: 'our next service', sender };
+  const record = () => {
+    if (!ready) return;
+    act.mutate({ url: `/followup/enrolments/${e.id}/send/`, body: { text: toWhatsApp(ready.html), template: ready.template } },
+      { onSuccess: onDone, onError: (x: any) => setErr(x?.response?.data?.detail || 'That could not be recorded. Try again.') });
+  };
+  return (
+    <div className="pm-send">
+      <b>Send a message</b>
+      <p className="muted" style={{ margin: '2px 0 8px', fontSize: '.85rem' }}>Any day, as well as their planned messages. It is recorded in their journey and does not move their plan.</p>
+      {!ready ? (
+        <SwapPanel entry={{ journey: e.journey, person: { first: person.first } }} vars={vars}
+          onPick={(html, theme, id) => setEditing({ html, template: id, title: `Edit the ${theme} message for ${person.first}` })}
+          onOwn={() => setEditing({ html: blankHTML(person.first, sender), template: null, title: `Write my own for ${person.first}` })} />
+      ) : asked ? (
+        <div className="fu-confirm" role="status">
+          <span>Did you send it on WhatsApp?</span>
+          <button className="btn sm" onClick={record} disabled={act.isPending}>Yes, record it</button>
+          <button className="btn sm ghost" onClick={() => setAsked(false)}>Not yet</button>
+        </div>
+      ) : (
+        <>
+          <div className="fu-bubble" dangerouslySetInnerHTML={{ __html: cleanHTML(ready.html) }} />
+          <div className="fu-acts">
+            <button className="btn sm fu-wa" onClick={() => { window.open(waLink(person.phone, toWhatsApp(ready.html)), '_blank', 'noopener'); setAsked(true); }}>Send on WhatsApp</button>
+            <button className="btn sm outline" onClick={() => setEditing({ html: ready.html, template: ready.template, title: `Edit the message for ${person.first}` })}>Edit</button>
+            <button className="btn sm ghost" onClick={() => setReady(null)}>Choose another</button>
+          </div>
+        </>
+      )}
+      {err && <p className="form-error" role="alert">{err}</p>}
+      <div className="fu-acts"><button className="btn sm ghost" onClick={onDone}>Close</button></div>
+      {editing && <EditorModal title={editing.title} start={editing.html} onClose={() => setEditing(null)}
+        onUse={(h) => { setReady({ html: h, template: editing.template }); setEditing(null); setAsked(false); }} />}
+    </div>
   );
 }

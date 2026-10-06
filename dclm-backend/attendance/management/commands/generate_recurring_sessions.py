@@ -70,7 +70,7 @@ class Command(BaseCommand):
                     _, was_created = AttendanceSession.objects.get_or_create(
                         **lookup,
                         defaults={
-                            "mode": AttendanceSession.Mode.IN_PERSON,
+                            "mode": mt.usual_mode,
                             "status": AttendanceSession.Status.PENDING,
                         },
                     )

@@ -13,6 +13,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useOutstanding } from '../api/notifications';
 import { useAuth } from '../context/AuthContext';
 import { useDashboardSummary } from '../api/dashboard';
+import { ByLocationCard } from '../components/dashboard/ByLocationCard';
 import { RingChart } from '../components/charts/RingChart';
 import { TestimonySlider } from '../components/dashboard/TestimonySlider';
 import { ChartTipBox, useChartTip } from '../components/charts/ChartTip';
@@ -218,6 +219,8 @@ export function DashboardPage() {
           )}
         </div>
       </div>
+
+      {data.by_location && <ByLocationCard rows={data.by_location} periodLabel={data.period.label} />}
 
       <div className="grid g2 section-gap">
         {data.finance_access && (

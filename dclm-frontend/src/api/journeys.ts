@@ -29,7 +29,7 @@ export function useSaved() {
 }
 export function usePersonFollowUp(kind: 'newcomer' | 'member' | 'enquiry', id: number) {
   return useQuery({ queryKey: ['followup-person', kind, id], enabled: !!id, retry: (n, e: any) => e?.response?.status !== 404 && n < 2,
-    queryFn: async () => (await apiClient.get<{ enrolments: PersonEnrolment[] }>('/followup/person/', { params: { [kind]: id } })).data });
+    queryFn: async () => (await apiClient.get<{ enrolments: PersonEnrolment[]; person?: { first: string; phone: string } }>('/followup/person/', { params: { [kind]: id } })).data });
 }
 export function useFollowUpAction() {
   const qc = useQueryClient();

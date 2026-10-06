@@ -170,7 +170,7 @@ export function MeetingTypesHouseholdsTab() {
           <div style={{ overflowX: 'auto' }}>
             <table className="cardtable meeting-table">
               <thead><tr>
-                <th>Meeting</th><th>Detail level</th><th>Day</th><th>Who it is for</th>
+                <th>Meeting</th><th>Detail level</th><th>Day</th><th>Usually held</th><th>Who it is for</th>
                 <th>Collects an offering</th>
                 <th>Follows up absence <HelpMark topic="absenceTracking" /></th><th></th>
               </tr></thead>
@@ -197,6 +197,15 @@ export function MeetingTypesHouseholdsTab() {
                           {WEEKDAYS.map((d) => <option key={d} value={d}>{d}</option>)}
                         </select>
                       ) : <span className="muted">Occasional</span>}
+                    </td>
+                    <td data-label="Usually held">
+                      {/* Issue 2: weekly sessions are created this way. */}
+                      <select className="selectbox" value={m.usual_mode ?? 'online'} aria-label={`How ${m.name} is usually held`} disabled={!churchWide}
+                        onChange={(e) => saveMeeting({ id: m.id, usual_mode: e.target.value } as any)}>
+                        <option value="in-person-and-online">In person and online</option>
+                        <option value="online">Online</option>
+                        <option value="in-person">In person</option>
+                      </select>
                     </td>
                     <td data-label="Who it is for">
                       <select className="selectbox" value={m.audience} aria-label={`Who ${m.name} is for`} disabled={!churchWide}

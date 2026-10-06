@@ -102,6 +102,9 @@ class MessageLog(models.Model):
     text = models.TextField(blank=True, default="", help_text="Exactly what was sent, with WhatsApp's marks.")
     sent_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
     on_date = models.DateField()
+    # Kay: a message chosen or written on any day, besides the plan. It never
+    # takes the place of that day's planned message.
+    extra = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

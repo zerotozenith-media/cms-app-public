@@ -93,7 +93,7 @@ class RecordView(APIView):
         kind = request.data.get("kind")
         if kind not in MessageLog.Kind.values:
             return refuse("Choose sent, reply, own or skipped.", status.HTTP_400_BAD_REQUEST)
-        if e.log.filter(on_date=timezone.localdate()).exists():
+        if e.log.filter(on_date=timezone.localdate(), extra=False).exists():
             return refuse("Today's message for this person is already recorded.", status.HTTP_400_BAD_REQUEST)
         text = (request.data.get("text") or "").strip()[:4000]
         if kind != MessageLog.Kind.SKIPPED and not text:
@@ -179,7 +179,8 @@ def person_payload(person, user, focus=None):
                       if e.journey == "converts" else []),
             "can_act": can_act(user, e),
         })
-    return {"enrolments": out}
+    first = (getattr(person, "first_name", "") or getattr(person, "full_name", "") or person.name or "").split()
+    return {"enrolments": out, "person": {"first": first[0] if first else "", "phone": getattr(person, "phone", "") or ""}}
 
 
 class PersonView(APIView):
@@ -324,3 +325,54 @@ class SavedView(APIView):
     def delete(self, request, pk=None):
         SavedMessage.objects.filter(pk=pk, user=request.user).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class SendExtraView(APIView):
+    """Kay: send a message on any day, chosen from the bank, saved, or written.
+    Recorded in their journey, and the plan carries on unchanged."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        e = get_object_or_404(Enrolment, pk=pk)
+        if not can_act(request.user, e):
+            return refuse()
+        text = (request.data.get("text") or "").strip()[:4000]
+        if not text:
+            return refuse("The message is empty.", status.HTTP_400_BAD_REQUEST)
+        tpl = MessageTemplate.objects.filter(pk=request.data.get("template"), active=True).first() if request.data.get("template") else None
+        log = MessageLog.objects.create(
+            enrolment=e, day=engine.plan_day(e), kind=MessageLog.Kind.PLANNED if tpl else MessageLog.Kind.OWN,
+            template=tpl, theme=tpl.theme if tpl else "Own message", text=text, sent_by=request.user,
+            on_date=timezone.localdate(), extra=True)
+        return Response({"id": log.id, **person_payload(e.person, request.user)}, status=status.HTTP_201_CREATED)
+
+
+def _startable(user):
+    """Newcomers at the user's location who are not on any journey."""
+    from newcomers.models import Newcomer
+    on = Enrolment.objects.filter(status=Enrolment.Status.ACTIVE, newcomer__isnull=False).values_list("newcomer_id", flat=True)
+    qs = Newcomer.objects.filter(stage__in=["new", "contacted", "attending"]).exclude(id__in=on).select_related("assigned_to")
+    loc = scope_location_id(user)
+    return qs.filter(location_id=loc) if loc else qs
+
+
+class StartManyView(APIView):
+    """Kay: choose which newcomers start receiving messages."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not user_has(request.user, "newcomers", "can_edit"):
+            return refuse()
+        rows = [{"id": n.id, "name": n.name, "stage": n.get_stage_display(),
+                 "shepherd": display_name(n.assigned_to) if n.assigned_to else "", "has_phone": bool(n.phone)}
+                for n in _startable(request.user).order_by("name")]
+        return Response({"results": rows})
+
+    def post(self, request):
+        if not user_has(request.user, "newcomers", "can_edit"):
+            return refuse()
+        ids = request.data.get("newcomers") or []
+        allowed = {n.id: n for n in _startable(request.user).filter(id__in=ids)}
+        for n in allowed.values():
+            engine.start("newcomers", newcomer=n, note="Started by " + display_name(request.user))
+        return Response({"started": len(allowed)}, status=status.HTTP_201_CREATED)

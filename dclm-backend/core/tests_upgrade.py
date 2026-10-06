@@ -1687,3 +1687,87 @@ class StableSessionOrderTestCase(Base):
         d = self.client.get("/api/attendance-sessions/?ordering=-date").data
         rows = d["results"] if isinstance(d, dict) else d
         self.assertEqual([r["id"] for r in rows if r["id"] in ids], sorted(ids, reverse=True))
+
+
+class UsualModeTestCase(Base):
+    """Issue 2: each meeting's usual mode, and changing a session's mode."""
+    def setUp(self):
+        super().setUp()
+        self.fri = MeetingType.objects.create(id="fri-worship", name="Friday Worship", day="Friday", frequency="weekly",
+                                              detail_level="detailed", usual_mode="in-person-and-online")
+        self.mon = MeetingType.objects.create(id="mon-bs", name="Monday Bible Study", day="Monday", frequency="weekly", detail_level="detailed")
+
+    def test_weekly_sessions_follow_the_usual_mode(self):
+        from django.core.management import call_command
+        call_command("generate_recurring_sessions", verbosity=0)
+        self.assertEqual(AttendanceSession.objects.filter(meeting_type=self.fri).first().mode, "in-person-and-online")
+        self.assertEqual(AttendanceSession.objects.filter(meeting_type=self.mon).first().mode, "online")
+
+    def test_a_session_mode_can_be_changed_when_recording(self):
+        s = AttendanceSession.objects.create(meeting_type=self.fri, location=self.bahrain, date=self.today, mode="in-person-and-online", status="pending")
+        self.client.post(f"/api/attendance-sessions/{s.id}/record/", {"men": 3, "women": 2, "mode": "online"}, format="json")
+        s.refresh_from_db(); self.assertEqual((s.mode, s.status), ("online", "filled"))
+        r = self.client.post(f"/api/attendance-sessions/{s.id}/record/", {"men": 3, "mode": "on-the-moon"}, format="json")
+        self.assertEqual(r.status_code, 400)
+
+    def test_the_usual_mode_is_shown_and_can_be_set(self):
+        r = self.client.patch("/api/meeting-types/mon-bs/", {"usual_mode": "in-person"}, format="json")
+        self.assertLess(r.status_code, 300, r.data)
+        self.assertEqual(self.client.get("/api/meeting-types/mon-bs/").data["usual_mode"], "in-person")
+
+
+class ByLocationDashboardTestCase(Base):
+    """Issue 3: All locations adds each location's latest service, and the
+    By location figures appear only with every location in view."""
+    def setUp(self):
+        super().setUp()
+        self.fri = MeetingType.objects.create(id="fri-worship", name="Friday Worship", day="Friday", frequency="weekly", detail_level="detailed")
+        import datetime as dt
+        AttendanceSession.objects.create(meeting_type=self.fri, location=self.bahrain, date=self.today - dt.timedelta(days=14), mode="in-person", status="filled", men=60, women=3)
+        AttendanceSession.objects.create(meeting_type=self.fri, location=self.others, date=self.today - dt.timedelta(days=7), mode="in-person", status="filled", men=50, women=13)
+
+    def test_latest_adds_each_locations_latest_service(self):
+        d = self.client.get("/api/dashboard/summary/").data
+        self.assertEqual(d["attendance"]["latest"], 126)
+        self.assertEqual({r["location"]: r["total"] for r in d["attendance"]["latest_by_location"]}, {"Bahrain": 63, "Others": 63})
+
+    def test_by_location_only_with_every_location_in_view(self):
+        d = self.client.get("/api/dashboard/summary/").data
+        self.assertEqual([r["location"] for r in d["by_location"]], ["Bahrain", "Others"])
+        self.client.credentials(HTTP_X_VIEWING_LOCATION="bahrain")
+        d = self.client.get("/api/dashboard/summary/").data
+        self.assertNotIn("by_location", d)
+        self.assertEqual(d["attendance"]["latest"], 63)
+
+
+class ByLocationReportTestCase(Base):
+    """Issue 3: the all-locations report shows each location side by side,
+    in the PDF and the spreadsheet. A single location's report is unchanged."""
+    def setUp(self):
+        super().setUp()
+        from finance.models import Fund, PaymentMethod, Giving
+        MeetingType.objects.create(id="fri-worship", name="Friday Worship", day="Friday", frequency="weekly", detail_level="detailed")
+        AttendanceSession.objects.create(meeting_type_id="fri-worship", location=self.bahrain, date=self.today.replace(day=1), mode="in-person", status="filled", men=40)
+        f = Fund.objects.create(name="Tithe"); m = PaymentMethod.objects.create(name="Cash")
+        Giving.objects.create(date=self.today.replace(day=1), fund=f, method=m, amount=100, location=self.bahrain)
+        Giving.objects.create(date=self.today.replace(day=1), fund=f, method=m, amount=25, location=self.others)
+
+    def test_by_location_in_the_all_locations_report_only(self):
+        from reports.pdf import gather_report_data
+        d = gather_report_data(self.today.year, self.today.month, "", self.admin)["by_location"]
+        self.assertEqual([r["location"] for r in d["rows"]], ["Bahrain", "Others"])
+        self.assertEqual([float(r["giving"]) for r in d["rows"]], [100.0, 25.0])
+        self.assertEqual(len(d["months"]), 6)
+        self.assertEqual(gather_report_data(self.today.year, self.today.month, "", self.admin, self.bahrain)["by_location"], [])
+
+    def test_pdf_and_spreadsheet_have_the_by_location_page(self):
+        import io, openpyxl
+        from pypdf import PdfReader
+        from reports.pdf import gather_report_data, render_report_pdf
+        from reports.spreadsheet import build_spreadsheet
+        text = " ".join(p.extract_text() or "" for p in PdfReader(io.BytesIO(render_report_pdf(self.today.year, self.today.month, "", self.admin))).pages)
+        self.assertIn("2. By location", text); self.assertIn("3. Attendance", text)
+        single = " ".join(p.extract_text() or "" for p in PdfReader(io.BytesIO(render_report_pdf(self.today.year, self.today.month, "", self.admin, self.bahrain))).pages)
+        self.assertNotIn("By location", single); self.assertIn("2. Attendance", single)
+        ctx = gather_report_data(self.today.year, self.today.month, "", self.admin); ctx["church_name"] = "Church"; ctx["location_name"] = "All locations"
+        self.assertEqual(openpyxl.load_workbook(io.BytesIO(build_spreadsheet(ctx))).sheetnames[0], "By location")
