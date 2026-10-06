@@ -4,6 +4,14 @@ MON={"Jul":7,"Aug":8,"Sep":9}
 def num(x):
     try: return float(str(x).replace(",",""))
     except: return None
+def nil0(cells):
+    """A row with real numbers may write Nil for a group with nobody in it
+    (September's Ministers' Renewal did). Count Nil as 0 then, but leave a
+    row with no numbers at all (XX, GCK) alone."""
+    vals=[num(x) for x in cells]
+    if any(v is not None for v in vals):
+        return [0.0 if (v is None and str(x).strip().lower() in ("nil","-","")) else v for v,x in zip(vals,cells)]
+    return vals
 def d(s, year=2026):
     s=str(s).strip()
     try:
@@ -43,7 +51,7 @@ def parse(path, month):
     for i in range(5,20):
         r=R[i]
         if "MINISTER" in r[18].upper(): mrc=True; continue
-        dt=d(r[19]); c=[num(x) for x in r[20:27]]
+        dt=d(r[19]); c=nil0(r[20:27])
         if not dt or not all(x is not None for x in c): continue
         label=r[18].strip()
         if mrc:

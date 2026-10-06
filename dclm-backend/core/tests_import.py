@@ -10,7 +10,7 @@ from core.tests_upgrade import Base
 from enquiries.models import Campaign, Enquiry
 from finance.models import Expense, Fund, Giving, PaymentMethod
 from followup.models import Enrolment, MessageTemplate
-from members.models import Household, Member
+from members.models import Household, Member, MemberCategoryHistory
 from newcomers.models import Newcomer, NewcomerSource
 from reports.models import Service, Testimony
 
@@ -116,10 +116,42 @@ class BundledDataTestCase(Base):
         from core.importers.people import read_people, read_simple
         from core.management.commands.load_church_data import DATA
         totals = {m: parse(os.path.join(DATA, f"report-2026-{m:02d}.csv"), m) for m in (7, 8, 9)}
-        self.assertEqual([len(t["sessions"]) for t in totals.values()], [9, 24, 25])
+        self.assertEqual([len(t["sessions"]) for t in totals.values()], [9, 24, 26])
         self.assertEqual([round(sum(g["sar"] for g in t["giving"]), 2) for t in totals.values()], [10130.9, 8291.4, 11422.57])
         self.assertEqual([round(sum(e["sar"] for e in t["expenses"]), 2) for t in totals.values()], [10059.06, 5100.0, 3450.0])
         people = read_people(os.path.join(DATA, "people.csv"))
         self.assertEqual((len(people), sum(p["status"] == "member" for p in people)), (17, 7))
         self.assertEqual(len(read_simple(os.path.join(DATA, "newcomers.csv"))), 19)
         self.assertEqual(len(read_simple(os.path.join(DATA, "contacts.csv"))), 59)
+
+
+class AddMissingDataTestCase(Base):
+    """Kay, 6 October: the July GCK, September's Ministers' Renewal and the workers."""
+    def setUp(self):
+        super().setUp()
+        MeetingType.objects.get_or_create(id="gck", defaults={"name": "Global Crusade with Kumuyi (GCK)", "day": "", "frequency": "occasional", "detail_level": "detailed"})
+        MeetingType.objects.get_or_create(id="min-renewal", defaults={"name": "Ministerial Renewal", "day": "", "frequency": "occasional", "detail_level": "simple"})
+        for first, surname in (("Chinedu", "Uguru"), ("Chinwendu", "Uguru"), ("Gloria", "Afari"), ("Kwabena", "Afari"), ("Henry", "Ashu")):
+            Member.objects.create(first_name=first, surname=surname, location=self.bahrain, category="General Member", joined_date=self.today)
+
+    def run_cmd(self, *args):
+        out = io.StringIO(); call_command(*args, stdout=out); return out.getvalue()
+
+    def test_check_keeps_nothing_then_apply_adds_everything_once(self):
+        self.assertIn("Nothing was kept", self.run_cmd("add_missing_church_data"))
+        self.assertFalse(AttendanceSession.objects.exists())
+        self.run_cmd("add_missing_church_data", "--yes")
+        gck = AttendanceSession.objects.filter(meeting_type_id="gck").order_by("date")
+        self.assertEqual([s.total for s in gck], [18, 14, 18, 12, 16])
+        self.assertEqual({s.edition_name for s in gck}, {"The Season of Divine Turnaround"})
+        self.assertEqual((gck[0].mode, gck[0].online_children_boys, gck[0].men), ("online", 4, 0))
+        self.assertEqual(AttendanceSession.objects.get(meeting_type_id="min-renewal").total, 6)
+        self.assertEqual(sorted(Member.objects.values_list("category", flat=True)), ["Worker"] * 4 + ["Worker in Training"])
+        self.assertEqual(MemberCategoryHistory.objects.count(), 5)
+        self.run_cmd("add_missing_church_data", "--yes")                 # a second run changes nothing
+        self.assertEqual((AttendanceSession.objects.count(), MemberCategoryHistory.objects.count()), (6, 5))
+
+    def test_a_session_added_by_hand_is_left_alone(self):
+        AttendanceSession.objects.create(meeting_type_id="min-renewal", location=self.bahrain, date="2026-09-28", mode="online", status="filled", online_men=3)
+        self.run_cmd("add_missing_church_data", "--yes")
+        self.assertEqual(AttendanceSession.objects.get(meeting_type_id="min-renewal").online_men, 3)
