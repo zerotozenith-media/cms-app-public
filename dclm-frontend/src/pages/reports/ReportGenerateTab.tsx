@@ -86,7 +86,8 @@ export function ReportGenerateTab() {
             />
           </div>}
           {error && <p style={{ color: 'var(--red)', fontSize: '.85rem', margin: '4px 0 10px' }}>{error}</p>}
-          <span className="report-actions">
+          {/* Both buttons in one row with a gap (they touched on phones). */}
+          <div className="report-actions">
           <button className="btn outline" type="button" disabled={downloading}
             onClick={async () => {
               // The PDF is the report; this is for whoever combines several
@@ -97,12 +98,12 @@ export function ReportGenerateTab() {
             }}>
             {downloading ? 'Preparing…' : 'Spreadsheet'}
           </button>
-          </span>
           {canCreate && (
             <button className="btn red" type="submit" disabled={generateReport.isPending}>
               {generateReport.isPending ? 'Generating…' : 'Generate report'}
             </button>
           )}
+          </div>
         </form>
       </div>
 

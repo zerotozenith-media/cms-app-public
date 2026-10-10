@@ -150,3 +150,45 @@ export function useDeleteEnquiryTask() {
     },
   });
 }
+
+// ---------------------------------------------- follow-up people (Kay, Oct 2026)
+export interface FollowUpPerson { id: number; name: string; contacts: number }
+export interface ContactAutoAssign {
+  people: { id: number; name: string; now: number; after: number }[];
+  rows: { enquiry: number; name: string; current: string; proposed: number; proposed_name: string; reason: string }[];
+  error?: string;
+}
+
+/** Who contacts can be given to: people ticked Can shepherd others whose
+ *  role can work on contacts, with how many each already has. */
+export function useFollowUpPeople(enabled = true) {
+  return useQuery({
+    queryKey: ['enquiry-followup-people'], enabled,
+    queryFn: async () => (await apiClient.get<{ results: FollowUpPerson[] }>('/enquiries/followup-people/')).data.results,
+  });
+}
+
+export function useBulkAssignContacts() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ enquiries, assigned_to }: { enquiries: number[]; assigned_to: number | null }) =>
+      (await apiClient.post<{ changed: number }>('/enquiries/bulk-assign/', { enquiries, assigned_to })).data,
+    onSuccess: () => { invalidateEnquiries(qc); qc.invalidateQueries({ queryKey: ['enquiry-followup-people'] }); qc.invalidateQueries({ queryKey: ['followup-today'] }); },
+  });
+}
+
+export function useContactAutoAssignPreview(everyone: boolean | null) {
+  return useQuery({
+    queryKey: ['enquiry-auto-assign', everyone], enabled: everyone !== null, staleTime: 0,
+    queryFn: async () => (await apiClient.get<ContactAutoAssign>('/enquiries/auto-assign/', { params: everyone ? { everyone: '1' } : {} })).data,
+  });
+}
+
+export function useApplyContactAutoAssign() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (changes: { enquiry: number; assigned_to: number | null }[]) =>
+      (await apiClient.post<{ changed: number }>('/enquiries/auto-assign/', { changes })).data,
+    onSuccess: () => { invalidateEnquiries(qc); qc.invalidateQueries({ queryKey: ['enquiry-followup-people'] }); qc.invalidateQueries({ queryKey: ['followup-today'] }); },
+  });
+}

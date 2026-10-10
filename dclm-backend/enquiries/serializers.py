@@ -146,6 +146,13 @@ class EnquirySerializer(serializers.ModelSerializer):
     def get_assigned_to_name(self, obj):
         return display_name(obj.assigned_to) if obj.assigned_to else None
 
+    def validate_assigned_to(self, value):
+        """Only people who may follow up contacts can be given one (Kay)."""
+        from .followup_people import followup_people
+        if value is not None and value.id not in {p.id for p in followup_people()}:
+            raise serializers.ValidationError("That person cannot be given contacts. Tick Can shepherd others for them in Admin.")
+        return value
+
     def to_representation(self, instance):
         """
         Campaign and spend are marketing data. A follow-up worker needs

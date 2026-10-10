@@ -1078,3 +1078,64 @@
 /* The headcount grid's boxes match every other box in the app. */
 .hc-grid input{border:1.5px solid var(--line);border-radius:9px;padding:.6rem .75rem;background:var(--sky-2);font:inherit}
 .hc-grid input:focus{outline:2px solid #7FB0F5;outline-offset:1px;background:#fff}
+
+/* Kay, October 2026: follow-up people for online contacts. Phone first,
+   so no button ever touches another: every row wraps with a gap, and on
+   a phone the controls take the full width, one per line. */
+.cfu-bar{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center;justify-content:space-between;padding:12px 16px}
+.cfu-left,.cfu-actions,.cfu-quick{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.cfu-label{font-weight:800;font-size:.9rem;margin:0}
+.cfu-bulk{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.cfu-msg{font-size:.85rem;color:var(--green,#1E9E64);font-weight:700}
+.cfu-title{font-size:1rem;display:block}
+.cfu-help{font-size:.85rem;margin:4px 0 10px}
+.cfu-load{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.cfu-load span{background:var(--sky-2,#E8EFF7);border-radius:8px;padding:6px 10px;font-size:.82rem}
+.cfu-rows{display:grid;gap:8px;max-height:420px;overflow-y:auto;padding-right:4px}
+.cfu-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,220px);gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}
+.cfu-name{min-width:0;overflow-wrap:anywhere}
+.cfu-bar .btn,.cfu-bulk .btn,.assign-preview .btn{min-height:40px}
+.cfu-bar .selectbox,.cfu-bulk .selectbox,.cfu-row .selectbox{min-height:40px;max-width:100%}
+.kcard{position:relative}
+.kcard-tick{position:absolute;top:10px;right:10px;width:20px;height:20px;accent-color:var(--blue);cursor:pointer}
+.kcard-picked{outline:2px solid var(--blue);outline-offset:-2px}
+.kcard:has(.kcard-tick) > b{padding-right:30px;display:block}
+@media (max-width:600px){
+  .cfu-bar{flex-direction:column;align-items:stretch}
+  .cfu-left,.cfu-actions,.cfu-quick{flex-direction:column;align-items:stretch}
+  .cfu-left .selectbox,.cfu-actions .btn,.cfu-quick .btn{width:100%}
+  .cfu-bulk{flex-direction:column;align-items:stretch}
+  .cfu-bulk .selectbox,.cfu-bulk .btn{width:100%}
+  .cfu-row{grid-template-columns:1fr}
+  .assign-preview .fu-acts{flex-direction:column;align-items:stretch}
+  .assign-preview .fu-acts .btn{width:100%}
+}
+.enq-followup{width:100%;min-height:40px;margin-top:4px}
+
+/* Kay, October 2026: on phones the top bar's controls sat 2px apart and
+   looked joined. An 8px gap between each, with the service badge's
+   invisible tap padding trimmed so the page title keeps its room. */
+@media (max-width:600px){
+  .topbar .right{gap:8px}
+  .tb-service-btn{min-width:38px;min-height:40px}
+}
+@media (max-width:380px){
+  .topbar .right{gap:6px}
+  .tb-service-btn{min-width:34px}
+}
+
+/* Kay, October 2026: the deep phone check found controls touching in
+   these places. Every one now has clear space around it. */
+.report-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.ts-arrows{gap:8px}
+.ts-dots{gap:4px}
+.dash-attention .attn-row + .attn-row{margin-top:4px}
+@media (max-width:600px){
+  .person-tabs{row-gap:8px}
+  .report-actions .btn{flex:1 1 140px}
+}
+/* Kay, October 2026, deep check on tablets and computers: row Edit and
+   Delete buttons, and the help topics, touched each other. */
+td.td-actions{white-space:nowrap}
+td.td-actions .icon-btn + .icon-btn,.row-actions .icon-btn + .icon-btn{margin-left:8px}
+.help-nav-item{margin-bottom:5px}

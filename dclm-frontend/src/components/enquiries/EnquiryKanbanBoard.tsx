@@ -10,6 +10,16 @@ interface Props {
   onCardClick: (id: number) => void;
   onDropToStage: (id: number, stage: EnquiryStage) => void;
   onSelectStage: (enquiry: Enquiry, stage: EnquiryStage) => void;
+  /** Kay: when set, each card has a tick box for assigning several at once. */
+  selected?: Set<number>;
+  onToggle?: (id: number) => void;
+}
+
+/** "Gloria Afari" -> "GA", so two people sharing a first letter differ. */
+export function initials(name?: string | null) {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase() || '?';
 }
 
 /**
@@ -20,7 +30,7 @@ interface Props {
  * drop does not work on touch screens at all, so without it nobody
  * could move a card along from a phone.
  */
-export function EnquiryKanbanBoard({ enquiries, onCardClick, onDropToStage, onSelectStage, canMove = true }: Props) {
+export function EnquiryKanbanBoard({ enquiries, onCardClick, onDropToStage, onSelectStage, canMove = true, selected, onToggle }: Props) {
   const [dragOverStage, setDragOverStage] = useState<EnquiryStage | null>(null);
 
   return (
@@ -44,11 +54,15 @@ export function EnquiryKanbanBoard({ enquiries, onCardClick, onDropToStage, onSe
             {cards.map((e) => (
               <div
                 key={e.id}
-                className="kcard"
-                draggable={canMove}
+                className={`kcard${selected?.has(e.id) ? ' kcard-picked' : ''}`}
+                draggable={canMove && !selected}
                 onDragStart={(ev) => ev.dataTransfer.setData('text/plain', String(e.id))}
-                onClick={() => onCardClick(e.id)}
+                onClick={() => (selected && onToggle ? onToggle(e.id) : onCardClick(e.id))}
               >
+                {selected && onToggle && (
+                  <input type="checkbox" className="kcard-tick" checked={selected.has(e.id)} aria-label={`Select ${e.name}`}
+                    onClick={(ev) => ev.stopPropagation()} onChange={() => onToggle(e.id)} />
+                )}
                 <b>{e.name}</b>
                 <small>{e.source_name}{e.social_handle ? ` · ${e.social_handle}` : ''}</small>
                 <div className="kcard-meta">
@@ -56,7 +70,7 @@ export function EnquiryKanbanBoard({ enquiries, onCardClick, onDropToStage, onSe
                     className={`kavatar${!e.assigned_to_name ? ' unassigned' : ''}`}
                     title={e.assigned_to_name || 'Unassigned'}
                   >
-                    {e.assigned_to_name ? e.assigned_to_name.charAt(0) : '?'}
+                    {initials(e.assigned_to_name)}
                   </span>
                   <Badge color={e.days_in_stage > 7 ? 'amber' : 'gray'}>
                     {e.days_in_stage}d in stage

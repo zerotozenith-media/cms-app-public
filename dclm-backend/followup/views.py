@@ -356,6 +356,16 @@ def _startable(user):
     return qs.filter(location_id=loc) if loc else qs
 
 
+def _startable_contacts():
+    """Online contacts still being followed up who are not on any journey
+    (Kay: the 59 Facebook contacts were loaded with messages not started).
+    Contacts have no location, so everyone who works on them sees all."""
+    from enquiries.models import Enquiry
+    on = Enrolment.objects.filter(status=Enrolment.Status.ACTIVE, enquiry__isnull=False).values_list("enquiry_id", flat=True)
+    return (Enquiry.objects.exclude(stage__in=[Enquiry.Stage.ATTENDED, Enquiry.Stage.NOT_PURSUING])
+            .exclude(id__in=on).select_related("assigned_to", "assigned_to__member"))
+
+
 class StartManyView(APIView):
     """Kay: choose which newcomers start receiving messages."""
     permission_classes = [IsAuthenticated]
@@ -363,6 +373,11 @@ class StartManyView(APIView):
     def get(self, request):
         if not user_has(request.user, "newcomers", "can_edit"):
             return refuse()
+        if request.query_params.get("kind") == "contacts":
+            rows = [{"id": e.id, "name": e.name, "stage": e.get_stage_display(),
+                     "shepherd": display_name(e.assigned_to) if e.assigned_to else "", "has_phone": bool(e.phone)}
+                    for e in _startable_contacts().order_by("name")]
+            return Response({"results": rows})
         rows = [{"id": n.id, "name": n.name, "stage": n.get_stage_display(),
                  "shepherd": display_name(n.assigned_to) if n.assigned_to else "", "has_phone": bool(n.phone)}
                 for n in _startable(request.user).order_by("name")]
@@ -371,6 +386,12 @@ class StartManyView(APIView):
     def post(self, request):
         if not user_has(request.user, "newcomers", "can_edit"):
             return refuse()
+        if request.data.get("enquiries") is not None:
+            ids = request.data.get("enquiries") or []
+            chosen = list(_startable_contacts().filter(id__in=ids))
+            for e in chosen:
+                engine.start("online", enquiry=e, note="Started by " + display_name(request.user))
+            return Response({"started": len(chosen)}, status=status.HTTP_201_CREATED)
         ids = request.data.get("newcomers") or []
         allowed = {n.id: n for n in _startable(request.user).filter(id__in=ids)}
         for n in allowed.values():

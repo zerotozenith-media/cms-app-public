@@ -6,6 +6,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from accounts.audit import log_audit
+from accounts.names import display_name
 from accounts.permissions import ModulePermission
 from core.models import Location
 from newcomers.models import Newcomer, NewcomerSource
@@ -166,6 +167,56 @@ class EnquiryViewSet(viewsets.ModelViewSet):
             f"from {enquiry.source.name}", instance=enquiry,
         )
         return Response(EnquirySerializer(enquiry).data)
+
+    # ------------------------------------------------ follow-up people (Kay)
+    @action(detail=False, methods=["get"], url_path="followup-people")
+    def followup_people(self, request):
+        from .followup_people import people_payload
+        return Response({"results": people_payload()})
+
+    def _assign(self, request, pairs, how):
+        """Save (enquiry, person or None) pairs, refusing anyone who may not
+        follow up contacts. All or nothing."""
+        from .followup_people import followup_people
+        allowed = {p.id: p for p in followup_people()}
+        bad = [pid for _, pid in pairs if pid is not None and pid not in allowed]
+        if bad:
+            return Response({"detail": "That person cannot be given contacts. Tick Can shepherd others for them in Admin."}, status=400)
+        contacts = {e.id: e for e in Enquiry.objects.filter(id__in=[eid for eid, _ in pairs])}
+        changed = 0
+        with transaction.atomic():
+            for eid, pid in pairs:
+                e = contacts.get(eid)
+                if not e or e.assigned_to_id == pid:
+                    continue
+                e.assigned_to = allowed.get(pid)
+                e.save(update_fields=["assigned_to"])
+                log_audit(request.user, how, "Enquiry", e.name,
+                          f"Follow-up person: {display_name(e.assigned_to) if e.assigned_to else 'none'}", instance=e)
+                changed += 1
+        return Response({"changed": changed})
+
+    @action(detail=False, methods=["post"], url_path="bulk-assign")
+    def bulk_assign(self, request):
+        require(request.user, ("newcomers", "can_edit"))
+        ids = request.data.get("enquiries") or []
+        pid = request.data.get("assigned_to")
+        if not isinstance(ids, list) or not ids:
+            return Response({"detail": "Choose at least one contact."}, status=400)
+        return self._assign(request, [(int(i), int(pid) if pid else None) for i in ids], "Assigned")
+
+    @action(detail=False, methods=["get", "post"], url_path="auto-assign")
+    def auto_assign(self, request):
+        require(request.user, ("newcomers", "can_edit"))
+        from .followup_people import build_preview
+        if request.method == "GET":
+            return Response(build_preview(everyone=request.query_params.get("everyone") == "1"))
+        changes = request.data.get("changes") or []
+        try:
+            pairs = [(int(c["enquiry"]), int(c["assigned_to"]) if c.get("assigned_to") else None) for c in changes]
+        except (KeyError, TypeError, ValueError):
+            return Response({"detail": "The proposal could not be read. Close it and press Auto-assign again."}, status=400)
+        return self._assign(request, pairs, "Auto-assigned")
 
     @action(detail=False, methods=["get"])
     def stats(self, request):

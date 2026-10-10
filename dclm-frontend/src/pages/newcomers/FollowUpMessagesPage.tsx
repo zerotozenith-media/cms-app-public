@@ -259,35 +259,40 @@ export function EditorModal({ title, start, onClose, onUse }: { title: string; s
 }
 
 /** Kay: choose which newcomers start receiving messages. */
-function StartPanel({ onClose }: { onClose: () => void }) {
+export function StartPanel({ onClose, kind = 'newcomers' }: { onClose: () => void; kind?: 'newcomers' | 'contacts' }) {
   const qc = useQueryClient();
-  const { data, isLoading } = useQuery({ queryKey: ['followup-startable'],
-    queryFn: async () => (await apiClient.get<{ results: { id: number; name: string; stage: string; shepherd: string; has_phone: boolean }[] }>('/followup/start-many/')).data });
+  const contacts = kind === 'contacts';
+  const { data, isLoading } = useQuery({ queryKey: ['followup-startable', kind],
+    queryFn: async () => (await apiClient.get<{ results: { id: number; name: string; stage: string; shepherd: string; has_phone: boolean }[] }>('/followup/start-many/', { params: contacts ? { kind: 'contacts' } : {} })).data });
   const rows = data?.results ?? [];
   const [picked, setPicked] = useState<Set<number> | null>(null);
   const chosen = picked ?? new Set(rows.map((r) => r.id));
   const [err, setErr] = useState('');
   const start = useMutation({
-    mutationFn: async () => (await apiClient.post('/followup/start-many/', { newcomers: [...chosen] })).data,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['followup-today'] }); qc.invalidateQueries({ queryKey: ['followup-startable'] }); qc.invalidateQueries({ queryKey: ['notifications'] }); onClose(); },
+    mutationFn: async () => (await apiClient.post('/followup/start-many/', contacts ? { enquiries: [...chosen] } : { newcomers: [...chosen] })).data,
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['followup-today'] }); qc.invalidateQueries({ queryKey: ['followup-startable'] }); qc.invalidateQueries({ queryKey: ['notifications'] }); qc.invalidateQueries({ queryKey: ['enquiry'] }); onClose(); },
     onError: (e: any) => setErr(e?.response?.data?.detail || 'Messages could not be started. Try again.'),
   });
   const toggle = (id: number) => { const s = new Set(chosen); if (s.has(id)) s.delete(id); else s.add(id); setPicked(s); };
   return (
     <div className="card fu-start">
       <h3 style={{ marginBottom: 2 }}>Start messages</h3>
-      <p className="muted" style={{ marginTop: 0, fontSize: '.86rem' }}>Newcomers not yet on a journey. Each starts on day 1 today, sent from their shepherd's WhatsApp.</p>
-      {isLoading ? <p className="muted">Loading.</p> : rows.length === 0 ? <p className="muted">Every current newcomer is already on a journey.</p> : (
+      <p className="muted" style={{ marginTop: 0, fontSize: '.86rem' }}>{contacts
+        ? "Online contacts not yet on a journey. Each starts on day 1 today, sent from their follow-up person's WhatsApp."
+        : "Newcomers not yet on a journey. Each starts on day 1 today, sent from their shepherd's WhatsApp."}</p>
+      {isLoading ? <p className="muted">Loading.</p> : rows.length === 0 ? <p className="muted">{contacts ? 'Every current contact is already on a journey.' : 'Every current newcomer is already on a journey.'}</p> : (
         <>
           <label className="fu-start-row all"><input type="checkbox" checked={chosen.size === rows.length} onChange={(e) => setPicked(e.target.checked ? new Set(rows.map((r) => r.id)) : new Set())} /> Select all ({rows.length})</label>
           {rows.map((r) => (
             <label className="fu-start-row" key={r.id}>
               <input type="checkbox" checked={chosen.has(r.id)} onChange={() => toggle(r.id)} />
-              <span><b>{r.name}</b><br /><span className="muted">{r.stage}, {r.shepherd ? `shepherd ${r.shepherd}` : 'no shepherd yet'}</span></span>
+              <span><b>{r.name}</b><br /><span className="muted">{r.stage}, {r.shepherd ? `${contacts ? 'follow-up person' : 'shepherd'} ${r.shepherd}` : (contacts ? 'no follow-up person yet' : 'no shepherd yet')}</span></span>
               <span className="muted">{r.has_phone ? 'Phone on file' : 'No phone'}</span>
             </label>
           ))}
-          <p className="fu-start-note">They were not asked at registration about keeping in touch. Start only those you know are happy to hear from us.</p>
+          <p className="fu-start-note">{contacts
+            ? 'Start only those who are happy to hear from us. Give each a follow-up person first, so their messages reach the right person.'
+            : 'They were not asked at registration about keeping in touch. Start only those you know are happy to hear from us.'}</p>
         </>
       )}
       {err && <p className="form-error" role="alert">{err}</p>}

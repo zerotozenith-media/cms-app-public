@@ -5,6 +5,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   useEnquiry, useChangeEnquiryStage, useConvertEnquiry,
   useEnquiryTasks, useCreateEnquiryTask, useCompleteEnquiryTask, useDeleteEnquiryTask,
+  useUpdateEnquiry, useFollowUpPeople,
 } from '../../api/enquiries';
 import { useMyLocations } from '../../api/locations';
 import { Badge } from '../../components/ui/Badge';
@@ -26,6 +27,8 @@ export function EnquiryProfilePage() {
   const canCreate = hasPermission('newcomers', 'create');
   const canEdit = hasPermission('newcomers', 'edit');
   const canDelete = hasPermission('newcomers', 'delete');
+  const updateEnquiry = useUpdateEnquiry();
+  const { data: followUpPeople = [] } = useFollowUpPeople(canEdit);
   const { id } = useParams();
   const enquiryId = Number(id);
   const navigate = useNavigate();
@@ -96,7 +99,20 @@ export function EnquiryProfilePage() {
             <div><span className="muted">Email</span><div>{enquiry.email || '–'}</div></div>
             <div><span className="muted">Social handle</span><div>{enquiry.social_handle || '–'}</div></div>
             <div><span className="muted">Where they are</span><div>{enquiry.area || 'Not said'}</div></div>
-            <div><span className="muted">Assigned to</span><div>{enquiry.assigned_to_name || 'Unassigned'}</div></div>
+            <div>
+              <label className="muted" htmlFor="enq-followup">Follow-up person</label>
+              {canEdit ? (
+                <select id="enq-followup" className="selectbox enq-followup" value={enquiry.assigned_to ?? ''}
+                  onChange={(ev) => updateEnquiry.mutate({ id: enquiry.id, assigned_to: ev.target.value ? Number(ev.target.value) : null })}>
+                  <option value="">Nobody yet</option>
+                  {enquiry.assigned_to && !followUpPeople.some((p) => p.id === enquiry.assigned_to) && (
+                    <option value={enquiry.assigned_to}>{enquiry.assigned_to_name}</option>
+                  )}
+                  {followUpPeople.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              ) : <div>{enquiry.assigned_to_name || 'Nobody yet'}</div>}
+              {updateEnquiry.isError && <p className="form-error" role="alert">{(updateEnquiry.error as any)?.response?.data?.assigned_to?.[0] ?? 'It could not be saved. Try again.'}</p>}
+            </div>
           </div>
 
           {enquiry.enquiry_text && (

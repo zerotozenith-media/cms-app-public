@@ -6,6 +6,8 @@ import { StatRow, type StatItem } from '../../components/ui/StatRow';
 import { Badge } from '../../components/ui/Badge';
 import { EnquiryKanbanBoard } from '../../components/enquiries/EnquiryKanbanBoard';
 import { Icon } from '../../components/ui/Icon';
+import { useState } from 'react';
+import { ContactFollowUpBar, applyContactFilter, type ContactFilter } from '../../components/enquiries/ContactFollowUpBar';
 import type { Enquiry, EnquiryStage } from '../../types/enquiries';
 
 /**
@@ -20,7 +22,10 @@ export function EnquiriesPage() {
   const navigate = useNavigate();
   // Campaign data is marketing, not pastoral: the tab only appears for
   // roles granted the outreach permission.
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
+  const [filter, setFilter] = useState<ContactFilter>('everyone');
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
   const canSeeOutreach = hasPermission('outreach', 'view');
   const canCreate = hasPermission('newcomers', 'create');
   const canEdit = hasPermission('newcomers', 'edit');
@@ -75,8 +80,13 @@ export function EnquiriesPage() {
 
       {isLoading && <div className="card section-gap"><Skeleton shape="list" /></div>}
 
+      <ContactFollowUpBar all={all} filter={filter} setFilter={setFilter} me={user?.id} canEdit={canEdit}
+        selecting={selecting} setSelecting={setSelecting} selected={selected} setSelected={setSelected} />
+
       <EnquiryKanbanBoard
-        enquiries={all}
+        enquiries={applyContactFilter(all, filter, user?.id)}
+        selected={selecting ? selected : undefined}
+        onToggle={(id) => { const s = new Set(selected); if (s.has(id)) s.delete(id); else s.add(id); setSelected(s); }}
         onCardClick={(id) => navigate(`/enquiries/${id}`)}
         onDropToStage={(id: number, stage) => {
           const enquiry = all.find((x) => x.id === id);
