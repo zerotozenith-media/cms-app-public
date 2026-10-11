@@ -71,6 +71,14 @@ def run_scheduled_task(request):
         return Response({"detail": str(exc)}, status=500)
 
     output = out.getvalue().strip()
+    # The morning and weekly phone alerts ride on whichever scheduled job
+    # runs, usually the hourly one, so no new schedule is needed. Each goes
+    # once per person, so running it every hour is safe.
+    try:
+        from alerts.scheduled import run as run_alerts
+        output = (output + "\n" + run_alerts()).strip()
+    except Exception:
+        logger.exception("Scheduled alerts failed")
     _audit(command, output[:400] or "Completed")
     return Response({"command": command, "output": output})
 

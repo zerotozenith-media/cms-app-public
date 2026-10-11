@@ -66,6 +66,17 @@ class EnquiryViewSet(viewsets.ModelViewSet):
             self.request.user, "Created", "Enquiry", instance.name,
             f"via {instance.source.name}", instance=instance,
         )
+        from alerts.events import arrival, given
+        arrival("contact", instance, by=self.request.user)
+        if instance.assigned_to_id:
+            given([("contact", instance.pk, instance.name, instance.assigned_to_id)], by=self.request.user)
+
+    def perform_update(self, serializer):
+        before = serializer.instance.assigned_to_id
+        instance = serializer.save()
+        if instance.assigned_to_id and instance.assigned_to_id != before:
+            from alerts.events import given
+            given([("contact", instance.pk, instance.name, instance.assigned_to_id)], by=self.request.user)
 
     @action(detail=True, methods=["post"], url_path="change-stage")
     def change_stage(self, request, pk=None):
@@ -139,6 +150,7 @@ class EnquiryViewSet(viewsets.ModelViewSet):
                 email=enquiry.email,
                 address=enquiry.area,
                 prayer_request=enquiry.enquiry_text,
+                gender=enquiry.gender,
             )
 
             # The enquiry's handler becomes the shepherd only if they are a
@@ -146,8 +158,10 @@ class EnquiryViewSet(viewsets.ModelViewSet):
             # given one the same way registration does. Converting used to
             # leave them with nobody whenever the enquiry was unassigned.
             from members.assignment import assign_on_registration, eligible_shepherds
-            if newcomer.assigned_to_id and newcomer.assigned_to_id not in {
-                    u.id for u in eligible_shepherds(location=location)}:
+            from accounts.gender import can_pair
+            if newcomer.assigned_to_id and (newcomer.assigned_to_id not in {
+                    u.id for u in eligible_shepherds(location=location)}
+                    or not can_pair(newcomer.gender, newcomer.assigned_to)):
                 newcomer.assigned_to = None
                 newcomer.save(update_fields=["assigned_to"])
             assign_on_registration(newcomer)
@@ -183,8 +197,19 @@ class EnquiryViewSet(viewsets.ModelViewSet):
         if bad:
             return Response({"detail": "That person cannot be given contacts. Tick Can shepherd others for them in Admin."}, status=400)
         contacts = {e.id: e for e in Enquiry.objects.filter(id__in=[eid for eid, _ in pairs])}
+        from accounts.gender import can_pair, WORD
+        clash = [contacts[eid] for eid, pid in pairs if pid is not None and eid in contacts
+                 and contacts[eid].assigned_to_id != pid and not can_pair(contacts[eid].gender, allowed[pid])]
+        if clash:
+            names = ", ".join(f"{e.name} ({WORD[e.gender]})" for e in clash[:5]) + (" and more" if len(clash) > 5 else "")
+            return Response({"detail": f"Men follow up men and women follow up women. Not saved, because of {names}. "
+                                       "Untick them or choose someone of the same gender."}, status=400)
         changed = 0
+        from alerts.events import given
+        newly = [("contact", eid, contacts[eid].name, pid) for eid, pid in pairs
+                 if pid and eid in contacts and contacts[eid].assigned_to_id != pid]
         with transaction.atomic():
+            given(newly, by=request.user)          # sent only once everything here is saved
             for eid, pid in pairs:
                 e = contacts.get(eid)
                 if not e or e.assigned_to_id == pid:

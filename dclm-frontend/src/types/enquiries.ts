@@ -40,6 +40,10 @@ export interface Enquiry {
   received_at: string;
   assigned_to: number | null;
   assigned_to_name: string | null;
+  /** The follow-up person's gender, so the page can warn on a mismatch. */
+  assigned_to_gender?: string;
+  /** Blank means not known. */
+  gender: '' | 'Male' | 'Female';
   not_pursuing_note: string;
   converted_newcomer: number | null;
   converted_newcomer_name: string | null;

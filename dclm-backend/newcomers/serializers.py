@@ -137,6 +137,16 @@ class NewcomerSerializer(serializers.ModelSerializer):
     def get_assigned_to_name(self, obj):
         return display_name(obj.assigned_to) if obj.assigned_to else None
 
+    def validate(self, attrs):
+        """Men follow up men, women follow up women (Kay)."""
+        attrs = super().validate(attrs)
+        if attrs.get("assigned_to") is not None:
+            from accounts.gender import can_pair, mismatch_message
+            gender = attrs.get("gender", self.instance.gender if self.instance else "") or ""
+            if not can_pair(gender, attrs["assigned_to"]):
+                raise serializers.ValidationError({"assigned_to": mismatch_message(gender, "newcomer")})
+        return attrs
+
     def get_days_in_stage(self, obj):
         return (timezone.localdate() - obj.stage_since).days
 

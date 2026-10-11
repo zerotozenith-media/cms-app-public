@@ -67,7 +67,13 @@ class NewcomerViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
             invited_by_member=invited_by_member,
         )
         log_audit(self.request.user, "Created", "Newcomer", instance.name, instance=instance)
+        hand_picked = instance.assigned_to_id
         create_auto_tasks(instance)
+        from alerts.events import arrival, given
+        if hand_picked:
+            given([("newcomer", instance.pk, instance.name, hand_picked)], by=self.request.user)
+        instance.refresh_from_db()
+        arrival("newcomer", instance, by=self.request.user)
 
     def perform_update(self, serializer):
         """
@@ -76,7 +82,11 @@ class NewcomerViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
         Moving them used to leave them with a shepherd at the old location.
         """
         before = serializer.instance.location_id
+        before_shepherd = serializer.instance.assigned_to_id
         newcomer = serializer.save()
+        if newcomer.assigned_to_id and newcomer.assigned_to_id != before_shepherd:
+            from alerts.events import given
+            given([("newcomer", newcomer.pk, newcomer.name, newcomer.assigned_to_id)], by=self.request.user)
         if newcomer.location_id != before and newcomer.assigned_to_id:
             from members.assignment import eligible_shepherds, assign_on_registration
             if newcomer.assigned_to_id not in {u.id for u in eligible_shepherds(location=newcomer.location_id)}:
@@ -392,6 +402,9 @@ def public_newcomer_registration(request):
         )
         create_auto_tasks(newcomer)
         log_audit(None, "Created (QR self-registration)", "Newcomer", newcomer.name, instance=newcomer)
+        from alerts.events import arrival
+        newcomer.refresh_from_db()
+        arrival("newcomer", newcomer)
         PublicRegistrationAttempt.objects.create(ip_address=ip, successful=True, reason=PublicRegistrationAttempt.Reason.SUCCESS)
 
     return Response({"detail": "Thank you! Someone from our team will be in touch soon."}, status=status.HTTP_201_CREATED)
@@ -406,8 +419,11 @@ def _shepherd_to_keep(newcomer):
     if not newcomer.assigned_to_id:
         return None
     from members.assignment import eligible_shepherds
+    from accounts.gender import can_pair
     ok = {u.id for u in eligible_shepherds(location=newcomer.location_id)}
-    return newcomer.assigned_to if newcomer.assigned_to_id in ok else None
+    if newcomer.assigned_to_id in ok and can_pair(newcomer.gender, newcomer.assigned_to):
+        return newcomer.assigned_to
+    return None
 
 
 def convert_to_member(newcomer, user):
@@ -449,6 +465,7 @@ def convert_to_member(newcomer, user):
             surname=surname or first, first_name=first,
             phone=phone, email=newcomer.email,
             location=newcomer.location,
+            gender=newcomer.gender,
             joined_date=timezone.localdate(),
             category=Member.Category.GENERAL,
             from_newcomer=newcomer,

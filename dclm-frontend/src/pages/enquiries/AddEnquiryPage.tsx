@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { useCreateEnquiry, useEnquirySources } from '../../api/enquiries';
+import { useCreateEnquiry, useEnquirySources, useFollowUpPeople } from '../../api/enquiries';
+import { canPair, ONLY } from '../../lib/gender';
 import { useCampaigns } from '../../api/campaigns';
-import { useAdminUsers } from '../../api/admin';
 import { Icon } from '../../components/ui/Icon';
 
 function today() {
@@ -25,13 +25,15 @@ export function AddEnquiryPage() {
   const canSeeOutreach = hasPermission('outreach', 'view');
   const createEnquiry = useCreateEnquiry();
   const { data: sources } = useEnquirySources();
-  const { data: users } = useAdminUsers();
+  // Only people who may follow up contacts, as everywhere else (Kay).
+  const { data: people = [] } = useFollowUpPeople();
   // Only fetched when the role may see it; a 403 otherwise is expected.
-  const { data: campaigns } = useCampaigns();
+  // Only roles with outreach access may read campaigns (it was asked of everyone and refused).
+  const { data: campaigns } = useCampaigns(canSeeOutreach);
 
   const [values, setValues] = useState({
     name: '', source: '', phone: '', email: '', social_handle: '',
-    enquiry_text: '', area: '', received_at: today(), assigned_to: '', campaign: '',
+    enquiry_text: '', area: '', received_at: today(), assigned_to: '', campaign: '', gender: '',
   });
   const [error, setError] = useState<string | null>(null);
 
@@ -57,6 +59,7 @@ export function AddEnquiryPage() {
       area: values.area,
       received_at: values.received_at,
       assigned_to: values.assigned_to ? Number(values.assigned_to) : null,
+      gender: values.gender,
       ...(canSeeOutreach && values.campaign ? { campaign: Number(values.campaign) } : {}),
     } as any);
     navigate(`/enquiries/${created.id}`);
@@ -145,15 +148,30 @@ export function AddEnquiryPage() {
           </div>
         </div>
 
-        <div className="field">
-          <label htmlFor="enq-assigned">Assign to</label>
-          <select id="enq-assigned" value={values.assigned_to}
-            onChange={(e) => set('assigned_to', e.target.value)}>
-            <option value="">Unassigned</option>
-            {(users ?? []).map((u) => (
-              <option key={u.id} value={u.id}>{u.full_name || u.email}</option>
-            ))}
-          </select>
+        <div className="form-row">
+          <div className="field">
+            <label htmlFor="enq-gender">Gender</label>
+            <select id="enq-gender" value={values.gender}
+              onChange={(e) => {
+                const g = e.target.value;
+                const chosen = people.find((p) => String(p.id) === values.assigned_to);
+                setValues((v) => ({ ...v, gender: g, assigned_to: chosen && !canPair(g, chosen.gender) ? '' : v.assigned_to }));
+              }}>
+              <option value="">Not known</option><option>Male</option><option>Female</option>
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="enq-assigned">Follow-up person</label>
+            <select id="enq-assigned" value={values.assigned_to}
+              onChange={(e) => set('assigned_to', e.target.value)}>
+              <option value="">Nobody yet</option>
+              {people.filter((p) => canPair(values.gender, p.gender)).map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            {values.gender && <span className="muted field-note">{ONLY[values.gender]} contact.</span>}
+            {!values.gender && values.assigned_to && <span className="gender-warn">Gender not known. Check this follow-up person is right.</span>}
+          </div>
         </div>
 
         {canSeeOutreach && (

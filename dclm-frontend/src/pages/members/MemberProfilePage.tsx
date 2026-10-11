@@ -20,6 +20,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useLocationName } from '../../api/locations';
 
 import { useEligibleShepherds } from '../../api/followup';
+import { canPair } from '../../lib/gender';
 const CATEGORIES = ['General Member', 'Worker in Training', 'Worker'];
 
 function categoryBadgeColor(cat: string): 'green' | 'amber' | 'gray' {
@@ -220,8 +221,10 @@ export function MemberProfilePage() {
               <MemberFormFields values={formValues} onChange={setFormValues} locations={locations}
                 excludeMemberId={memberId} showCategoryAndJoined={false} />
               {editError && <p className="form-error" role="alert">{editError}</p>}
-              <button className="btn sm" onClick={saveEdit} disabled={updateMember.isPending}>Save changes</button>
-              <button className="btn sm ghost" onClick={() => setEditing(false)}>Cancel</button>
+              <div className="form-actions-row">
+                <button className="btn sm" onClick={saveEdit} disabled={updateMember.isPending}>Save changes</button>
+                <button className="btn sm ghost" onClick={() => setEditing(false)}>Cancel</button>
+              </div>
             </div>
           )}
 
@@ -242,10 +245,17 @@ export function MemberProfilePage() {
                 <select id="member-shepherd" className="selectbox" style={{ maxWidth: 170 }} value={member.assigned_to ?? ''}
                   onChange={(e) => changeShepherd(e.target.value)}>
                   <option value="">No shepherd</option>
-                  {(shepherds ?? []).map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  {member.assigned_to && !(shepherds ?? []).some((s: any) => s.id === member.assigned_to && canPair(member.gender, s.gender)) && (
+                    <option value={member.assigned_to}>{member.assigned_to_name}</option>
+                  )}
+                  {/* Men follow up men, women follow up women (Kay). */}
+                  {(shepherds ?? []).filter((s: any) => canPair(member.gender, s.gender)).map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               ) : <b>{member.assigned_to_name || 'No shepherd'}</b>}
             </div>
+            {!member.gender && member.assigned_to && (
+              <span className="gender-warn">Gender not known. Check this shepherd is right, then set the gender.</span>
+            )}
             {shepherdError && <p className="form-error" role="alert">{shepherdError}</p>}
             <div className="pf"><span>Household</span><span>{household?.name ?? 'None'}</span></div>
             <div className="pf"><span>Member since</span><span>{longDate(member.joined_date)}</span></div>

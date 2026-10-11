@@ -201,8 +201,10 @@ export function NewcomerProfilePage() {
                     <label htmlFor="nc-ni-note">Note (optional)</label>
                     <textarea id="nc-ni-note" value={niNote} onChange={(e) => setNiNote(e.target.value)} placeholder="Why are they being marked not interested?" />
                   </div>
-                  <button className="btn sm red" onClick={confirmNotInterested} disabled={changeStage.isPending}>Confirm</button>
-                  <button className="btn sm ghost" onClick={() => setShowNotInterested(false)}>Cancel</button>
+                  <div className="form-actions-row">
+                    <button className="btn sm red" onClick={confirmNotInterested} disabled={changeStage.isPending}>Confirm</button>
+                    <button className="btn sm ghost" onClick={() => setShowNotInterested(false)}>Cancel</button>
+                  </div>
                 </div>
               )}
             </>
@@ -346,8 +348,10 @@ export function NewcomerProfilePage() {
                 <div className="field-hint">Moving them gives them a shepherd at the new location if theirs cannot serve it.</div>
               </div>
               {editError && <p className="form-error" role="alert">{editError}</p>}
-              <button className="btn sm" onClick={saveEdit} disabled={updateNewcomer.isPending}>Save changes</button>
-              <button className="btn sm ghost" onClick={() => setEditing(false)}>Cancel</button>
+              <div className="form-actions-row">
+                <button className="btn sm" onClick={saveEdit} disabled={updateNewcomer.isPending}>Save changes</button>
+                <button className="btn sm ghost" onClick={() => setEditing(false)}>Cancel</button>
+              </div>
             </div>
           )}
           </div>

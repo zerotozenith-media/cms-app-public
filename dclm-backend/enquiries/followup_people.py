@@ -7,6 +7,7 @@ Enquiries uses) may be given them. Auto-assign shares only contacts still
 being followed up, giving each to the person with the fewest, and saves
 nothing until the caller applies the changes.
 """
+from accounts.gender import choose, shepherd_gender, skipped_notice
 from accounts.names import display_name
 from accounts.permissions import user_has
 from members.assignment import eligible_shepherds
@@ -34,7 +35,7 @@ def contact_load(people):
 def people_payload():
     people = followup_people()
     load = contact_load(people)
-    return [{"id": p.id, "name": display_name(p), "contacts": load[p.id]} for p in people]
+    return [{"id": p.id, "name": display_name(p), "contacts": load[p.id], "gender": shepherd_gender(p)} for p in people]
 
 
 def build_preview(everyone=False):
@@ -47,12 +48,19 @@ def build_preview(everyone=False):
     if not everyone:
         qs = qs.filter(assigned_to__isnull=True)
     names = {p.id: display_name(p) for p in people}
+    by_id = {p.id: p for p in people}
     order = [p.id for p in people]
     rows = []
     for e in qs:
-        pick = min(order, key=lambda pid: (load[pid], order.index(pid)))
-        load[pick] += 1
-        rows.append({"enquiry": e.id, "name": e.name, "current": display_name(e.assigned_to) if e.assigned_to else "",
-                     "proposed": pick, "proposed_name": names[pick], "reason": "Fewest contacts"})
-    people_rows = [{"id": pid, "name": names[pid], "now": before[pid], "after": load[pid]} for pid in order]
-    return {"people": people_rows, "rows": rows}
+        pick, reason, warn = choose(e.gender, load, order, by_id)
+        if not pick and e.assigned_to_id:
+            # Nobody suitable: never strip someone of the person they have.
+            pick, reason = e.assigned_to_id, reason.replace("Left unassigned.", "Left as it is.")
+        if pick in load:
+            load[pick] += 1
+        rows.append({"enquiry": e.id, "name": e.name, "gender": e.gender,
+                     "current": display_name(e.assigned_to) if e.assigned_to else "",
+                     "proposed": pick, "proposed_name": names.get(pick, "") or (display_name(e.assigned_to) if pick and e.assigned_to else ""), "reason": reason, "warn": warn})
+    people_rows = [{"id": pid, "name": names[pid], "gender": shepherd_gender(by_id[pid]),
+                    "now": before[pid], "after": load[pid]} for pid in order]
+    return {"people": people_rows, "rows": rows, "notice": skipped_notice(people)}

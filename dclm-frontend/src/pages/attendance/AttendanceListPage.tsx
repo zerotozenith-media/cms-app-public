@@ -5,6 +5,7 @@ import { AUDIENCES } from '../../types/attendance';
 import { useNavigate } from 'react-router-dom';
 import { useMeetingTypes, useAttendanceStats, useSessions, useRecentFilledSessions, useDeleteSession } from '../../api/attendance';
 import { useDashboardSummary } from '../../api/dashboard';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { StatRow, type StatItem } from '../../components/ui/StatRow';
 import { GroupedBars } from '../../components/charts/GroupedBars';
 import { Pagination } from '../../components/ui/Pagination';
@@ -123,7 +124,7 @@ export function AttendanceListPage() {
 
   return (
     <>
-      <StatRow stats={statItems} />
+      <StatRow stats={statItems} loading={!stats || !dashboard} />
 
       <div className="card section-gap">
         <div className="toolbar" style={{ marginBottom: 4 }}>
@@ -137,13 +138,12 @@ export function AttendanceListPage() {
           </select>
         </div>
         <p className="muted" style={{ fontSize: '.82rem', marginBottom: 10 }}>
-          {chartMeetingType?.name}, last {chartGroupsData.length} service
-          {chartGroupsData.length === 1 ? '' : 's'}
+          {chartMeetingType?.name}{recentFW ? `, last ${chartGroupsData.length} service${chartGroupsData.length === 1 ? '' : 's'}` : ''}
         </p>
 
         <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
           <div className="mini-stat">
-            <span>Average</span><b>{chartAverage}</b>
+            <span>Average</span><b>{recentFW ? chartAverage : <span className="sk sk-mini" aria-label="Loading" />}</b>
           </div>
           {chartTarget ? (
             <div className="mini-stat">
@@ -167,7 +167,7 @@ export function AttendanceListPage() {
           </label>
         </div>
 
-        <GroupedBars groups={chartGroupsData} series={chartSeries} />
+        {recentFW ? <GroupedBars groups={chartGroupsData} series={chartSeries} /> : <Skeleton shape="chart" />}
       </div>
 
       <div className="card section-gap">
@@ -261,6 +261,7 @@ export function AttendanceListPage() {
               ))}
             </tbody>
           </table>
+          {isLoading && <Skeleton shape="rows" rows={6} />}
           {!isLoading && sessions?.results.length === 0 && <div className="empty">No sessions match these filters.</div>}
         </div>
 

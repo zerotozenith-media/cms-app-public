@@ -81,10 +81,23 @@ def build_assignment_preview(location=None, reassign_everyone=False):
             "others on at least one account first."
         )
 
+    from accounts.gender import can_pair, choose, shepherd_gender
     by_id = {s.id: s for s in shepherds}
     load = current_load(shepherds)
+    order = [s.id for s in shepherds]
     changes = []
     household_choice = {}  # household_id -> shepherd chosen during this run
+
+    def add(kind, obj, name, chosen_id, reason, warn):
+        changes.append({
+            "kind": kind, "id": obj.id, "name": name, "gender": obj.gender or "",
+            "from_name": _shepherd_name(obj.assigned_to) if obj.assigned_to else None,
+            "to_id": chosen_id,
+            "to_name": _shepherd_name(by_id[chosen_id]) if chosen_id else None,
+            "reason": reason, "warn": warn,
+        })
+        if chosen_id:
+            load[chosen_id] = load.get(chosen_id, 0) + 1
 
     member_qs = Member.objects.select_related("assigned_to", "household")
     if location:
@@ -93,54 +106,34 @@ def build_assignment_preview(location=None, reassign_everyone=False):
         member_qs = member_qs.filter(assigned_to__isnull=True)
 
     for m in member_qs:
-        chosen_id = None
-        reason = "Balanced load"
+        chosen_id, reason, warn = None, "", False
+        # A person must never be their own shepherd.
+        me = {sid for sid in by_id if by_id[sid].member_id == m.id}
 
-        # Household first: keep families with the same shepherd. Checks
-        # both people already assigned in the database AND people given a
-        # shepherd earlier in this same preview run, otherwise a household
-        # where nobody is assigned yet would never pair up: the first
-        # member would fall through to load balancing and the second
-        # would find no saved housemate to match.
+        # Household first: keep families with the same shepherd, but only
+        # where the gender matches (Kay). Checks people already assigned in
+        # the database AND people given a shepherd earlier in this run.
         if m.household_id:
-            chosen_id = household_choice.get(m.household_id)
-            if chosen_id:
-                reason = "Household"
-            else:
-                housemate = (
-                    Member.objects.filter(household_id=m.household_id, assigned_to__isnull=False)
-                    .exclude(id=m.id)
-                    .first()
-                )
-                if housemate and housemate.assigned_to_id in by_id:
-                    chosen_id = housemate.assigned_to_id
-                    reason = "Household"
+            ok = lambda sid: sid in by_id and sid not in me and shepherd_gender(by_id[sid]) and can_pair(m.gender, by_id[sid])
+            hid = household_choice.get((m.household_id, m.gender))
+            if not ok(hid):
+                hid = next((sid for sid in (Member.objects.filter(household_id=m.household_id, assigned_to__isnull=False)
+                                            .exclude(id=m.id).values_list("assigned_to_id", flat=True)) if ok(sid)), None)
+            if hid:
+                chosen_id, warn = hid, not m.gender
+                reason = "Household, same gender" if m.gender else "Household. Gender not known. Check before you apply."
 
         if chosen_id is None:
-            # A person must never be their own shepherd. Exclude any
-            # shepherd account linked to this same member record before
-            # picking the least loaded. Found when a worker with no
-            # shepherd was proposed as her own.
-            candidates = {sid: n for sid, n in load.items() if by_id[sid].member_id != m.id}
-            chosen_id = _least_loaded(candidates)
-        elif by_id.get(chosen_id) and by_id[chosen_id].member_id == m.id:
-            candidates = {sid: n for sid, n in load.items() if by_id[sid].member_id != m.id}
-            chosen_id = _least_loaded(candidates)
-            reason = "Balanced load"
+            chosen_id, reason, warn = choose(m.gender, load, order, by_id, exclude=me)
 
-        if chosen_id and chosen_id != m.assigned_to_id:
-            changes.append({
-                "kind": "member",
-                "id": m.id,
-                "name": m.full_name,
-                "from_name": _shepherd_name(m.assigned_to) if m.assigned_to else None,
-                "to_id": chosen_id,
-                "to_name": _shepherd_name(by_id[chosen_id]),
-                "reason": reason,
-            })
-            load[chosen_id] = load.get(chosen_id, 0) + 1
-            if m.household_id and m.household_id not in household_choice:
-                household_choice[m.household_id] = chosen_id
+        if chosen_id is None:
+            # Nobody suitable: listed so the reviewer sees why, never applied.
+            add("member", m, m.full_name, None, reason, True)
+            continue
+        if chosen_id != m.assigned_to_id:
+            add("member", m, m.full_name, chosen_id, reason, warn)
+            if m.household_id and (m.household_id, m.gender) not in household_choice:
+                household_choice[(m.household_id, m.gender)] = chosen_id
 
     if AppSetting.get_bool(SETTING_AUTO_ASSIGN_NEWCOMERS, default=True):
         newcomer_qs = Newcomer.objects.select_related("assigned_to").exclude(stage="not-interested")
@@ -150,23 +143,16 @@ def build_assignment_preview(location=None, reassign_everyone=False):
             newcomer_qs = newcomer_qs.filter(assigned_to__isnull=True)
 
         for n in newcomer_qs:
-            chosen_id = _least_loaded(load)
-            if chosen_id and chosen_id != n.assigned_to_id:
-                changes.append({
-                    "kind": "newcomer",
-                    "id": n.id,
-                    "name": n.name,
-                    "from_name": _shepherd_name(n.assigned_to) if n.assigned_to else None,
-                    "to_id": chosen_id,
-                    "to_name": _shepherd_name(by_id[chosen_id]),
-                    "reason": "Balanced load",
-                })
-                load[chosen_id] = load.get(chosen_id, 0) + 1
+            chosen_id, reason, warn = choose(n.gender, load, order, by_id)
+            if chosen_id is None:
+                add("newcomer", n, n.name, None, reason, True)
+            elif chosen_id != n.assigned_to_id:
+                add("newcomer", n, n.name, chosen_id, reason, warn)
 
     return changes, None
 
 
-def apply_assignment_changes(changes):
+def apply_assignment_changes(changes, by=None):
     """
     Commit a reviewed set of changes, all or nothing. Returns how many of
     each kind were applied.
@@ -177,10 +163,19 @@ def apply_assignment_changes(changes):
     from django.db import transaction
     from newcomers.models import Newcomer as NewcomerModel
 
-    member_ids = {c["id"]: c["to_id"] for c in changes if c["kind"] == "member"}
-    newcomer_ids = {c["id"]: c["to_id"] for c in changes if c["kind"] == "newcomer"}
+    member_ids = {c["id"]: c["to_id"] for c in changes if c["kind"] == "member" and c.get("to_id")}
+    newcomer_ids = {c["id"]: c["to_id"] for c in changes if c["kind"] == "newcomer" and c.get("to_id")}
+
+    from alerts.events import given
+    before_m = dict(Member.objects.filter(id__in=member_ids).values_list("id", "assigned_to_id"))
+    before_n = dict(NewcomerModel.objects.filter(id__in=newcomer_ids).values_list("id", "assigned_to_id"))
+    names = {("member", c["id"]): c["name"] for c in changes} | {("newcomer", c["id"]): c["name"] for c in changes}
+    newly = ([("member", i, names.get(("member", i), ""), sid) for i, sid in member_ids.items() if before_m.get(i) != sid]
+             + [("newcomer", i, names.get(("newcomer", i), ""), sid) for i, sid in newcomer_ids.items() if before_n.get(i) != sid])
 
     with transaction.atomic():
+        # Sent only once everything here is saved.
+        given(newly, by=by)
         applied_members = 0
         for mid, sid in member_ids.items():
             applied_members += Member.objects.filter(id=mid).update(assigned_to_id=sid)
@@ -222,12 +217,17 @@ def assign_on_registration(newcomer):
     if not shepherds:
         return None
 
-    chosen_id = _least_loaded(current_load(shepherds))
+    from accounts.gender import choose
+    by_id = {s.id: s for s in shepherds}
+    order = [s.id for s in shepherds]
+    chosen_id, _, _ = choose(newcomer.gender, current_load(shepherds), order, by_id)
     if chosen_id is None:
         return None
 
     newcomer.assigned_to_id = chosen_id
     newcomer.save(update_fields=["assigned_to"])
+    from alerts.events import given
+    given([("newcomer", newcomer.pk, newcomer.name, chosen_id)])
     return newcomer.assigned_to
 
 

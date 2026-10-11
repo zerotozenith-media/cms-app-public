@@ -27,6 +27,7 @@ export interface AdminUser {
   member: number | null;
   is_active: boolean;
   can_shepherd?: boolean;
+  gender?: '' | 'Male' | 'Female';
   last_login: string | null;
 }
 

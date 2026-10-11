@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGoals, useCreateGoal, useUpdateGoalProgress, useDeleteGoal } from '../../api/goals';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { StatRow, type StatItem } from '../../components/ui/StatRow';
 import { Badge } from '../../components/ui/Badge';
 import { Icon } from '../../components/ui/Icon';
@@ -63,7 +64,7 @@ export function GoalsPage() {
 
   return (
     <>
-      <StatRow stats={stats} />
+      <StatRow stats={stats} loading={!goals} />
 
       <div className="toolbar">
         <div className="muted" style={{ fontSize: '.85rem', maxWidth: 520 }}>
@@ -104,8 +105,10 @@ export function GoalsPage() {
                 <input id="goal-unit" value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="e.g. % or blank" />
               </div>
             </div>
-            <button className="btn sm" type="submit" disabled={createGoal.isPending}>Add goal</button>
-            <button className="btn sm ghost" type="button" onClick={() => setShowForm(false)}>Cancel</button>
+            <div className="form-actions-row">
+              <button className="btn sm" type="submit" disabled={createGoal.isPending}>Add goal</button>
+              <button className="btn sm ghost" type="button" onClick={() => setShowForm(false)}>Cancel</button>
+            </div>
           </form>
         </div>
       )}
@@ -115,7 +118,7 @@ export function GoalsPage() {
         return (
           <div className="card section-gap" key={h}>
             <h3>{h}</h3>
-            {goalsInHorizon.length ? goalsInHorizon.map((g) => (
+            {!goals ? <Skeleton shape="rows" rows={2} /> : goalsInHorizon.length ? goalsInHorizon.map((g) => (
               <GoalRow key={g.id} goal={g} canEdit={canEdit} canDelete={canDelete} onDelete={handleDelete} onNavigate={navigate} />
             )) : <div className="empty">No goals in this category yet.</div>}
           </div>

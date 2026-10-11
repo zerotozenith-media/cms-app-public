@@ -89,6 +89,12 @@ class User(AbstractUser):
     # in Admin, separate from the member category: a shepherd need not be an
     # approved Worker, and a Worker need not shepherd.
     can_shepherd = models.BooleanField(default=False)
+    # Set in Admin beside Shepherd. Auto-assign gives men to men and women to
+    # women, so a shepherd with no gender set is given nobody automatically.
+    # Kept on the account because shepherd accounts are often not linked to
+    # a member record. Blank means not set.
+    gender = models.CharField(max_length=10, choices=[("Male", "Male"), ("Female", "Female")],
+                              blank=True, default="")
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []

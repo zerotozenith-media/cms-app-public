@@ -3,9 +3,9 @@ import { apiClient } from './client';
 import type { PaginatedResponse } from '../types/members';
 import type { Campaign, CampaignSummary } from '../types/campaigns';
 
-export function useCampaigns() {
+export function useCampaigns(enabled = true) {
   return useQuery({
-    queryKey: ['campaigns'],
+    queryKey: ['campaigns'], enabled,
     queryFn: async () => {
       const resp = await apiClient.get<PaginatedResponse<Campaign> | Campaign[]>('/campaigns/');
       return Array.isArray(resp.data) ? resp.data : resp.data.results;

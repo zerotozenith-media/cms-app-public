@@ -7,6 +7,7 @@ import App from './App';
 import { AuthProvider } from './context/AuthContext';
 import './styles/design-system.css';
 import './styles/app.css';
+import { registerServiceWorker } from './lib/push';
 
 /**
  * F11. Lists keep showing while a filter or page changes, with a thin bar
@@ -36,6 +37,8 @@ const queryClient: QueryClient = new QueryClient({
     },
   },
 });
+
+registerServiceWorker();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

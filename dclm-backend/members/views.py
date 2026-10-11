@@ -117,6 +117,16 @@ class MemberViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
     def perform_create(self, serializer):
         instance = serializer.save()
         log_audit(self.request.user, "Created", "Member", instance.full_name, instance=instance)
+        if instance.assigned_to_id:
+            from alerts.events import given
+            given([("member", instance.pk, instance.full_name, instance.assigned_to_id)], by=self.request.user)
+
+    def perform_update(self, serializer):
+        before = serializer.instance.assigned_to_id
+        instance = serializer.save()
+        if instance.assigned_to_id and instance.assigned_to_id != before:
+            from alerts.events import given
+            given([("member", instance.pk, instance.full_name, instance.assigned_to_id)], by=self.request.user)
 
     @action(detail=False, methods=["get"])
     def stats(self, request):
@@ -321,11 +331,13 @@ class ShepherdAssignmentView(APIView):
         changes, error = build_assignment_preview(location=location, reassign_everyone=reassign)
         if error:
             return Response({"detail": error}, status=400)
+        from accounts.gender import skipped_notice
         return Response({
             "reassign_everyone": reassign,
             "count": len(changes),
             "changes": changes,
             "load": _load_summary(location, changes),
+            "notice": skipped_notice(eligible_shepherds(location=location)),
         })
 
     def post(self, request):
@@ -356,7 +368,7 @@ class ShepherdAssignmentView(APIView):
             return Response({"detail": "Every change was skipped, so nothing was assigned.",
                              "applied_members": 0, "applied_newcomers": 0})
 
-        applied_members, applied_newcomers = apply_assignment_changes(changes)
+        applied_members, applied_newcomers = apply_assignment_changes(changes, by=request.user)
         detail = "Reassigned everyone" if reassign else "Filled unassigned only"
         if hand_picked:
             detail += f", {hand_picked} chosen by hand"
@@ -401,8 +413,17 @@ class BulkAssignShepherdView(APIView):
         qs = Member.objects.filter(id__in=data["member_ids"])
         if not request.user.is_superuser and request.user.location_id:
             qs = qs.filter(location_id=request.user.location_id)
+        from accounts.gender import can_pair, WORD
+        clash = [m for m in qs if not can_pair(m.gender, shepherd)]
+        if clash:
+            names = ", ".join(f"{m.full_name} ({WORD[m.gender]})" for m in clash[:5]) + (" and more" if len(clash) > 5 else "")
+            return Response({"detail": f"Men follow up men and women follow up women. Not saved, because of {names}. "
+                                       "Untick them or choose someone of the same gender."}, status=400)
 
+        from alerts.events import given
+        newly = [("member", m.id, m.full_name, shepherd.id) for m in qs if m.assigned_to_id != shepherd.id]
         updated = qs.update(assigned_to=shepherd)
+        given(newly, by=request.user)
         log_audit(
             request.user, "Bulk assigned shepherd", "Member",
             f"{updated} member(s)", f"Assigned to {display_name(shepherd)}",
@@ -430,8 +451,9 @@ class EligibleShepherdsView(APIView):
         if not request.user.is_superuser and request.user.location_id:
             location = request.user.location_id
         shepherds = eligible_shepherds(location)
+        from accounts.gender import shepherd_gender
         return Response([
-            {"id": s.id, "name": display_name(s)} for s in shepherds
+            {"id": s.id, "name": display_name(s), "gender": shepherd_gender(s)} for s in shepherds
         ])
 
 def _apply_reviewer_edits(changes, data, location):
@@ -456,6 +478,7 @@ def _apply_reviewer_edits(changes, data, location):
             continue
         if to_id in eligible:
             overrides[key] = to_id
+    from accounts.gender import can_pair
     skips = set()
     for s in (data.get("skips") or []):
         try:
@@ -470,8 +493,13 @@ def _apply_reviewer_edits(changes, data, location):
             skipped += 1
             continue
         if key in overrides and overrides[key] != ch["to_id"]:
-            ch = dict(ch, to_id=overrides[key], reason="Chosen by hand")
-            hand_picked += 1
+            # Men follow up men, women follow up women (Kay). A hand pick
+            # that breaks this is ignored, like any other bad override.
+            if can_pair(ch.get("gender", ""), eligible[overrides[key]]):
+                ch = dict(ch, to_id=overrides[key], reason="Chosen by hand")
+                hand_picked += 1
+        if not ch.get("to_id"):
+            continue
         kept.append(ch)
     return kept, hand_picked, skipped
 
@@ -487,9 +515,10 @@ def _load_summary(location, changes):
     from .assignment import _shepherd_name, current_load
     shepherds = eligible_shepherds(location=location)
     now = current_load(shepherds)
-    gained = Counter(ch["to_id"] for ch in changes)
+    from accounts.gender import shepherd_gender
+    gained = Counter(ch["to_id"] for ch in changes if ch.get("to_id"))
     return sorted(({
-        "id": s.id, "name": _shepherd_name(s),
+        "id": s.id, "name": _shepherd_name(s), "gender": shepherd_gender(s),
         "now": now.get(s.id, 0),
         "after": now.get(s.id, 0) + gained.get(s.id, 0),
     } for s in shepherds), key=lambda x: x["name"])

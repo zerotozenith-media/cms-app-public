@@ -280,7 +280,7 @@ export function StartPanel({ onClose, kind = 'newcomers' }: { onClose: () => voi
       <p className="muted" style={{ marginTop: 0, fontSize: '.86rem' }}>{contacts
         ? "Online contacts not yet on a journey. Each starts on day 1 today, sent from their follow-up person's WhatsApp."
         : "Newcomers not yet on a journey. Each starts on day 1 today, sent from their shepherd's WhatsApp."}</p>
-      {isLoading ? <p className="muted">Loading.</p> : rows.length === 0 ? <p className="muted">{contacts ? 'Every current contact is already on a journey.' : 'Every current newcomer is already on a journey.'}</p> : (
+      {isLoading ? <Skeleton shape="rows" rows={4} /> : rows.length === 0 ? <p className="muted">{contacts ? 'Every current contact is already on a journey.' : 'Every current newcomer is already on a journey.'}</p> : (
         <>
           <label className="fu-start-row all"><input type="checkbox" checked={chosen.size === rows.length} onChange={(e) => setPicked(e.target.checked ? new Set(rows.map((r) => r.id)) : new Set())} /> Select all ({rows.length})</label>
           {rows.map((r) => (

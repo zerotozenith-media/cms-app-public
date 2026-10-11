@@ -5,6 +5,7 @@ import { Icon } from '../../components/ui/Icon';
 
 import { useAuth } from '../../context/AuthContext';
 import { useMyLocations } from '../../api/locations';
+import { Skeleton } from '../../components/ui/Skeleton';
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
@@ -135,7 +136,7 @@ export function ReportGenerateTab() {
               ))}
             </tbody>
           </table>
-        ) : (
+        ) : !reports ? <Skeleton shape="rows" rows={4} /> : (
           <div className="empty">No reports generated yet.</div>
         )}
       </div>

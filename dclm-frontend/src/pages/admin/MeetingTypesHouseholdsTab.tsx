@@ -9,6 +9,7 @@ import { useAppSettings, useUpdateAppSetting } from '../../api/settings';
 import { HelpMark } from '../../components/ui/HelpMark';
 
 import { useAuth } from '../../context/AuthContext';
+import { Skeleton } from '../../components/ui/Skeleton';
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export function MeetingTypesHouseholdsTab() {
@@ -162,8 +163,10 @@ export function MeetingTypesHouseholdsTab() {
                     </select>
                   </div>
                 </div>
-                <button className="btn sm" type="submit" disabled={createMeetingType.isPending}>Add meeting type</button>
-                <button className="btn sm ghost" type="button" onClick={() => setShowMeetingForm(false)}>Cancel</button>
+                <div className="form-actions-row">
+                  <button className="btn sm" type="submit" disabled={createMeetingType.isPending}>Add meeting type</button>
+                  <button className="btn sm ghost" type="button" onClick={() => setShowMeetingForm(false)}>Cancel</button>
+                </div>
               </form>
             </div>
           )}
@@ -241,6 +244,7 @@ export function MeetingTypesHouseholdsTab() {
                 ))}
               </tbody>
             </table>
+            {!meetingTypes && <Skeleton shape="rows" rows={4} />}
           </div>
         </div>
 
@@ -266,8 +270,10 @@ export function MeetingTypesHouseholdsTab() {
                   <label htmlFor="hh-phone">Phone</label>
                   <input id="hh-phone" value={hPhone} onChange={(e) => setHPhone(e.target.value)} placeholder="+973 0000 0000" />
                 </div>
-                <button className="btn sm" type="submit" disabled={createHousehold.isPending}>Add household</button>
-                <button className="btn sm ghost" type="button" onClick={() => setShowHouseholdForm(false)}>Cancel</button>
+                <div className="form-actions-row">
+                  <button className="btn sm" type="submit" disabled={createHousehold.isPending}>Add household</button>
+                  <button className="btn sm ghost" type="button" onClick={() => setShowHouseholdForm(false)}>Cancel</button>
+                </div>
               </form>
             </div>
           )}
@@ -287,6 +293,7 @@ export function MeetingTypesHouseholdsTab() {
               </tbody>
             </table>
           </div>
+          {!households && <Skeleton shape="rows" rows={3} />}
           {households?.length === 0 && <div className="empty">No households yet.</div>}
         </div>
       </div>

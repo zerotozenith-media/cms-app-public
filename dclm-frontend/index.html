@@ -3,14 +3,46 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Installable on phones, so alerts can reach them (Kay, October 2026) -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#082C69" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="DCLM Bahrain" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <title>DCLM Bahrain · Church Management</title>
+    <style>
+      /* First open: shown until the app has loaded, then React replaces it
+         (Kay, October 2026). Plain CSS, so it appears before any script. */
+      #boot{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+        background:linear-gradient(160deg,#0B3C91,#082C69 55%,#061F4A);color:#fff;text-align:center;padding:24px;box-sizing:border-box;
+        font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif}
+      #boot img{width:88px;height:88px;border-radius:20px;background:#fff;padding:10px;box-sizing:border-box;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+      #boot .t{font-weight:800;font-size:1.25rem;letter-spacing:.06em}
+      #boot .s{font-size:.8rem;letter-spacing:.18em;opacity:.75;margin-top:-12px}
+      #boot .bar{width:180px;height:4px;border-radius:4px;background:rgba(255,255,255,.18);overflow:hidden;margin-top:6px}
+      #boot .bar i{display:block;width:40%;height:100%;border-radius:4px;background:#F2B630;animation:boot-slide 1.2s ease-in-out infinite}
+      #boot .m{font-size:.85rem;opacity:.8}
+      @keyframes boot-slide{0%{transform:translateX(-100%)}100%{transform:translateX(250%)}}
+      @media (prefers-reduced-motion:reduce){#boot .bar i{animation:none;width:100%}}
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="boot" role="status" aria-label="Opening DCLM Bahrain">
+        <img src="/logo-badge.png" alt="" width="88" height="88" />
+        <div class="t">DCLM BAHRAIN</div>
+        <div class="s">CHURCH MANAGEMENT</div>
+        <div class="bar"><i></i></div>
+        <div class="m">Opening…</div>
+      </div>
+    </div>
+    <noscript>DCLM Bahrain needs JavaScript switched on in your browser.</noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -26,9 +26,26 @@ function Rows({ n = 5 }: { n?: number }) {
   );
 }
 
-export function Skeleton({ shape }: { shape: 'profile' | 'list' | 'dashboard' | 'form' }) {
+export function Skeleton({ shape, rows = 5 }: { shape: 'profile' | 'list' | 'dashboard' | 'form' | 'board' | 'rows' | 'chart'; rows?: number }) {
   const ready = useDelay();
   if (!ready) return null;
+  // Rows inside a card or table that is already on screen, such as a list
+  // whose filters stay usable while it loads.
+  if (shape === 'rows') return <div className="sk-wrap sk-inline" aria-busy="true" aria-label="Loading"><Rows n={rows} /></div>;
+  if (shape === 'chart') return <div className="sk-wrap sk-inline" aria-busy="true" aria-label="Loading"><span className="sk sk-chart" /></div>;
+  // A pipeline board: a column per stage, each with a couple of cards.
+  if (shape === 'board') {
+    return (
+      <div className="sk-wrap sk-board" aria-busy="true" aria-label="Loading">
+        {[0, 1, 2, 3].map((c) => (
+          <div className="sk-col" key={c}>
+            <Bar w="50%" />
+            {[0, 1].map((k) => <div className="sk-kcard" key={k}><Bar w="70%" /><Bar w="40%" h={9} /><Bar w="100%" h={30} /></div>)}
+          </div>
+        ))}
+      </div>
+    );
+  }
   if (shape === 'list') return <div className="sk-wrap" aria-busy="true" aria-label="Loading"><Rows /></div>;
   if (shape === 'profile') {
     return (

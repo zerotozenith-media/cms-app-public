@@ -126,10 +126,14 @@ export interface AssignmentChange {
   kind: 'member' | 'newcomer';
   id: number;
   name: string;
+  gender?: string;
   from_name: string | null;
-  to_id: number;
-  to_name: string;
-  reason: 'Household' | 'Balanced load' | 'Chosen by hand';
+  /** null when nobody suitable exists, shown so the reviewer sees why. */
+  to_id: number | null;
+  to_name: string | null;
+  reason: string;
+  /** Check before applying, such as gender not known. */
+  warn?: boolean;
 }
 
 /** Each shepherd's load now and after the proposed changes. Without it a
@@ -138,6 +142,7 @@ export interface AssignmentChange {
 export interface ShepherdLoad {
   id: number;
   name: string;
+  gender?: string;
   now: number;
   after: number;
 }
@@ -147,6 +152,8 @@ export interface AssignmentPreview {
   count: number;
   load?: ShepherdLoad[];
   changes: AssignmentChange[];
+  /** Shepherds with no gender set, whom auto-assign gives nobody. */
+  notice?: string;
 }
 
 export interface AssignmentApplyResult {

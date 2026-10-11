@@ -7,6 +7,7 @@ import {
   useAssignmentPreview, useApplyAssignment, useBulkAssignShepherd,
 } from '../../api/followup';
 import { AssignmentPreviewPanel } from '../../components/members/AssignmentPreviewPanel';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { Pagination } from '../../components/ui/Pagination';
 import { Badge } from '../../components/ui/Badge';
 import { Icon } from '../../components/ui/Icon';
@@ -40,6 +41,7 @@ export function MembersListPage() {
   const [previewMode, setPreviewMode] = useState<null | 'unassigned' | 'everyone'>(null);
   const [selected, setSelected] = useState<number[]>([]);
   const [bulkShepherd, setBulkShepherd] = useState('');
+  const [bulkError, setBulkError] = useState('');
   const [shepherdFilter, setShepherdFilter] = useState('all');
   const [householdFilter, setHouseholdFilter] = useState('all');
   const [leaderFilter, setLeaderFilter] = useState('all');
@@ -98,7 +100,7 @@ export function MembersListPage() {
         </div>
       </div>
 
-      <StatRow stats={stats} />
+      <StatRow stats={stats} loading={!memberStats} />
 
       <div className="card">
         <div className="toolbar">
@@ -177,6 +179,7 @@ export function MembersListPage() {
 
         {previewMode && preview.data && preview.data.changes.length > 0 && (
           <AssignmentPreviewPanel
+            notice={preview.data.notice}
             changes={preview.data.changes}
             load={preview.data.load ?? []}
             reassignEveryone={previewMode === 'everyone'}
@@ -229,10 +232,16 @@ export function MembersListPage() {
             </select>
             <button className="btn sm" disabled={!bulkShepherd || bulkAssign.isPending}
               onClick={async () => {
-                await bulkAssign.mutateAsync({ memberIds: selected, shepherdId: Number(bulkShepherd) });
-                setSelected([]); setBulkShepherd('');
+                setBulkError('');
+                try {
+                  await bulkAssign.mutateAsync({ memberIds: selected, shepherdId: Number(bulkShepherd) });
+                  setSelected([]); setBulkShepherd('');
+                } catch (e: any) {
+                  setBulkError(e?.response?.data?.detail || e?.response?.data?.shepherd_id || 'They could not be assigned. Try again.');
+                }
               }}>Assign</button>
-            <button className="btn sm ghost" onClick={() => setSelected([])}>Clear</button>
+            <button className="btn sm ghost" onClick={() => { setSelected([]); setBulkError(''); }}>Clear</button>
+            {bulkError && <span className="form-error cfu-msg" role="alert">{bulkError}</span>}
           </div>
         )}
 
@@ -295,6 +304,7 @@ export function MembersListPage() {
               ))}
             </tbody>
           </table>
+          {isLoading && <Skeleton shape="rows" rows={6} />}
           {!isLoading && data?.results.length === 0 && <div className="empty">No members match these filters.</div>}
         </div>
 

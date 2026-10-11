@@ -346,11 +346,19 @@ class NewcomerIntakeSlipTestCase(APITestCase):
         self.assertEqual(NewcomerTask.objects.filter(newcomer_id=resp.data["id"]).count(), 0)
 
     def test_auto_created_tasks_default_to_the_newcomers_assigned_leader(self):
-        leader = User.objects.create_user(email="leader@test.com", password="x", role=self.role)
+        leader = User.objects.create_user(email="leader@test.com", password="x", role=self.role, gender="Female")
         self.auth(self.admin)
         resp = self.client.post("/api/newcomers/", self.base_payload(wants_visit=True, assigned_to=leader.id))
         task = NewcomerTask.objects.get(newcomer_id=resp.data["id"])
         self.assertEqual(task.assigned_to_id, leader.id)
+
+    def test_a_woman_cannot_be_given_to_a_man(self):
+        """Men follow up men, women follow up women (Kay, 10 October 2026)."""
+        man = User.objects.create_user(email="man@test.com", password="x", role=self.role, gender="Male")
+        self.auth(self.admin)
+        resp = self.client.post("/api/newcomers/", self.base_payload(assigned_to=man.id))
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("a woman", str(resp.data["assigned_to"]))
 
 
 class NewcomerListQueryCountTestCase(APITestCase):

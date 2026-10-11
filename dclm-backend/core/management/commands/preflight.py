@@ -52,6 +52,7 @@ class Command(BaseCommand):
         self.check_meeting_setup()
         self.check_version_11()
         self.check_email()
+        self.check_alerts()
         self.check_backups()
 
         self.stdout.write("")
@@ -157,6 +158,17 @@ class Command(BaseCommand):
             )
         else:
             self.ok(f"{count} active account(s)")
+        # Men follow up men, women follow up women: auto-assign gives a
+        # shepherd with no gender set nobody (Kay, 10 October 2026).
+        from accounts.gender import shepherd_gender
+        from accounts.names import display_name
+        shepherds = list(User.objects.filter(is_active=True, can_shepherd=True).select_related("member"))
+        missing = [display_name(u) for u in shepherds if not shepherd_gender(u)]
+        if missing:
+            self.warn(f"shepherds with no gender set: {', '.join(missing)}",
+                      "Auto-assign gives them nobody. In Admin, Users, choose Male or Female for each.")
+        elif shepherds:
+            self.ok(f"every shepherd has a gender set ({len(shepherds)})")
 
     def check_scheduled_jobs(self):
         """
@@ -221,6 +233,24 @@ class Command(BaseCommand):
                                ("send_leadership_summary", "the leadership summary")]:
             if command in out or AuditLog.objects.filter(action="Scheduled task", entity_name=command).exists():
                 self.ok(f"{label} are scheduled" if command.endswith("s") else f"{label} is scheduled")
+
+    def check_alerts(self):
+        """Phone and computer alerts (Kay, October 2026)."""
+        try:
+            import pywebpush  # noqa: F401
+        except ImportError:
+            self.bad("phone and computer alerts cannot be sent",
+                     "The pywebpush library is missing. Run pip install -r requirements.txt and restart.")
+            return
+        try:
+            from alerts.models import PushSubscription
+            from alerts.push import keys
+            pub, _ = keys()
+        except Exception as exc:
+            self.bad("phone and computer alerts are not ready", f"{exc}. Run python manage.py migrate.")
+            return
+        people = PushSubscription.objects.values("user").distinct().count()
+        self.ok(f"phone and computer alerts ready, {people} {'person has' if people == 1 else 'people have'} them on")
 
     def check_meeting_setup(self):
         tracked = MeetingType.objects.filter(counts_for_absence=True)

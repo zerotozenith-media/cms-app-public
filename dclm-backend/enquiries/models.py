@@ -120,6 +120,11 @@ class Enquiry(models.Model):
         related_name="enquiries",
     )
 
+    # Blank means not known yet. Auto-assign matches it to the follow-up
+    # person's gender, and it carries to the newcomer record on conversion.
+    gender = models.CharField(max_length=10, choices=[("Male", "Male"), ("Female", "Female")],
+                              blank=True, default="")
+
     stage = models.CharField(max_length=20, choices=Stage.choices, default=Stage.NEW)
     stage_since = models.DateField(default=timezone.localdate)
     received_at = models.DateField(default=timezone.localdate)

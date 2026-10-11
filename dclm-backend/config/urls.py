@@ -36,6 +36,7 @@ urlpatterns = [
     path("api/", include("service.urls")),
     path("api/", include("accounts.urls")),
     path("api/", include("core.urls")),
+    path("api/", include("alerts.urls")),
 ]
 
 # Serves uploaded files (receipts, report PDFs) back through the local

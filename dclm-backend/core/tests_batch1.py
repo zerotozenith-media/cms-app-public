@@ -160,7 +160,7 @@ class RegistrationAssignmentTestCase(Base):
         RolePermission.objects.create(role=worker_role, module="newcomers",
                                       can_view=True, can_create=True, can_edit=True)
         self.shepherd = User.objects.create_user(
-            email="s@t.com", password="x", role=worker_role, location=self.bahrain, can_shepherd=True)
+            email="s@t.com", password="x", role=worker_role, location=self.bahrain, can_shepherd=True, gender="Female")
         m = Member.objects.create(surname="Osei", first_name="Sarah",
                                   location=self.bahrain, joined_date=self.today,
                                   category=Member.Category.WORKER)

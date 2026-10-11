@@ -131,6 +131,7 @@ export function useBulkAssignShepherd() {
 export interface EligibleShepherd {
   id: number;
   name: string;
+  gender?: string;
 }
 
 /** Who the bulk-assign dropdown may offer. Comes from the same source

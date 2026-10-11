@@ -10,6 +10,7 @@ import {
 import { useMyLocations } from '../../api/locations';
 import { apiClient } from '../../api/client';
 import { useQuery } from '@tanstack/react-query';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { StatRow, type StatItem } from '../../components/ui/StatRow';
 import { Pagination } from '../../components/ui/Pagination';
 import { Icon } from '../../components/ui/Icon';
@@ -216,11 +217,12 @@ export function FinancePage() {
   return (
     <>
       {tabs}
-      <StatRow stats={stats} />
+      <StatRow stats={stats} loading={!summary} />
 
       <div className="grid g2 section-gap">
         <div className="card">
           <h3>Income by fund</h3>
+          {!summary && <Skeleton shape="rows" rows={4} />}
           {(summary?.income_by_fund ?? []).map((f) => (
             <div key={f.fund} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid var(--line)' }}>
               <span>{f.fund}</span><b>{fmt(f.total)}</b>
@@ -229,7 +231,7 @@ export function FinancePage() {
         </div>
         <div className="card">
           <h3>Expenses by category</h3>
-          {(summary?.expenses_by_category ?? []).length ? summary!.expenses_by_category.map((c) => (
+          {!summary ? <Skeleton shape="rows" rows={4} /> : (summary?.expenses_by_category ?? []).length ? summary!.expenses_by_category.map((c) => (
             <div key={c.category} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid var(--line)' }}>
               <span>{c.category}</span><b>{fmt(c.total)}</b>
             </div>
@@ -397,6 +399,7 @@ export function FinancePage() {
               ))}
             </tbody>
           </table>
+          {!givingList && <Skeleton shape="rows" rows={5} />}
           {givingList?.results.length === 0 && <div className="empty">No giving matches these filters.</div>}
         </div>
         {givingList && (
@@ -452,6 +455,7 @@ export function FinancePage() {
               ))}
             </tbody>
           </table>
+          {!expenseList && <Skeleton shape="rows" rows={5} />}
           {expenseList?.results.length === 0 && <div className="empty">No expenses match these filters.</div>}
         </div>
         {expenseList && (

@@ -29,11 +29,17 @@ export function useDeleteUser() {
 export function useUpdateUser() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...data }: { id: number; can_shepherd?: boolean }) => {
+    mutationFn: async ({ id, ...data }: { id: number; can_shepherd?: boolean; gender?: string }) => {
       const r = await apiClient.patch(`/users/${id}/`, data);
       return r.data;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
+    // Gender decides who auto-assign may pair them with, so every list
+    // built on shepherds is refreshed too.
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-users'] });
+      qc.invalidateQueries({ queryKey: ['eligible-shepherds'] });
+      qc.invalidateQueries({ queryKey: ['enquiry-followup-people'] });
+    },
   });
 }
 

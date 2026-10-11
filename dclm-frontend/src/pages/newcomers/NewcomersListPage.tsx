@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAllNewcomers, useChangeStageForAnyNewcomer } from '../../api/newcomers';
 import { StatRow, type StatItem } from '../../components/ui/StatRow';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { KanbanBoard } from '../../components/newcomers/KanbanBoard';
 import { Pagination } from '../../components/ui/Pagination';
 import { Badge } from '../../components/ui/Badge';
@@ -65,7 +66,7 @@ export function NewcomersListPage() {
   if (sourceFilter !== 'all') headingBits.push(`from ${sourceFilter}`);
   const heading = headingBits.length ? `Newcomers ${headingBits.join(', ')}` : 'Newcomer pipeline';
   const baseCount = everyone.filter((n) => n.stage !== 'not-interested').length;
-  const subhead = headingBits.length || stageFilter === 'all'
+  const subhead = !allNewcomers ? 'Loading' : headingBits.length || stageFilter === 'all'
     ? `${filtered.length} of ${everyone.length} shown`
     : `${filtered.length} in the pipeline`;
   void baseCount;
@@ -113,7 +114,7 @@ export function NewcomersListPage() {
         </div>
       </div>
 
-      <StatRow stats={stats} />
+      <StatRow stats={stats} loading={!allNewcomers} />
 
       <div className="card section-gap">
         <div className="toolbar">
@@ -157,7 +158,9 @@ export function NewcomersListPage() {
           </select>
         </div>
 
-        {view === 'board' ? (
+        {!allNewcomers ? (
+          <Skeleton shape={view === 'board' ? 'board' : 'rows'} />
+        ) : view === 'board' ? (
           <KanbanBoard
             newcomers={filtered}
             onCardClick={(id) => navigate(`/newcomers/${id}`)}

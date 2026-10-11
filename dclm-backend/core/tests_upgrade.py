@@ -540,7 +540,7 @@ class AutoAssignWithNewcomersTestCase(Base):
         worker = Member.objects.create(first_name="Grace", surname="Shepherd",
                                        location=self.bahrain, joined_date=self.today,
                                        category=Member.Category.WORKER)
-        self.shepherd = User.objects.create_user(can_shepherd=True, email="s@t.com", password="x",
+        self.shepherd = User.objects.create_user(can_shepherd=True, gender="Female", email="s@t.com", password="x",
                                                  role=Role.objects.get(name="Administrator"),
                                                  member=worker, location=self.bahrain)
         self.person = self.member("Plain", "Member")
@@ -671,10 +671,10 @@ class EnquiryConversionShepherdTestCase(Base):
         from enquiries.models import Enquiry, EnquirySource
         worker = Member.objects.create(first_name="Grace", surname="Shepherd", location=self.bahrain,
                                        joined_date=self.today, category=Member.Category.WORKER)
-        self.shepherd = User.objects.create_user(can_shepherd=True, email="s@t.com", password="x",
+        self.shepherd = User.objects.create_user(can_shepherd=True, gender="Female", email="s@t.com", password="x",
                                                  role=Role.objects.get(name="Administrator"),
                                                  member=worker, location=self.bahrain)
-        self.qatar_handler = User.objects.create_user(can_shepherd=True, email="qh@t.com", password="x",
+        self.qatar_handler = User.objects.create_user(can_shepherd=True, gender="Female", email="qh@t.com", password="x",
                                                       role=Role.objects.get(name="Administrator"),
                                                       location=self.others)
         src = EnquirySource.objects.create(name="Instagram")
@@ -983,7 +983,7 @@ class MemberShepherdTestCase(Base):
         super().setUp()
         worker = Member.objects.create(first_name="Grace", surname="Worker", location=self.bahrain,
                                        joined_date=self.today, category=Member.Category.WORKER)
-        self.shepherd = User.objects.create_user(can_shepherd=True, email="sh@t.com", password="x",
+        self.shepherd = User.objects.create_user(can_shepherd=True, gender="Female", email="sh@t.com", password="x",
                                                  role=Role.objects.get(name="Administrator"),
                                                  member=worker, location=self.bahrain)
         self.not_a_shepherd = User.objects.create_user(can_shepherd=False, email="fo@t.com", password="x",
@@ -1077,7 +1077,7 @@ class MemberKeepsShepherdTestCase(Base):
     def test_the_newcomers_shepherd_stays_with_them(self):
         worker = Member.objects.create(first_name="Grace", surname="Worker", location=self.bahrain,
                                        joined_date=self.today, category=Member.Category.WORKER)
-        shepherd = User.objects.create_user(can_shepherd=True, email="ks@t.com", password="x",
+        shepherd = User.objects.create_user(can_shepherd=True, gender="Female", email="ks@t.com", password="x",
                                             role=Role.objects.get(name="Administrator"),
                                             member=worker, location=self.bahrain)
         n = self.newcomer("Joy Mensah", stage="attending")
@@ -1088,7 +1088,7 @@ class MemberKeepsShepherdTestCase(Base):
     def test_a_shepherd_from_another_location_is_not_carried_over(self):
         worker = Member.objects.create(first_name="Far", surname="Worker", location=self.others,
                                        joined_date=self.today, category=Member.Category.WORKER)
-        elsewhere = User.objects.create_user(can_shepherd=True, email="fw@t.com", password="x",
+        elsewhere = User.objects.create_user(can_shepherd=True, gender="Female", email="fw@t.com", password="x",
                                              role=Role.objects.get(name="Administrator"),
                                              member=worker, location=self.others)
         n = self.newcomer("Near Visitor", stage="attending")
@@ -1135,7 +1135,7 @@ class NewcomerMovedTestCase(Base):
         def shepherd(email, loc):
             w = Member.objects.create(first_name=email[:3], surname="Worker", location=loc,
                                       joined_date=self.today, category=Member.Category.WORKER)
-            return User.objects.create_user(can_shepherd=True, email=email, password="x", member=w, location=loc,
+            return User.objects.create_user(can_shepherd=True, gender="Female", email=email, password="x", member=w, location=loc,
                                             role=Role.objects.get(name="Administrator"))
         here, there = shepherd("bh@t.com", self.bahrain), shepherd("qa@t.com", self.others)
         n = self.newcomer("Moving Visitor", stage="new")
@@ -1154,7 +1154,7 @@ class WorkerLeavesTestCase(Base):
         def shepherd(email, first):
             w = Member.objects.create(first_name=first, surname="Worker", location=self.bahrain,
                                       joined_date=self.today, category=Member.Category.WORKER)
-            return User.objects.create_user(can_shepherd=True, email=email, password="x", member=w, location=self.bahrain,
+            return User.objects.create_user(can_shepherd=True, gender="Female", email=email, password="x", member=w, location=self.bahrain,
                                             role=Role.objects.get(name="Administrator")), w
         leaving, leaving_member = shepherd("lv@t.com", "Leaving")
         staying, _ = shepherd("st@t.com", "Staying")
@@ -1642,7 +1642,7 @@ class ShepherdLocationTestCase(Base):
     def test_account_location_decides(self):
         from members.assignment import eligible_shepherds
         m = self.member("Linked", "Elsewhere", location=self.others)
-        u = User.objects.create_user(email="sh@t.com", password="x", role=self.admin.role, location=self.bahrain, can_shepherd=True)
+        u = User.objects.create_user(email="sh@t.com", password="x", role=self.admin.role, location=self.bahrain, can_shepherd=True, gender="Female")
         u.member = m; u.save()
         self.assertIn(u, eligible_shepherds(location="bahrain"))
         self.assertNotIn(u, eligible_shepherds(location="others"))

@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "reports",
     "followup",
     "service",
+    "alerts",
 ]
 
 MIDDLEWARE = [
@@ -135,6 +136,14 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="DCLM Bahrain <noreply@dc
 # Used to build links in emails. Without it the emails still send, they
 # just carry no "open your list" button.
 APP_BASE_URL = env("APP_BASE_URL", default="")
+
+# Phone and computer alerts (web push). The key pair is made automatically
+# and kept in the database unless these are set. Alerts are sent away from
+# the request so nobody waits on phones.
+VAPID_PUBLIC_KEY = env("VAPID_PUBLIC_KEY", default="")
+VAPID_PRIVATE_KEY = env("VAPID_PRIVATE_KEY", default="")
+VAPID_SUBJECT = env("VAPID_SUBJECT", default="")
+ALERTS_IN_BACKGROUND = env.bool("ALERTS_IN_BACKGROUND", default=True)
 
 
 # Shared secret for the scheduled-task endpoint, which exists because

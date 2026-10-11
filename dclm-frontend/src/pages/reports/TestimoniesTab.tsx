@@ -4,6 +4,7 @@ import { Icon } from '../../components/ui/Icon';
 import type { Testimony } from '../../types/reports';
 
 import { useAuth } from '../../context/AuthContext';
+import { Skeleton } from '../../components/ui/Skeleton';
 const today = new Date().toISOString().slice(0, 10);
 
 export function TestimoniesTab() {
@@ -117,7 +118,7 @@ export function TestimoniesTab() {
               </div>
             </div>
           </div>
-        )) : <div className="empty">No testimonies match these filters.</div>}
+        )) : !testimonies ? <Skeleton shape="rows" rows={4} /> : <div className="empty">No testimonies match these filters.</div>}
       </div>
     </div>
   );

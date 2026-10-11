@@ -114,6 +114,7 @@ class CompleteEnquiryTaskSerializer(serializers.Serializer):
 class EnquirySerializer(serializers.ModelSerializer):
     source_name = serializers.CharField(source="source.name", read_only=True)
     assigned_to_name = serializers.SerializerMethodField()
+    assigned_to_gender = serializers.SerializerMethodField()
     best_contact = serializers.ReadOnlyField()
     open_tasks_count = serializers.SerializerMethodField()
     days_in_stage = serializers.SerializerMethodField()
@@ -130,7 +131,7 @@ class EnquirySerializer(serializers.ModelSerializer):
             "phone", "email", "social_handle", "best_contact",
             "enquiry_text", "area",
             "stage", "stage_since", "received_at",
-            "assigned_to", "assigned_to_name",
+            "assigned_to", "assigned_to_name", "assigned_to_gender", "gender",
             "not_pursuing_note",
             "converted_newcomer", "converted_newcomer_name",
             "campaign", "campaign_name",
@@ -145,6 +146,10 @@ class EnquirySerializer(serializers.ModelSerializer):
 
     def get_assigned_to_name(self, obj):
         return display_name(obj.assigned_to) if obj.assigned_to else None
+
+    def get_assigned_to_gender(self, obj):
+        from accounts.gender import shepherd_gender
+        return shepherd_gender(obj.assigned_to)
 
     def validate_assigned_to(self, value):
         """Only people who may follow up contacts can be given one (Kay)."""
@@ -188,6 +193,14 @@ class EnquirySerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "Record at least one way to reach them: phone, email, or social handle."
             )
+        # Men follow up men, women follow up women (Kay). Checked when the
+        # follow-up person is chosen. Setting a gender that no longer
+        # matches the person already chosen is allowed, and the page warns.
+        from accounts.gender import can_pair, mismatch_message
+        if attrs.get("assigned_to") is not None:
+            gender = attrs.get("gender", getattr(instance, "gender", "")) or ""
+            if not can_pair(gender, attrs["assigned_to"]):
+                raise serializers.ValidationError({"assigned_to": mismatch_message(gender, "contact")})
         return attrs
 
 

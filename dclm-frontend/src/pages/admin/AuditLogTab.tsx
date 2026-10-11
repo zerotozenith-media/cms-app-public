@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuditLog, useLoginAttempts } from '../../api/admin';
 import { Pagination } from '../../components/ui/Pagination';
 import { Badge } from '../../components/ui/Badge';
+import { Skeleton } from '../../components/ui/Skeleton';
 
 export function AuditLogTab() {
   const [entityFilter, setEntityFilter] = useState('');
@@ -49,6 +50,7 @@ export function AuditLogTab() {
               ))}
             </tbody>
           </table>
+          {!auditLog && <Skeleton shape="rows" rows={5} />}
           {auditLog?.results.length === 0 && <div className="empty">No audit entries match this filter.</div>}
         </div>
         {auditLog && (

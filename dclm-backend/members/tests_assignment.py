@@ -30,9 +30,9 @@ class AssignmentEngineTestCase(APITestCase):
             joined_date=datetime.date(2018, 1, 1), category=Member.Category.WORKER)
         self.m2 = Member.objects.create(surname="Osei", first_name="Sarah", location=self.bahrain,
             joined_date=datetime.date(2017, 1, 1), category=Member.Category.WORKER)
-        self.w1 = User.objects.create_user(can_shepherd=True, email="grace@test.com", password="x", role=role,
+        self.w1 = User.objects.create_user(can_shepherd=True, gender="Female", email="grace@test.com", password="x", role=role,
             first_name="Grace", last_name="Thomas", member=self.m1)
-        self.w2 = User.objects.create_user(can_shepherd=True, email="sarah@test.com", password="x", role=role,
+        self.w2 = User.objects.create_user(can_shepherd=True, gender="Female", email="sarah@test.com", password="x", role=role,
             first_name="Sarah", last_name="Osei", member=self.m2)
         self.source = NewcomerSource.objects.create(name="Church website")
 
@@ -53,7 +53,7 @@ class AssignmentEngineTestCase(APITestCase):
         self.assertIsNone(err)
         change = next(c for c in changes if c["id"] == target.id)
         self.assertEqual(change["to_id"], self.w1.id)
-        self.assertEqual(change["reason"], "Household")
+        self.assertTrue(change["reason"].startswith("Household"))
 
     def test_load_balancing_spreads_people_across_workers(self):
         for i in range(4):
@@ -203,7 +203,7 @@ class AssignmentEngineTestCase(APITestCase):
         cb = next(c for c in changes if c["id"] == b.id and c["kind"] == "member")
         self.assertEqual(ca["to_id"], cb["to_id"],
             "Both members of a household should get the same shepherd in one run")
-        self.assertEqual(cb["reason"], "Household")
+        self.assertTrue(cb["reason"].startswith("Household"))
 
     def test_preview_shows_real_names_not_email_addresses(self):
         """
@@ -239,7 +239,7 @@ class EligibleShepherdsEndpointTestCase(APITestCase):
 
         worker = Member.objects.create(surname="Osei", first_name="Sarah", location=self.bahrain,
             joined_date=datetime.date(2020, 1, 1), category=Member.Category.WORKER)
-        self.worker_user = User.objects.create_user(can_shepherd=True, email="sarah@t.com", password="x", role=role)
+        self.worker_user = User.objects.create_user(can_shepherd=True, gender="Female", email="sarah@t.com", password="x", role=role)
         self.worker_user.member = worker
         self.worker_user.save()
 

@@ -104,8 +104,10 @@ export function OutreachPage() {
               </div>
             </div>
             {error && <div className="form-error">{error}</div>}
-            <button className="btn sm" onClick={handleCreate} disabled={createCampaign.isPending}>Save campaign</button>
-            <button className="btn sm ghost" onClick={() => setShowForm(false)}>Cancel</button>
+            <div className="form-actions-row">
+              <button className="btn sm" onClick={handleCreate} disabled={createCampaign.isPending}>Save campaign</button>
+              <button className="btn sm ghost" onClick={() => setShowForm(false)}>Cancel</button>
+            </div>
           </div>
         )}
 

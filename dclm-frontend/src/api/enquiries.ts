@@ -152,10 +152,13 @@ export function useDeleteEnquiryTask() {
 }
 
 // ---------------------------------------------- follow-up people (Kay, Oct 2026)
-export interface FollowUpPerson { id: number; name: string; contacts: number }
+export interface FollowUpPerson { id: number; name: string; contacts: number; gender: string }
 export interface ContactAutoAssign {
-  people: { id: number; name: string; now: number; after: number }[];
-  rows: { enquiry: number; name: string; current: string; proposed: number; proposed_name: string; reason: string }[];
+  people: { id: number; name: string; gender: string; now: number; after: number }[];
+  /** proposed is null when nobody suitable exists (no follow-up person of
+   *  that gender yet). warn marks rows to check, such as gender not known. */
+  rows: { enquiry: number; name: string; gender: string; current: string; proposed: number | null; proposed_name: string; reason: string; warn: boolean }[];
+  notice?: string;
   error?: string;
 }
 

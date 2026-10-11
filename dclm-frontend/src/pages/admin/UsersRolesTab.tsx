@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAdminUsers, useCreateUser, useDeleteUser, useUpdateUser, useRoles, useCreateRole, useDeleteRole } from '../../api/admin';
 import { useMyLocations } from '../../api/locations';
 import { RolePermissionMatrix } from '../../components/admin/RolePermissionMatrix';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { Badge } from '../../components/ui/Badge';
 import { Icon } from '../../components/ui/Icon';
 
@@ -21,6 +22,7 @@ export function UsersRolesTab() {
   const updateUser = useUpdateUser();
   const canEditUser = hasPermission('admin', 'edit');
   const [canShepherd, setCanShepherd] = useState(false);
+  const [gender, setGender] = useState('');
   const deleteUser = useDeleteUser();
   const createRole = useCreateRole();
   const deleteRole = useDeleteRole();
@@ -44,12 +46,12 @@ export function UsersRolesTab() {
     setUserError(null);
     try {
       await createUser.mutateAsync({
-        email, first_name: firstName, last_name: lastName, password, can_shepherd: canShepherd,
+        email, first_name: firstName, last_name: lastName, password, can_shepherd: canShepherd, gender,
         // Someone limited to one location adds accounts there. The box showed
         // their location but sent none, which the server refused.
         role: Number(role), location: location || me?.location || null,
       });
-      setEmail(''); setFirstName(''); setLastName(''); setPassword('');
+      setEmail(''); setFirstName(''); setLastName(''); setPassword(''); setGender('');
       setShowUserForm(false);
     } catch (err: any) {
       const data = err?.response?.data;
@@ -80,6 +82,8 @@ export function UsersRolesTab() {
   }
 
   const selectedRole = roles?.find((r) => r.id === selectedRoleId);
+  // Auto-assign gives a shepherd with no gender set nobody (Kay), so say so.
+  const noGender = (users ?? []).filter((u) => u.can_shepherd && u.is_active && !u.gender).map((u) => u.full_name);
 
   return (
     <div className="grid g2 admin-users-grid">
@@ -133,15 +137,29 @@ export function UsersRolesTab() {
                 Can shepherd others
                 <span className="muted" style={{ fontSize: '.8rem' }}>People can be assigned to them to follow up, whatever their member category.</span>
               </label>
+              <div className="field">
+                <label htmlFor="user-gender">Gender</label>
+                <select id="user-gender" value={gender} onChange={(e) => setGender(e.target.value)}>
+                  <option value="">Not set</option><option>Male</option><option>Female</option>
+                </select>
+                <span className="muted field-note">Men follow up men and women follow up women. A shepherd with no gender set is given nobody by auto-assign.</span>
+              </div>
               {userError && <p style={{ color: 'var(--red)', fontSize: '.85rem', marginBottom: 10 }}>{userError}</p>}
-              <button className="btn sm" type="submit" disabled={createUser.isPending}>Add user</button>
-              <button className="btn sm ghost" type="button" onClick={() => setShowUserForm(false)}>Cancel</button>
+              <div className="form-actions-row">
+                <button className="btn sm" type="submit" disabled={createUser.isPending}>Add user</button>
+                <button className="btn sm ghost" type="button" onClick={() => setShowUserForm(false)}>Cancel</button>
+              </div>
             </form>
+          </div>
+        )}
+        {noGender.length > 0 && (
+          <div className="gender-notice" role="status">
+            <b>{noGender.join(', ')}</b> {noGender.length === 1 ? 'can' : 'can each'} shepherd others but {noGender.length === 1 ? 'has' : 'have'} no gender set. Auto-assign will not give them anyone until you set it.
           </div>
         )}
         <div style={{ overflowX: 'auto' }}>
           <table className="cardtable">
-            <thead><tr><th>Name</th><th>Role</th><th>Location</th><th></th></tr></thead>
+            <thead><tr><th>Name</th><th>Role</th><th>Gender</th><th>Location</th><th></th></tr></thead>
             <tbody>
               {(users ?? []).map((u) => (
                 <tr key={u.id}>
@@ -155,6 +173,15 @@ export function UsersRolesTab() {
                       Shepherd
                     </label>
                   </td>
+                  <td data-label="Gender">
+                    {canEditUser ? (
+                      <select className="selectbox user-gender" aria-label={`Gender of ${u.full_name}`} value={u.gender ?? ''}
+                        disabled={updateUser.isPending}
+                        onChange={(e) => updateUser.mutate({ id: u.id, gender: e.target.value })}>
+                        <option value="">Not set</option><option>Male</option><option>Female</option>
+                      </select>
+                    ) : <span>{u.gender || <span className="muted">Not set</span>}</span>}
+                  </td>
                   <td data-label="Location">{u.location_name ?? 'All locations'}</td>
                   <td className="td-actions">
                     {canDeleteUser && <button className="icon-btn" title="Delete user" aria-label="Delete user" onClick={() => handleDeleteUser(u.id)}><Icon name="trash" size={14} /></button>}
@@ -163,6 +190,7 @@ export function UsersRolesTab() {
               ))}
             </tbody>
           </table>
+          {!users && <Skeleton shape="rows" rows={4} />}
         </div>
       </div>
 

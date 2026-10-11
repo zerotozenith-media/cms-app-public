@@ -6,6 +6,7 @@ import { Icon } from '../../components/ui/Icon';
 import type { WeeklyNote } from '../../types/reports';
 
 import { useAuth } from '../../context/AuthContext';
+import { Skeleton } from '../../components/ui/Skeleton';
 const today = new Date().toISOString().slice(0, 10);
 
 export function WeeklyNotesTab() {
@@ -134,7 +135,7 @@ export function WeeklyNotesTab() {
             <div style={{ fontSize: '.85rem', marginTop: 4 }}><b>Highlights:</b> {n.highlights}</div>
             <div style={{ fontSize: '.85rem' }}><b>Challenges:</b> {n.challenges}</div>
           </div>
-        )) : <div className="empty">No notes match these filters.</div>}
+        )) : !notes ? <Skeleton shape="rows" rows={4} /> : <div className="empty">No notes match these filters.</div>}
       </div>
     </div>
   );

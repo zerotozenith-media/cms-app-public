@@ -3,6 +3,8 @@ import { Badge } from '../ui/Badge';
 import { Icon } from '../ui/Icon';
 import type { AssignmentChange, ShepherdLoad } from '../../types/members';
 import { HelpMark } from '../ui/HelpMark';
+import { GenderTag } from '../ui/GenderTag';
+import { canPair } from '../../lib/gender';
 
 export interface ReviewedChanges {
   overrides: { kind: string; id: number; to_id: number }[];
@@ -10,6 +12,8 @@ export interface ReviewedChanges {
 }
 
 interface Props {
+  /** Shepherds with no gender set, whom auto-assign gives nobody. */
+  notice?: string;
   changes: AssignmentChange[];
   load: ShepherdLoad[];
   reassignEveryone: boolean;
@@ -31,11 +35,12 @@ const SKIP = -1;
  * is not a shepherd.
  */
 export function AssignmentPreviewPanel({
-  changes, load, reassignEveryone, applying, onApply, onCancel, onSwitchToReassignEveryone,
+  notice, changes, load, reassignEveryone, applying, onApply, onCancel, onSwitchToReassignEveryone,
 }: Props) {
   const [chosen, setChosen] = useState<Record<string, number>>({});
   const key = (c: AssignmentChange) => `${c.kind}-${c.id}`;
-  const pick = (c: AssignmentChange) => chosen[key(c)] ?? c.to_id;
+  // A row with no suitable shepherd (to_id null) starts as Leave unassigned.
+  const pick = (c: AssignmentChange): number => chosen[key(c)] ?? c.to_id ?? SKIP;
 
   // The load each shepherd would carry, recalculated as rows are edited,
   // so the numbers always describe what Apply would actually do.
@@ -59,6 +64,7 @@ export function AssignmentPreviewPanel({
       const to = pick(c);
       if (to === SKIP) skips.push({ kind: c.kind, id: c.id });
       else if (to !== c.to_id) overrides.push({ kind: c.kind, id: c.id, to_id: to });
+      // A row with nobody suitable that is left alone is simply not applied.
     });
     onApply({ overrides, skips });
   }
@@ -73,8 +79,9 @@ export function AssignmentPreviewPanel({
         {reassignEveryone
           ? 'Reassigning everyone, including people who already have a shepherd.'
           : 'Only filling people who currently have no shepherd. Existing pairings are left alone.'}
-        {' '}Change any row before applying.
+        {' '}Men go to men, women to women. A family stays with one shepherd only where the gender matches. Change any row before applying.
       </div>
+      {notice && <div className="gender-notice" role="status">{notice}</div>}
 
       {load.length > 0 && (
         <div className="load-strip">
@@ -83,6 +90,7 @@ export function AssignmentPreviewPanel({
             return (
               <div className="load-item" key={s.id}>
                 <b>{s.name}</b>
+                {s.gender ? <GenderTag gender={s.gender} /> : <span className="gender-tag g-unknown">No gender set</span>}
                 <span>{s.now} now{after !== s.now ? `, ${after} after` : ''}</span>
               </div>
             );
@@ -98,10 +106,10 @@ export function AssignmentPreviewPanel({
           <tbody>
             {changes.map((c) => {
               const to = pick(c);
-              const edited = to !== c.to_id;
+              const edited = to !== (c.to_id ?? SKIP);
               return (
-                <tr key={key(c)} className={to === SKIP ? 'row-skipped' : ''}>
-                  <td data-label="Who"><b>{c.name}</b></td>
+                <tr key={key(c)} className={`${to === SKIP ? 'row-skipped' : ''}${c.warn ? ' row-warn' : ''}`}>
+                  <td data-label="Who"><span className="name-tags"><b>{c.name}</b><GenderTag gender={c.gender} /></span></td>
                   <td data-label="Type">
                     <Badge color={c.kind === 'member' ? 'blue' : 'amber'}>
                       {c.kind === 'member' ? 'Member' : 'Newcomer'}
@@ -112,7 +120,7 @@ export function AssignmentPreviewPanel({
                     <select className="selectbox assign-to" value={to}
                       aria-label={`Shepherd for ${c.name}`}
                       onChange={(e) => setChosen({ ...chosen, [key(c)]: Number(e.target.value) })}>
-                      {load.map((s) => (
+                      {load.filter((s) => canPair(c.gender, s.gender) || s.id === c.to_id).map((s) => (
                         <option key={s.id} value={s.id}>{s.name}</option>
                       ))}
                       <option value={SKIP}>Leave unassigned</option>
@@ -120,7 +128,7 @@ export function AssignmentPreviewPanel({
                   </td>
                   <td data-label="Why">
                     {to === SKIP
-                      ? <span className="muted">Skipped</span>
+                      ? <span className={c.to_id ? 'muted' : 'gender-warn'}>{c.to_id ? 'Skipped' : c.reason}</span>
                       : edited
                         ? (
                           <span className="why-edited">
@@ -128,7 +136,7 @@ export function AssignmentPreviewPanel({
                             <span className="muted">Suggested: {c.to_name}</span>
                           </span>
                         )
-                        : <span className="muted">{c.reason}</span>}
+                        : <span className={c.warn ? 'gender-warn' : 'muted'}>{c.reason}</span>}
                   </td>
                 </tr>
               );

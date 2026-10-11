@@ -4,6 +4,8 @@ import {
   useApplyContactAutoAssign, useBulkAssignContacts, useContactAutoAssignPreview, useFollowUpPeople,
 } from '../../api/enquiries';
 import { StartPanel } from '../../pages/newcomers/FollowUpMessagesPage';
+import { GenderTag } from '../ui/GenderTag';
+import { canPair, GROUP } from '../../lib/gender';
 
 /**
  * Kay, October 2026: a named follow-up person for every online contact.
@@ -34,6 +36,10 @@ export function ContactFollowUpBar({ all, filter, setFilter, me, canEdit, select
   const [assignTo, setAssignTo] = useState('');
   const [msg, setMsg] = useState('');
   const bulk = useBulkAssignContacts();
+  // Men follow up men, women follow up women (Kay). When every ticked
+  // contact is the same known gender, only matching people are offered.
+  const pickedGenders = new Set(all.filter((e) => selected.has(e.id) && e.gender).map((e) => e.gender));
+  const offer = pickedGenders.size === 1 ? people.filter((p) => canPair([...pickedGenders][0], p.gender)) : people;
 
   return (
     <>
@@ -68,7 +74,7 @@ export function ContactFollowUpBar({ all, filter, setFilter, me, canEdit, select
           <label htmlFor="cfu-assign" className="sr-only">Follow-up person</label>
           <select id="cfu-assign" className="selectbox" value={assignTo} onChange={(e) => setAssignTo(e.target.value)}>
             <option value="">Choose follow-up person…</option>
-            {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            {offer.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             <option value="none">No follow-up person</option>
           </select>
           <button className="btn sm" disabled={!selected.size || !assignTo || bulk.isPending}
@@ -97,32 +103,45 @@ function AutoAssignPanel({ onClose }: { onClose: () => void }) {
   const [edits, setEdits] = useState<Record<number, string>>({});
   const [err, setErr] = useState('');
   const rows = data?.rows ?? [];
-  const choice = (r: { enquiry: number; proposed: number }) => edits[r.enquiry] ?? String(r.proposed);
+  const choice = (r: { enquiry: number; proposed: number | null }) => edits[r.enquiry] ?? (r.proposed ? String(r.proposed) : 'none');
   const after = useMemo(() => {
     const load: Record<number, number> = {};
     for (const p of data?.people ?? []) load[p.id] = everyone ? 0 : p.now;
     for (const r of rows) { const c = choice(r); if (c !== 'none') load[Number(c)] = (load[Number(c)] ?? 0) + 1; }
     return load;
   }, [data, edits, everyone]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Men first, then women, then anyone with no gender set, each under a label.
+  const groups = (['Male', 'Female', ''] as const)
+    .map((g) => ({ g, list: (data?.people ?? []).filter((p) => (p.gender || '') === g) }))
+    .filter((x) => x.list.length);
 
   return (
     <div className="assign-preview section-gap">
       <b className="cfu-title">{everyone ? 'Reassign every contact' : `Auto-assign ${rows.length} unassigned contact${rows.length === 1 ? '' : 's'}`}</b>
-      <p className="muted cfu-help">Each contact goes to the follow-up person with the fewest. Change any row, or leave it unassigned. Nothing is saved until you press Apply.</p>
+      <p className="muted cfu-help">Each contact goes to the follow-up person of the same gender with the fewest. Contacts whose gender is not known go to whoever has the fewest, with a warning. Change any row, or leave it unassigned. Nothing is saved until you press Apply.</p>
+      {data?.notice && <div className="gender-notice" role="status">{data.notice}</div>}
       {isLoading ? <p className="muted">Working it out.</p> : isError ? <p className="form-error">The proposal could not be loaded. Try again.</p> : data?.error ? (
         <p className="form-error" role="alert">{data.error}</p>
       ) : rows.length === 0 ? <p className="muted">Every contact already has a follow-up person.</p> : (
         <>
           <div className="cfu-load">
-            {(data?.people ?? []).map((p) => <span key={p.id}><b>{p.name}</b> {everyone ? 0 : p.now} to {after[p.id] ?? 0}</span>)}
+            {groups.map(({ g, list }) => (
+              <span className="cfu-load-group" key={g || 'none'}>
+                <span className="load-group">{g ? GROUP[g] : 'No gender set'}</span>
+                {list.map((p) => <span key={p.id}><b>{p.name}</b> {everyone ? 0 : p.now} to {after[p.id] ?? 0}</span>)}
+              </span>
+            ))}
           </div>
           <div className="cfu-rows">
             {rows.map((r) => (
-              <div className="cfu-row" key={r.enquiry}>
-                <span className="cfu-name">{r.name}{r.current && <small className="muted"> now {r.current}</small>}</span>
+              <div className={`cfu-row${r.warn ? ' cfu-row-warn' : ''}`} key={r.enquiry}>
+                <span className="cfu-name">
+                  <span className="name-tags">{r.name}<GenderTag gender={r.gender} />{r.current && <small className="muted">now {r.current}</small>}</span>
+                  {r.warn && <span className="gender-warn">{r.reason}</span>}
+                </span>
                 <label className="sr-only" htmlFor={`cfu-p-${r.enquiry}`}>Follow-up person for {r.name}</label>
                 <select id={`cfu-p-${r.enquiry}`} className="selectbox" value={choice(r)} onChange={(e) => setEdits({ ...edits, [r.enquiry]: e.target.value })}>
-                  {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  {people.filter((p) => canPair(r.gender, p.gender) || p.id === r.proposed).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                   <option value="none">Leave unassigned</option>
                 </select>
               </div>

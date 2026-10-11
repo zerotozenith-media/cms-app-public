@@ -4,6 +4,8 @@ import { apiClient, mediaUrl } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { Skeleton } from '../components/ui/Skeleton';
+import { AlertsCard } from '../components/profile/AlertsCard';
 
 interface Profile {
   first_name: string; last_name: string; name: string; email: string; phone: string;
@@ -74,7 +76,7 @@ export function MyProfilePage() {
     }
   }
 
-  if (!p) return <Card><p className="muted">Loading your profile…</p></Card>;
+  if (!p) return <Skeleton shape="form" />;
   return (
     <div className="profile-page">
       <Card>
@@ -120,6 +122,8 @@ export function MyProfilePage() {
           </div>
         </form>
       </Card>
+
+      <AlertsCard />
 
       <Card style={{ marginTop: 16 }}>
         <h3>Change password</h3>

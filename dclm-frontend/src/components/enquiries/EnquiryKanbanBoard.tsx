@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { GenderTag } from '../ui/GenderTag';
 import { Badge } from '../ui/Badge';
 import { ENQUIRY_STAGES } from '../../types/enquiries';
 import type { Enquiry, EnquiryStage } from '../../types/enquiries';
@@ -76,6 +77,10 @@ export function EnquiryKanbanBoard({ enquiries, onCardClick, onDropToStage, onSe
                     {e.days_in_stage}d in stage
                   </Badge>
                 </div>
+                {/* Stays until someone sets the gender, even after assignment (Kay). */}
+                {!e.gender && e.stage !== 'attended' && e.stage !== 'not-pursuing' && (
+                  <div className="kcard-gender"><GenderTag gender="" long /></div>
+                )}
                 <div className={`ktask${e.open_tasks_count === 0 ? ' overdue' : ''}`}>
                   {e.open_tasks_count > 0
                     ? `${e.open_tasks_count} open follow-up${e.open_tasks_count > 1 ? 's' : ''}`

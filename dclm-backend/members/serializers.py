@@ -42,6 +42,10 @@ class MemberSerializer(serializers.ModelSerializer):
             {u.id for u in eligible_shepherds()}
         if user.id not in allowed:
             raise serializers.ValidationError("Choose a shepherd: a Worker with an account at this location.")
+        from accounts.gender import can_pair, mismatch_message
+        gender = self.initial_data.get("gender", getattr(self.instance, "gender", "")) or ""
+        if not can_pair(gender, user):
+            raise serializers.ValidationError(mismatch_message(gender, "member"))
         return user
 
     class Meta:

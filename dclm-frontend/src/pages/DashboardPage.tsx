@@ -20,6 +20,7 @@ import { ChartTipBox, useChartTip } from '../components/charts/ChartTip';
 import { DonutChart } from '../components/charts/DonutChart';
 import { GroupedBars } from '../components/charts/GroupedBars';
 import { Icon } from '../components/ui/Icon';
+import { AlertBanner } from '../components/dashboard/AlertBanner';
 import { fmt } from '../lib/format';
 import type { DashPeriod } from '../types/dashboard';
 
@@ -107,6 +108,7 @@ export function DashboardPage() {
 
   return (
     <>
+      <AlertBanner />
       {denied && (
         <p className="form-note" role="status">
           Your role does not include the page you tried to open, so you are back on the dashboard.

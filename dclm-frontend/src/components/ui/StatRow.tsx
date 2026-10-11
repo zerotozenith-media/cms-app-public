@@ -16,6 +16,9 @@ export interface StatItem {
 interface StatRowProps {
   stats: StatItem[];
   columns?: 3 | 4;
+  /** While the figures are on their way, each value shows a pulsing bar
+   *  instead of a 0 that looks real (Kay, October 2026). */
+  loading?: boolean;
 }
 
 /**
@@ -23,9 +26,9 @@ interface StatRowProps {
  * card, divider-separated columns, icon per stat, 2×2 on mobile (CSS
  * handles the breakpoint, ported as-is in design-system.css).
  */
-export function StatRow({ stats, columns = 4 }: StatRowProps) {
+export function StatRow({ stats, columns = 4, loading = false }: StatRowProps) {
   return (
-    <div className="statcard" style={{ marginBottom: 20 }}>
+    <div className="statcard" style={{ marginBottom: 20 }} aria-busy={loading || undefined}>
       <div className={`statrow${columns === 3 ? ' c3' : ''}`}>
         {stats.map((s, i) => (
           <div
@@ -33,7 +36,7 @@ export function StatRow({ stats, columns = 4 }: StatRowProps) {
             className={s.onClick ? 'stat stat-link' : 'stat'}
             onClick={s.onClick}
           >
-            {s.topRight ? (
+            {s.topRight && !loading ? (
               <div className="stat-top-row">
                 <IconBadge icon={s.icon} color={s.color} size="sm" />
                 {s.topRight}
@@ -43,7 +46,7 @@ export function StatRow({ stats, columns = 4 }: StatRowProps) {
             )}
             <div className="label">{s.label}</div>
             <div className="value" style={s.valueColor ? { color: s.valueColor } : undefined}>
-              {s.value}
+              {loading ? <span className="sk sk-value" aria-label="Loading" /> : s.value}
             </div>
             {s.hint && <span className="card-link-hint">{s.hint}</span>}
           </div>

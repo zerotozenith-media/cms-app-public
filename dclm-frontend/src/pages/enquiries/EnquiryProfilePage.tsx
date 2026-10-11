@@ -9,6 +9,8 @@ import {
 } from '../../api/enquiries';
 import { useMyLocations } from '../../api/locations';
 import { Badge } from '../../components/ui/Badge';
+import { GenderTag } from '../../components/ui/GenderTag';
+import { canPair, ONLY } from '../../lib/gender';
 import { Icon } from '../../components/ui/Icon';
 import { FollowUpCompletionForm } from '../../components/followup/FollowUpCompletionForm';
 import { CompletedFollowUpLog } from '../../components/followup/CompletedFollowUpLog';
@@ -29,6 +31,7 @@ export function EnquiryProfilePage() {
   const canDelete = hasPermission('newcomers', 'delete');
   const updateEnquiry = useUpdateEnquiry();
   const { data: followUpPeople = [] } = useFollowUpPeople(canEdit);
+  // Men follow up men, women follow up women (Kay). Not known: anyone, with a warning.
   const { id } = useParams();
   const enquiryId = Number(id);
   const navigate = useNavigate();
@@ -51,6 +54,8 @@ export function EnquiryProfilePage() {
 
   if (isLoading) return <Skeleton shape="profile" />;
   if (!enquiry) return <div className="card">Enquiry not found.</div>;
+  const offered = followUpPeople.filter((p) => canPair(enquiry.gender, p.gender));
+  const mismatch = !!(enquiry.gender && enquiry.assigned_to && enquiry.assigned_to_gender !== enquiry.gender);
 
   // Narrowed once here: the guards above prove it is defined, but
   // TypeScript cannot carry that into the closures below.
@@ -100,17 +105,40 @@ export function EnquiryProfilePage() {
             <div><span className="muted">Social handle</span><div>{enquiry.social_handle || '–'}</div></div>
             <div><span className="muted">Where they are</span><div>{enquiry.area || 'Not said'}</div></div>
             <div>
+              <label className="muted" htmlFor="enq-gender">Gender</label>
+              {canEdit ? (
+                <select id="enq-gender" className="selectbox enq-followup" value={enquiry.gender ?? ''}
+                  onChange={(ev) => updateEnquiry.mutate({ id: enquiry.id, gender: ev.target.value as '' | 'Male' | 'Female' })}>
+                  <option value="">Not known</option><option>Male</option><option>Female</option>
+                </select>
+              ) : <div>{enquiry.gender || <GenderTag gender="" long />}</div>}
+            </div>
+            <div>
               <label className="muted" htmlFor="enq-followup">Follow-up person</label>
               {canEdit ? (
                 <select id="enq-followup" className="selectbox enq-followup" value={enquiry.assigned_to ?? ''}
                   onChange={(ev) => updateEnquiry.mutate({ id: enquiry.id, assigned_to: ev.target.value ? Number(ev.target.value) : null })}>
                   <option value="">Nobody yet</option>
-                  {enquiry.assigned_to && !followUpPeople.some((p) => p.id === enquiry.assigned_to) && (
+                  {enquiry.assigned_to && !offered.some((p) => p.id === enquiry.assigned_to) && (
                     <option value={enquiry.assigned_to}>{enquiry.assigned_to_name}</option>
                   )}
-                  {followUpPeople.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  {offered.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               ) : <div>{enquiry.assigned_to_name || 'Nobody yet'}</div>}
+              {canEdit && enquiry.gender && <div className="muted field-note">{ONLY[enquiry.gender]} contact.</div>}
+              {canEdit && enquiry.gender && !offered.length && (
+                <div className="gender-warn">Nobody of the same gender can be given contacts yet. Set gender in Admin, Users.</div>
+              )}
+              {!enquiry.gender && enquiry.assigned_to && (
+                <div className="gender-warn">Gender not known. Check this follow-up person is right, then set the gender.</div>
+              )}
+              {mismatch && (
+                <div className="gender-warn" role="alert">
+                  {enquiry.assigned_to_gender
+                    ? `${enquiry.assigned_to_name} is ${enquiry.assigned_to_gender === 'Male' ? 'a man' : 'a woman'}, but this contact is ${enquiry.gender === 'Male' ? 'a man' : 'a woman'}. Choose a new follow-up person.`
+                    : `${enquiry.assigned_to_name} has no gender set. Set it in Admin, Users, or choose a new follow-up person.`}
+                </div>
+              )}
               {updateEnquiry.isError && <p className="form-error" role="alert">{(updateEnquiry.error as any)?.response?.data?.assigned_to?.[0] ?? 'It could not be saved. Try again.'}</p>}
             </div>
           </div>
