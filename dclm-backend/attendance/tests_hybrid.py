@@ -173,7 +173,9 @@ class SpreadsheetTestCase(Base):
         resp = self.client.get("/api/reports/spreadsheet/?year=%d&month=%d"
                                % (self.today.year, self.today.month))
         wb = load_workbook(io.BytesIO(resp.content))
-        self.assertEqual(wb.sheetnames, ["Attendance", "Finance", "Fellowships"])
+        # The zonal report's tables, one sheet for the month.
+        import calendar
+        self.assertEqual(wb.sheetnames, [f"{calendar.month_name[self.today.month]} {self.today.year}"])
 
     def test_every_sheet_prints_as_one_page_across(self):
         """A sheet that spills its last columns onto a page of their own

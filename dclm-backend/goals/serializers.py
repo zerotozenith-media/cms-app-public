@@ -12,6 +12,7 @@ class GoalSerializer(serializers.ModelSerializer):
         model = Goal
         fields = [
             "id", "horizon", "name", "target", "current", "unit", "tracking",
+            "target_date", "measured_by",
             "period_type", "source", "link_route", "link_tab",
             "calculation_type", "calculation_meeting_type",
             "calculation_target_category", "calculation_milestone_type",

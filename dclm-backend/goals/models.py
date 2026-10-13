@@ -47,6 +47,10 @@ class Goal(models.Model):
         help_text="Batch 0.5, Finding 1: auto goals filter their underlying query to this window.",
     )
     source = models.CharField(max_length=300, help_text="Plain-language description shown to users.")
+    # For the overseer report's goal tables. Free text, because a target is
+    # often "From October 2026" or "31 October and 31 December 2026".
+    target_date = models.CharField(max_length=80, blank=True, default="")
+    measured_by = models.CharField(max_length=200, blank=True, default="")
     link_route = models.CharField(max_length=50, blank=True, default="")
     link_tab = models.CharField(max_length=50, blank=True, default="")
 

@@ -4,11 +4,14 @@ from django.core.files.base import ContentFile
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.views import APIView
+
+from accounts.permissions import user_has
 
 from accounts.audit import log_audit
 from accounts.permissions import ModulePermission
 from .models import Service, Department, Testimony, WeeklyNote, Report
-from .pdf import render_report_pdf
 from core.viewing import scope_location_id
 from .serializers import (
     ServiceSerializer, DepartmentSerializer, TestimonySerializer,
@@ -101,7 +104,7 @@ class ReportViewSet(viewsets.ModelViewSet):
         return Response({"detail": "Use /generate/ to create a report."}, status=405)
 
     def perform_destroy(self, instance):
-        label = f"{instance.period_month}/{instance.period_year}"
+        label = f"{instance.get_kind_display()}, {ReportSerializer(instance).data['period_label']}"
         log_audit(self.request.user, "Deleted", "Report", label)
         instance.delete()
 
@@ -109,35 +112,66 @@ class ReportViewSet(viewsets.ModelViewSet):
     def generate(self, request):
         serializer = GenerateReportSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        month = serializer.validated_data["period_month"]
-        year = serializer.validated_data["period_year"]
-        other_additions = serializer.validated_data["other_additions"]
-
+        d = serializer.validated_data
         # One location's report, or the whole church's for an administrator
-        # who does not choose one. Each can have its own month.
+        # who does not choose one.
         location = report_location(request)
-        scope = location.name if location else "the whole church"
-        if Report.objects.filter(period_month=month, period_year=year, location=location).exists():
+        scope = location.name if location else "all locations"
+        (y1, m1), (y2, m2) = d["start"], d["end"]
+        if Report.objects.filter(kind=d["kind"], start_year=y1, start_month=m1, period_year=y2,
+                                 period_month=m2, location=location).exists():
             return Response(
-                {"detail": f"A report for {month}/{year} for {scope} already exists. "
-                           f"Delete it first to regenerate."},
+                {"detail": f"This report already exists for {scope}. Delete it first to make it again."},
                 status=status.HTTP_409_CONFLICT,
             )
-
-        pdf_bytes = render_report_pdf(year, month, other_additions, request.user, location)
-
+        pdf_bytes, title = make_pdf(d, location)
         report = Report.objects.create(
-            period_month=month, period_year=year, generated_by=request.user,
-            other_additions=other_additions, location=location,
+            kind=d["kind"], start_month=m1, start_year=y1, period_month=m2, period_year=y2,
+            generated_by=request.user, location=location, other_additions=d["other_additions"],
+            **{k: d[k].strip() for k in TEXTS},
         )
-        slug = (location.id if location else "all")
-        report.pdf_file.save(f"report-{year}-{month:02d}-{slug}.pdf", ContentFile(pdf_bytes), save=True)
-
-        log_audit(
-            request.user, "Generated", "Report", f"{month}/{year}",
-            f"{len(pdf_bytes)} bytes", instance=report,
-        )
+        slug = location.id if location else "all"
+        report.pdf_file.save(f"{title.replace(' ', '-').replace(',', '')}-{slug}.pdf", ContentFile(pdf_bytes), save=True)
+        log_audit(request.user, "Generated", "Report", title, f"{scope}, {len(pdf_bytes)} bytes", instance=report)
         return Response(ReportSerializer(report).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["get"], url_path="last-text")
+    def last_text(self, request):
+        """What was written in the last overseer report for these figures,
+        brought forward so only what is new needs changing."""
+        location = report_location(request)
+        last = Report.objects.filter(kind=Report.Kind.OVERSEER, location=location).order_by("-generated_at").first()
+        return Response({k: (getattr(last, k) if last else "") for k in TEXTS} | {
+            "from_report": ReportSerializer(last).data["period_label"] if last else ""})
+
+
+TEXTS = ("summary", "challenges", "training", "conclusion")
+
+
+def make_pdf(d, location):
+    from .church_data import gather, month_list
+    ctx = gather(month_list(d["start"], d["end"]), location)
+    if d["kind"] == Report.Kind.ZONAL:
+        from .zonal import build_pdf
+        return build_pdf(ctx)
+    from .overseer import build
+    return build(ctx, {k: d.get(k, "") for k in TEXTS})
+
+
+class PreviewView(APIView):
+    """The report as it would come out, without saving it. Anybody who can
+    see reports can preview one."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if not user_has(request.user, "reports", "can_view"):
+            return Response({"detail": "You do not have permission to see reports."}, status=403)
+        serializer = GenerateReportSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        pdf_bytes, title = make_pdf(serializer.validated_data, report_location(request))
+        resp = HttpResponse(pdf_bytes, content_type="application/pdf")
+        resp["Content-Disposition"] = f'inline; filename="{title.replace(" ", "-").replace(",", "")}-preview.pdf"'
+        return resp
 
 
 class _ReportsModulePermission(ModulePermission):
@@ -152,33 +186,36 @@ class _ReportsModulePermission(ModulePermission):
 @permission_classes([_ReportsModulePermission])
 def monthly_spreadsheet(request):
     """
-    The month's figures as a formatted spreadsheet.
-
-    The PDF is the report. This exists for whoever combines several
-    locations and would otherwise retype the numbers out of a document.
+    The zonal report's tables as a spreadsheet, for whoever at Zonal
+    combines several locations and would otherwise retype the figures.
+    from=YYYY-MM and to=YYYY-MM give the months; year and month alone, as
+    older screens send, mean one month.
     """
-    year = int(request.query_params.get("year", timezone.localdate().year))
-    month = int(request.query_params.get("month", timezone.localdate().month))
-
-    from reports.pdf import gather_report_data
-    from reports.spreadsheet import build_spreadsheet
-
+    from .church_data import gather, month_list
+    from .zonal import build_xlsx
+    q = request.query_params
+    today = timezone.localdate()
+    try:
+        if q.get("from"):
+            y1, m1 = (int(x) for x in q["from"].split("-"))
+            y2, m2 = (int(x) for x in (q.get("to") or q["from"]).split("-"))
+        else:
+            y1 = y2 = int(q.get("year", today.year))
+            m1 = m2 = int(q.get("month", today.month))
+        ser = GenerateReportSerializer(data={"kind": "zonal", "from_year": y1, "from_month": m1, "to_year": y2, "to_month": m2})
+        ser.is_valid(raise_exception=True)
+    except (ValueError, TypeError):
+        return Response({"detail": "Choose the first and last month."}, status=400)
+    d = ser.validated_data
     location = report_location(request)
-    ctx = gather_report_data(year, month, "", request.user, location)
-    ctx["church_name"] = "Deeper Life Bible Church"
-    # It said Bahrain even when the figures were the whole church's.
-    ctx["location_name"] = location.name if location else "All locations"
-
-    data = build_spreadsheet(ctx)
-    log_audit(request.user, "Exported", "Report", ctx["period_label"],
-              "Monthly figures as a spreadsheet")
-
-    resp = HttpResponse(
-        data,
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
-    resp["Content-Disposition"] = (
-        f'attachment; filename="DCLM-{(location.name if location else "All-locations").replace(" ", "-")}-{year}-{month:02d}.xlsx"')
+    ctx = gather(month_list(d["start"], d["end"]), location)
+    data = build_xlsx(ctx)
+    log_audit(request.user, "Exported", "Report", f"Zonal monthly, {ctx['label']}", "As a spreadsheet")
+    resp = HttpResponse(data, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    name = f"DCLM-Bahrain-Zonal-{y1}-{m1:02d}" + (f"-to-{y2}-{m2:02d}" if (y1, m1) != (y2, m2) else "")
+    if location:
+        name += "-" + location.name.replace(" ", "-")
+    resp["Content-Disposition"] = f'attachment; filename="{name}.xlsx"'
     return resp
 
 def report_location(request):

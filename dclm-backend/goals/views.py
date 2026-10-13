@@ -27,7 +27,11 @@ class GoalViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         instance = serializer.save()
-        if instance.tracking == Goal.Tracking.MANUAL:
+        details = {"name", "horizon", "target", "unit", "target_date", "measured_by"} & set(self.request.data.keys())
+        if details:
+            log_audit(self.request.user, "Edited", "Goal", instance.name,
+                      ", ".join(sorted(details)), instance=instance)
+        if "current" in self.request.data and instance.tracking == Goal.Tracking.MANUAL:
             log_audit(
                 self.request.user, "Updated progress", "Goal",
                 instance.name, f"current = {instance.current}", instance=instance,

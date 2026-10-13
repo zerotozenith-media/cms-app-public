@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useGoals, useCreateGoal, useUpdateGoalProgress, useDeleteGoal } from '../../api/goals';
+import { useGoals, useCreateGoal, useUpdateGoalProgress, useDeleteGoal, useEditGoal } from '../../api/goals';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { StatRow, type StatItem } from '../../components/ui/StatRow';
 import { Badge } from '../../components/ui/Badge';
@@ -34,6 +34,8 @@ export function GoalsPage() {
   const [horizon, setHorizon] = useState<GoalHorizon>('Short-term');
   const [target, setTarget] = useState('');
   const [unit, setUnit] = useState('');
+  const [targetDate, setTargetDate] = useState('');
+  const [measuredBy, setMeasuredBy] = useState('');
 
   const list = goals ?? [];
   let achieved = 0, behind = 0, onTrack = 0;
@@ -53,8 +55,8 @@ export function GoalsPage() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    await createGoal.mutateAsync({ name, horizon, target: Number(target), unit });
-    setName(''); setTarget(''); setUnit(''); setHorizon('Short-term');
+    await createGoal.mutateAsync({ name, horizon, target: Number(target), unit, target_date: targetDate.trim(), measured_by: measuredBy.trim() });
+    setName(''); setTarget(''); setUnit(''); setHorizon('Short-term'); setTargetDate(''); setMeasuredBy('');
     setShowForm(false);
   }
   async function handleDelete(id: number) {
@@ -105,6 +107,7 @@ export function GoalsPage() {
                 <input id="goal-unit" value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="e.g. % or blank" />
               </div>
             </div>
+            <ReportFields targetDate={targetDate} setTargetDate={setTargetDate} measuredBy={measuredBy} setMeasuredBy={setMeasuredBy} idPrefix="goal" />
             <div className="form-actions-row">
               <button className="btn sm" type="submit" disabled={createGoal.isPending}>Add goal</button>
               <button className="btn sm ghost" type="button" onClick={() => setShowForm(false)}>Cancel</button>
@@ -141,6 +144,7 @@ function GoalRow({
   // on every click away, silently, even when refused.
   const updateProgress = useUpdateGoalProgress();
   const [status, setStatus] = useState<'' | 'saved' | 'failed'>('');
+  const [editing, setEditing] = useState(false);
   function saveProgress(el: HTMLInputElement) {
     const value = Number(el.value);
     if (el.value === '' || value === Number(goal.current)) return;
@@ -184,6 +188,9 @@ function GoalRow({
               <span className="muted">/ {goal.target}{goal.unit}</span>
             </>
           )}
+          {canEdit && !editing && (
+            <button className="btn sm outline" type="button" onClick={() => setEditing(true)}>Edit</button>
+          )}
           {canDelete && (
             <button className="icon-btn" title="Delete goal" onClick={() => onDelete(goal.id)}>
               <Icon name="trash" size={14} />
@@ -194,16 +201,114 @@ function GoalRow({
       {status === 'saved' && <div className="muted" style={{ fontSize: '.78rem' }}>Saved.</div>}
       {status === 'failed' && <div className="form-error">That figure could not be saved.</div>}
       <div className="bar-track"><div className={`bar-fill ${progressColor(displayValue ?? 0, goal.target)}`} style={{ width: `${pct}%` }} /></div>
-      <div className="goal-source">
-        {goal.calculation_error ? (
-          <span style={{ color: 'var(--red)' }}>{goal.calculation_error}</span>
-        ) : (
-          goal.source
-        )}
-        {isAuto && goal.link_route && (
-          <a onClick={() => onNavigate(`/${goal.link_route}`)}>View data →</a>
-        )}
-      </div>
+      {isAuto && (
+        <div className="goal-source">
+          {goal.calculation_error ? (
+            <span style={{ color: 'var(--red)' }}>{goal.calculation_error}</span>
+          ) : (
+            goal.source
+          )}
+          {goal.link_route && (
+            <a onClick={() => onNavigate(`/${goal.link_route}`)}>View data →</a>
+          )}
+        </div>
+      )}
+      <GoalMeta goal={goal} canEdit={canEdit} />
+      {editing && <GoalEditForm goal={goal} onDone={() => setEditing(false)} />}
     </div>
+  );
+}
+
+/** Target date and how a goal is measured, shown in the overseer report's
+ *  goal tables. */
+function GoalMeta({ goal, canEdit }: { goal: Goal; canEdit: boolean }) {
+  const date = (goal.target_date || '').trim();
+  const measure = (goal.measured_by || '').trim();
+  if (!date && !measure) {
+    return canEdit ? <div className="goal-source goal-meta-missing">Target date and Measured by not set yet. Edit to add them.</div> : null;
+  }
+  return (
+    <div className="goal-source">
+      {date && <>By {date}. </>}
+      {measure && <>Measured by: {measure}</>}
+    </div>
+  );
+}
+
+function ReportFields({ targetDate, setTargetDate, measuredBy, setMeasuredBy, idPrefix }: {
+  targetDate: string; setTargetDate: (v: string) => void;
+  measuredBy: string; setMeasuredBy: (v: string) => void; idPrefix: string;
+}) {
+  return (
+    <>
+      <div className="form-row">
+        <div className="field">
+          <label htmlFor={`${idPrefix}-date`}>Target date</label>
+          <input id={`${idPrefix}-date`} value={targetDate} maxLength={80} onChange={(e) => setTargetDate(e.target.value)}
+            placeholder="e.g. December 2026" />
+        </div>
+        <div className="field">
+          <label htmlFor={`${idPrefix}-measure`}>Measured by</label>
+          <input id={`${idPrefix}-measure`} value={measuredBy} maxLength={200} onChange={(e) => setMeasuredBy(e.target.value)}
+            placeholder="e.g. Friday attendance register" />
+        </div>
+      </div>
+      <p className="muted field-note goal-note">Target date and Measured by appear in the goal tables of the overseer report.</p>
+    </>
+  );
+}
+
+function GoalEditForm({ goal, onDone }: { goal: Goal; onDone: () => void }) {
+  const edit = useEditGoal();
+  const [name, setName] = useState(goal.name);
+  const [horizon, setHorizon] = useState<GoalHorizon>(goal.horizon);
+  const [target, setTarget] = useState(String(goal.target));
+  const [unit, setUnit] = useState(goal.unit || '');
+  const [targetDate, setTargetDate] = useState(goal.target_date || '');
+  const [measuredBy, setMeasuredBy] = useState(goal.measured_by || '');
+  const [error, setError] = useState('');
+  const p = `goal-${goal.id}`;
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    try {
+      await edit.mutateAsync({ id: goal.id, name: name.trim(), horizon, target: Number(target), unit: unit.trim(),
+        target_date: targetDate.trim(), measured_by: measuredBy.trim() });
+      onDone();
+    } catch {
+      setError('The goal could not be saved. Check the boxes and try again.');
+    }
+  }
+
+  return (
+    <form className="goal-edit" onSubmit={save}>
+      <div className="field">
+        <label htmlFor={`${p}-name`}>Goal name</label>
+        <input id={`${p}-name`} value={name} onChange={(e) => setName(e.target.value)} required maxLength={200} />
+      </div>
+      <div className="form-row g3">
+        <div className="field">
+          <label htmlFor={`${p}-horizon`}>Horizon</label>
+          <select id={`${p}-horizon`} value={horizon} onChange={(e) => setHorizon(e.target.value as GoalHorizon)}>
+            {HORIZONS.map((h) => <option key={h}>{h}</option>)}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor={`${p}-target`}>Target</label>
+          <input id={`${p}-target`} type="number" value={target} onChange={(e) => setTarget(e.target.value)} required />
+        </div>
+        <div className="field">
+          <label htmlFor={`${p}-unit`}>Unit (optional)</label>
+          <input id={`${p}-unit`} value={unit} maxLength={10} onChange={(e) => setUnit(e.target.value)} />
+        </div>
+      </div>
+      <ReportFields targetDate={targetDate} setTargetDate={setTargetDate} measuredBy={measuredBy} setMeasuredBy={setMeasuredBy} idPrefix={p} />
+      {error && <div className="form-error">{error}</div>}
+      <div className="form-actions-row">
+        <button className="btn sm" type="submit" disabled={edit.isPending}>{edit.isPending ? 'Saving…' : 'Save'}</button>
+        <button className="btn sm ghost" type="button" onClick={onDone}>Cancel</button>
+      </div>
+    </form>
   );
 }

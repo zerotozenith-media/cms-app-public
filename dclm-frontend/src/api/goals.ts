@@ -21,7 +21,7 @@ export function useGoals() {
 export function useCreateGoal() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: { name: string; horizon: string; target: number; unit: string }) =>
+    mutationFn: async (payload: { name: string; horizon: string; target: number; unit: string; target_date: string; measured_by: string }) =>
       (await apiClient.post<Goal>('/goals/', {
         ...payload,
         tracking: 'manual',
@@ -39,6 +39,17 @@ export function useUpdateGoalProgress() {
   return useMutation({
     mutationFn: async ({ id, current }: { id: number; current: number }) =>
       (await apiClient.patch<Goal>(`/goals/${id}/`, { current })).data,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['goals'] }),
+  });
+}
+
+/** Changing a goal's details: its name, horizon, target, and the target
+ *  date and measure the overseer report shows. */
+export function useEditGoal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...patch }: { id: number } & Partial<Pick<Goal, 'name' | 'horizon' | 'target' | 'unit' | 'target_date' | 'measured_by'>>) =>
+      (await apiClient.patch<Goal>(`/goals/${id}/`, patch)).data,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['goals'] }),
   });
 }

@@ -13,7 +13,7 @@ export function ReportsPage() {
       <div className="toolbar">
         <div className="tabs">
           <button className={`tab${tab === 'generate' ? ' active' : ''}`} onClick={() => setTab('generate')}>
-            Generate Monthly Report
+            Reports
           </button>
           <button className={`tab${tab === 'notes' ? ' active' : ''}`} onClick={() => setTab('notes')}>
             Weekly Leadership Notes

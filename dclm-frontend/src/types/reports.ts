@@ -22,12 +22,25 @@ export interface WeeklyNote {
   prayer_points: string;
 }
 
+export type ReportKind = 'overseer' | 'zonal';
+
 export interface Report {
   location?: string | null;
   location_name?: string;
   id: number;
+  kind: ReportKind;
+  /** "Overseer report" or "Zonal monthly". */
+  kind_label: string;
+  start_month: number | null;
+  start_year: number | null;
   period_month: number;
   period_year: number;
+  /** "September 2026" or "July to September 2026". */
+  period_label: string;
+  summary: string;
+  challenges: string;
+  training: string;
+  conclusion: string;
   generated_by: number;
   generated_by_name: string;
   generated_at: string;

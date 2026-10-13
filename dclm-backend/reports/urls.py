@@ -2,7 +2,7 @@ from rest_framework.routers import DefaultRouter
 
 from django.urls import path
 
-from .views import monthly_spreadsheet, ServiceViewSet, DepartmentViewSet, TestimonyViewSet, WeeklyNoteViewSet, ReportViewSet
+from .views import monthly_spreadsheet, PreviewView, ServiceViewSet, DepartmentViewSet, TestimonyViewSet, WeeklyNoteViewSet, ReportViewSet
 
 router = DefaultRouter()
 router.register("services", ServiceViewSet, basename="service")
@@ -15,4 +15,5 @@ urlpatterns = [
     # Declared before the router: its reports/<pk>/ route would otherwise
     # match "spreadsheet" as a report id and return 404.
     path("reports/spreadsheet/", monthly_spreadsheet, name="monthly-spreadsheet"),
+    path("reports/preview/", PreviewView.as_view(), name="report-preview"),
 ] + router.urls

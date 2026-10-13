@@ -165,6 +165,10 @@
   .goal-source{font-size:.78rem;color:var(--muted);margin-top:7px}
   .goal-source a{color:var(--blue);font-weight:700;cursor:pointer;margin-left:4px}
   .goal-source a:hover{text-decoration:underline}
+  .goal-meta-missing{color:#B26A00}
+  @media (max-width:600px){ .goal-row-top > span:first-child{flex-basis:100%} }
+  .goal-edit{margin-top:12px;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--sky2, #F4F8FE)}
+  .goal-note{display:block;margin:-4px 0 12px;font-size:.8rem}
   .card-link{cursor:pointer;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}
   .card-link:hover{transform:translateY(-3px);box-shadow:var(--shadow);border-color:transparent}
   .card-link-hint{display:block;margin-top:14px;font-size:.78rem;font-weight:700;color:var(--blue-bright);opacity:.75}
@@ -1139,7 +1143,7 @@
 /* Kay, October 2026, deep check on tablets and computers: row Edit and
    Delete buttons, and the help topics, touched each other. */
 td.td-actions{white-space:nowrap}
-td.td-actions .icon-btn + .icon-btn,.row-actions .icon-btn + .icon-btn{margin-left:8px}
+td.td-actions .icon-btn + .icon-btn,.row-actions .icon-btn + .icon-btn,td.td-actions .btn + .icon-btn{margin-left:8px}
 .help-nav-item{margin-bottom:5px}
 
 /* Gender matching (Kay, 10 October 2026) */
@@ -1184,3 +1188,15 @@ td.td-actions .icon-btn + .icon-btn,.row-actions .icon-btn + .icon-btn{margin-le
 .alert-banner-icon{width:40px;height:40px;border-radius:12px;background:var(--blue-deep);display:grid;place-items:center;flex:none}
 .alert-banner-text{flex:1 1 220px;display:flex;flex-direction:column;gap:3px;font-size:.88rem;min-width:0}
 .alert-banner-acts{display:flex;gap:8px;flex-wrap:wrap}
+
+/* Reports: generate an overseer or zonal report */
+.report-card{max-width:720px;margin-left:auto;margin-right:auto}
+.report-kinds{flex-wrap:wrap}
+.report-title{background:#EEF4FB;border-left:4px solid #1F4E79;border-radius:8px;padding:10px 14px;margin:4px 0 14px}
+.report-title span{display:block;font-size:.8rem;color:var(--muted)}
+.report-title b{color:#1F4E79}
+.report-filled{list-style:none;margin:6px 0 10px;padding:10px 14px;background:#F4F8FE;border-radius:10px}
+.report-filled li{display:flex;gap:8px;align-items:flex-start;font-size:.86rem;padding:3px 0}
+.report-filled li svg{flex:none;margin-top:3px;color:#1E7A43}
+.report-note{font-size:.84rem;margin:4px 0 12px}
+.report-done{color:#1E7A43;font-weight:600;font-size:.88rem;margin:4px 0 10px}

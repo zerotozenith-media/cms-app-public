@@ -7,6 +7,9 @@ export interface Goal {
   target: number;
   current: number;
   unit: string;
+  /** For the overseer report's goal tables. Free text. */
+  target_date: string;
+  measured_by: string;
   tracking: 'auto' | 'manual';
   period_type: string;
   source: string;
