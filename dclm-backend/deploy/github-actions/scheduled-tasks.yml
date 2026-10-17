@@ -19,10 +19,19 @@ name: Scheduled tasks
 on:
   schedule:
     # Times are UTC. Bahrain is UTC+3, so 04:00 UTC is 07:00 locally.
-    - cron: "0 * * * *"      # hourly, absence check
-    - cron: "0 23 * * *"     # 02:00 Bahrain, generate next week's sessions
-    - cron: "0 4 * * *"      # 07:00 Bahrain, follow-up digests
-    - cron: "30 4 * * 1"     # 07:30 Bahrain on Mondays, leadership summary
+    #
+    # None of these run on the hour. GitHub delays scheduled runs when it is
+    # busy, the start of every hour is its busiest time, and under heavy load
+    # it drops some runs altogether. GitHub's own advice is to pick another
+    # minute. The absence check also runs twice an hour, so one dropped run
+    # never leaves a gap: it is safe to repeat, because nobody gets a second
+    # task for the same service, and a late run still catches up on every
+    # service it missed.
+    - cron: "17 * * * *"     # hourly, absence check
+    - cron: "47 * * * *"     # hourly, absence check again, in case one is dropped
+    - cron: "7 23 * * *"     # 02:07 Bahrain, generate next week's sessions
+    - cron: "7 4 * * *"      # 07:07 Bahrain, follow-up digests
+    - cron: "37 4 * * 1"     # 07:37 Bahrain on Mondays, leadership summary
   workflow_dispatch:
     # So the jobs can be run by hand from the Actions tab, which is how
     # you confirm the setup works without waiting for the next hour.
@@ -51,10 +60,10 @@ jobs:
             echo "commands=${{ inputs.command }}" >> "$GITHUB_OUTPUT"
           else
             case "${{ github.event.schedule }}" in
-              "0 * * * *")   echo "commands=check_absences" >> "$GITHUB_OUTPUT" ;;
-              "0 23 * * *")  echo "commands=generate_recurring_sessions" >> "$GITHUB_OUTPUT" ;;
-              "0 4 * * *")   echo "commands=send_followup_digests" >> "$GITHUB_OUTPUT" ;;
-              "30 4 * * 1")  echo "commands=send_leadership_summary" >> "$GITHUB_OUTPUT" ;;
+              "17 * * * *"|"47 * * * *") echo "commands=check_absences" >> "$GITHUB_OUTPUT" ;;
+              "7 23 * * *")  echo "commands=generate_recurring_sessions" >> "$GITHUB_OUTPUT" ;;
+              "7 4 * * *")   echo "commands=send_followup_digests" >> "$GITHUB_OUTPUT" ;;
+              "37 4 * * 1")  echo "commands=send_leadership_summary" >> "$GITHUB_OUTPUT" ;;
               *)             echo "commands=" >> "$GITHUB_OUTPUT" ;;
             esac
           fi

@@ -104,6 +104,10 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+# Tests run with HTTPS forcing off and files in a temporary folder, so they
+# pass and stay harmless on the live server too (core/test_runner.py).
+TEST_RUNNER = "core.test_runner.SafeTestRunner"
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
