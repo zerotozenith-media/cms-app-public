@@ -187,3 +187,32 @@ class RegisteredOnTheDay(Base):
         self.client.post("/api/newcomers/", {"name": "Other place", "source": self.src.id, "location": "others",
                                              "meeting_attended": "fri-worship", "phone": "+97333333333"}, format="json")
         self.assertFalse(AttendanceSessionMember.objects.filter(newcomer__name="Other place").exists())
+
+
+class AfterTheService(Base):
+    """Ticking names off for a session already filled in (Kay, 17 Oct 2026)."""
+
+    def test_a_filled_session_from_last_week_takes_check_ins_and_keeps_its_headcount(self):
+        last_week = self.today - datetime.timedelta(days=7)
+        s = self.session(date=last_week, status="filled", men=12, women=9)
+        n = self.newcomer("Abel")
+        m = Member.objects.create(surname="Afari", first_name="Gloria", location=self.bh, joined_date=D(2026, 7, 1))
+        for body in ({"newcomer_id": n.id}, {"member_id": m.id}):
+            self.assertEqual(self.client.post(f"/api/attendance-sessions/{s.id}/check_in/", body, format="json").status_code, 200)
+        s.refresh_from_db()
+        self.assertEqual((s.status, s.men, s.women), ("filled", 12, 9))
+        self.assertEqual(readiness(n)["services_attended"], 1)
+        r = self.client.get(f"/api/attendance-sessions/{s.id}/").data
+        self.assertEqual(len(r["attendees"]), 2)
+        self.assertIn("counts_for_absence", r)
+
+    def test_late_ticks_on_a_recent_service_follow_up_the_rest(self):
+        from members.models import MemberFollowUpTask
+        MeetingType.objects.filter(pk="fri-worship").update(counts_for_absence=True, start_time=datetime.time(18, 0))
+        s = self.session(date=self.today - datetime.timedelta(days=2), status="filled", men=2)
+        came = Member.objects.create(surname="Afari", first_name="Gloria", location=self.bh, joined_date=D(2026, 7, 1))
+        missed = Member.objects.create(surname="Uguru", first_name="Grace", location=self.bh, joined_date=D(2026, 7, 1))
+        self.client.post(f"/api/attendance-sessions/{s.id}/check_in/", {"member_id": came.id}, format="json")
+        self.assertTrue(self.client.get(f"/api/attendance-sessions/{s.id}/").data["counts_for_absence"])
+        call_command("check_absences", verbosity=0)
+        self.assertEqual(list(MemberFollowUpTask.objects.values_list("member_id", flat=True)), [missed.id])

@@ -172,3 +172,51 @@ class CheckAbsencesCommandTestCase(TestCase):
         call_command("check_absences")
         self.assertFalse(MemberFollowUpTask.objects.filter(member=qatar_member).exists(),
             "A Bahrain session's roster must not include members from a different location.")
+
+
+class HeadcountSavedEarlyTestCase(CheckAbsencesCommandTestCase):
+    """The gap found on 17 Oct 2026: a session whose headcount was saved
+    before the check ran was skipped for good, so nobody absent from it
+    was ever followed up."""
+
+    def _filled(self, date=None):
+        s = self._session(self.tracked_mt, date)
+        AttendanceSession.objects.filter(pk=s.pk).update(status="filled", men=40)
+        return s
+
+    def test_saved_early_with_names_taken_still_follows_up_absentees(self):
+        s = self._filled()
+        AttendanceSessionMember.objects.create(session=s, member=self.member_present)
+        call_command("check_absences", verbosity=0)
+        self.assertFalse(MemberFollowUpTask.objects.filter(member=self.member_present).exists())
+        self.assertEqual(MemberFollowUpTask.objects.get(member=self.member_absent).missed_session, s)
+        call_command("check_absences", verbosity=0)
+        self.assertEqual(MemberFollowUpTask.objects.count(), 1)
+
+    def test_a_headcount_alone_says_nothing_about_who_came(self):
+        self._filled()
+        call_command("check_absences", verbosity=0)
+        self.assertEqual(MemberFollowUpTask.objects.count(), 0)
+
+    def test_newcomers_checked_in_alone_do_not_count_as_names_taken(self):
+        from newcomers.models import Newcomer, NewcomerSource
+        s = self._filled()
+        n = Newcomer.objects.create(name="Abel", source=NewcomerSource.objects.create(name="Friend"),
+                                    location=self.bahrain, created_at=self.service_date, stage_since=self.service_date)
+        AttendanceSessionMember.objects.create(session=s, newcomer=n)
+        call_command("check_absences", verbosity=0)
+        self.assertEqual(MemberFollowUpTask.objects.count(), 0)
+
+    def test_old_saved_services_are_left_alone(self):
+        s = self._filled(self.service_date - datetime.timedelta(days=8))
+        AttendanceSessionMember.objects.create(session=s, member=self.member_present)
+        call_command("check_absences", verbosity=0)
+        self.assertEqual(MemberFollowUpTask.objects.count(), 0)
+
+    def test_saved_early_but_not_yet_three_hours_after_the_start(self):
+        later = timezone.localtime(self.now - datetime.timedelta(hours=1)).time().replace(microsecond=0)
+        MeetingType.objects.filter(pk=self.tracked_mt.pk).update(start_time=later)
+        s = self._filled(timezone.localtime(self.now - datetime.timedelta(hours=1)).date())
+        AttendanceSessionMember.objects.create(session=s, member=self.member_present)
+        call_command("check_absences", verbosity=0)
+        self.assertEqual(MemberFollowUpTask.objects.count(), 0)

@@ -31,6 +31,10 @@ from members.models import Member, MemberFollowUpTask
 
 HOURS_AFTER_START = 3
 FOLLOWUP_DUE_IN_DAYS = 2
+# A session whose headcount was saved early is still checked, for this
+# many days after it, so switching this on never reaches back to old
+# services and floods shepherds with tasks for months ago.
+FILLED_LOOKBACK_DAYS = 7
 
 
 class Command(BaseCommand):
@@ -38,11 +42,19 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         now = timezone.now()
+        # Pending sessions as before. A session whose headcount was saved
+        # before the check ran was skipped for good, so nobody absent from
+        # it was ever followed up (found 17 Oct 2026). It is checked too,
+        # when at least one member was checked in by name, which shows the
+        # names were taken; a headcount alone says nothing about who came.
+        recent = timezone.localdate() - datetime.timedelta(days=FILLED_LOOKBACK_DAYS)
         candidates = AttendanceSession.objects.filter(
-            status=AttendanceSession.Status.PENDING,
+            Q(status=AttendanceSession.Status.PENDING)
+            | Q(status=AttendanceSession.Status.FILLED, date__gte=recent,
+                attendees__member__isnull=False),
             meeting_type__counts_for_absence=True,
             meeting_type__start_time__isnull=False,
-        ).select_related("meeting_type", "location")
+        ).distinct().select_related("meeting_type", "location")
 
         sessions_checked = 0
         tasks_created = 0

@@ -1204,3 +1204,7 @@ td.td-actions .icon-btn + .icon-btn,.row-actions .icon-btn + .icon-btn,td.td-act
 /* Live check-in: newcomers under the members */
 .checkin-newcomers{margin-top:14px;padding-top:4px;border-top:1px solid var(--line)}
 .checkin-newcomers-note{font-size:.8rem;margin:0 0 8px}
+
+/* Checking in after the service */
+.checkin-past{background:#FFF7E6;border:1px solid #F0D9A8;margin-bottom:12px}
+.checkin-past div{font-size:.86rem;margin-top:4px}

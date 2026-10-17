@@ -94,11 +94,15 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
     },
     {
       h: 'Can two ushers do this at once?',
-      p: 'Yes. Each tap saves on its own, so two people on different doors will not overwrite each other. Both should use Check in on the same session.',
+      p: 'Yes. Each tap saves on its own, so two people on different doors will not overwrite each other. Both should use Check in on the same session. The headcount can be saved at any time, before or after the absence check.',
+    },
+    {
+      h: 'Can I tick names after the service?',
+      p: 'Yes. A session already filled in has a white Check in on its row in All sessions. Tick everyone who came that day. The headcount is not changed, and newcomers ticked count towards their Fridays for membership. On a service from the last 7 days that follows up absence, members not ticked get a follow-up task.',
     },
     {
       h: 'What if I forget to check anyone in?',
-      p: 'Then everyone counts as absent and a lot of follow-up tasks are created. If that happens, tell an administrator, and the tasks can be closed. Better to check in nobody at all than to check in only half the room.',
+      p: 'If the headcount has not been saved either, everyone counts as absent three hours after the start and a lot of follow-up tasks are created. If that happens, tell an administrator, and the tasks can be closed. Once the headcount is saved with nobody checked in, nobody is followed up. Better to check in nobody at all than to check in only half the room.',
     },
   ],
 

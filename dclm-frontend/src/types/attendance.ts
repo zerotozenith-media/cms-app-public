@@ -63,6 +63,8 @@ export interface AttendanceSessionMember {
 }
 
 export interface AttendanceSession {
+  /** Whether this meeting follows up absence, so ticking names late makes tasks for those not ticked. */
+  counts_for_absence?: boolean;
   /** Online attendance, counted separately. Any meeting can be hybrid,
    *  and a total showing only the room understates the month. */
   online_men: number;

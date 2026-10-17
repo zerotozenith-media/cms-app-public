@@ -69,6 +69,9 @@ class AttendanceSessionSerializer(serializers.ModelSerializer):
     fellowship_name = serializers.CharField(source="fellowship.name", read_only=True, default=None)
     led_by_name = serializers.CharField(source="led_by.full_name", read_only=True, default=None)
     attendees = AttendanceSessionMemberSerializer(many=True, read_only=True)
+    # So the check-in screen can say when ticking names late will make
+    # absence follow-up tasks for those not ticked.
+    counts_for_absence = serializers.BooleanField(source="meeting_type.counts_for_absence", read_only=True)
 
     class Meta:
         model = AttendanceSession
@@ -80,7 +83,7 @@ class AttendanceSessionSerializer(serializers.ModelSerializer):
         "online_children_boys", "online_children_girls", "online_total",
         "in_person_total", "new_comers", "new_converts",
         "fellowship", "fellowship_name", "led_by", "led_by_name", "lesson",
-        "edition_name", "edition_place",
+        "edition_name", "edition_place", "counts_for_absence",
         ]
         read_only_fields = ["id", "status"]
         # status is deliberately read-only here too , the only correct way

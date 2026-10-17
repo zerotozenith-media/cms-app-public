@@ -10,6 +10,7 @@ import { HelpMark } from '../../components/ui/HelpMark';
 import { useAuth } from '../../context/AuthContext';
 
 const CATEGORY_ORDER = ['Worker', 'Worker in Training', 'General Member'] as const;
+const longDay = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).replace(',', '');
 
 export function LiveCheckInPage() {
   const { id } = useParams();
@@ -63,6 +64,12 @@ export function LiveCheckInPage() {
   if (!session) return <div className="card">Session not found.</div>;
 
   const checkedCount = session.attendees.length;
+  // A service from an earlier day, being ticked off afterwards.
+  const todayIso = new Date().toLocaleDateString('en-CA');
+  const past = session.date < todayIso;
+  const daysAgo = Math.round((new Date(`${todayIso}T00:00:00`).getTime() - new Date(`${session.date}T00:00:00`).getTime()) / 86400000);
+  // The absence check looks at services up to 7 days old.
+  const recentAbsence = past && !!session.counts_for_absence && daysAgo <= 7;
   const total = (roster?.length ?? 0) + (ncRoster?.results.length ?? 0);
   const anyVisible = CATEGORY_ORDER.some((c) => grouped[c].length > 0) || newcomers.length > 0;
 
@@ -96,11 +103,21 @@ export function LiveCheckInPage() {
         ← Back to session details
       </a>
 
+      {past && (
+        <div className="card checkin-past" role="note">
+          <b>This service was on {longDay(session.date)}.</b>
+          <div>
+            Tick everyone who came that day. Newcomers ticked here count towards their Fridays for membership.
+            {session.status === 'filled' ? ' The headcount already saved is not changed.' : ' The headcount is not changed.'}
+            {recentAbsence && ' Members not ticked get an absence follow-up task, as this service follows up absence.'}
+          </div>
+        </div>
+      )}
       <div className="card checkin-header">
         <div className="checkin-header-row">
           <div style={{ minWidth: 0 }}>
             <h3 style={{ fontSize: '1.1rem' }}>{session.meeting_type_name}</h3>
-            <div className="muted">{session.date} · Live check-in<HelpMark topic="liveCheckIn" /></div>
+            <div className="muted">{session.date} · {past ? 'Checking in after the service' : 'Live check-in'}<HelpMark topic="liveCheckIn" /></div>
           </div>
           <div style={{ textAlign: 'right', flex: 'none' }}>
             <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--blue-deep)' }}>
@@ -216,15 +233,17 @@ export function LiveCheckInPage() {
         )}
       </div>
 
-      <div className="card section-gap checkin-note">
-        Nobody needs to press a finish button. A few hours after this meeting's start time,
-        anyone still not checked in is treated as absent and a follow-up task is created for
-        their shepherd. This only happens for meetings marked
-        <b> Counts toward absence follow-up</b> in Admin.
-        <br /><br />
-        Someone registered as a newcomer today, by QR code or Manual entry, is checked in to this
-        service automatically.
-      </div>
+      {!past && (
+        <div className="card section-gap checkin-note">
+          Nobody needs to press a finish button. A few hours after this meeting's start time,
+          anyone still not checked in is treated as absent and a follow-up task is created for
+          their shepherd. This only happens for meetings marked
+          <b> Counts toward absence follow-up</b> in Admin.
+          <br /><br />
+          Someone registered as a newcomer today, by QR code or Manual entry, is checked in to this
+          service automatically.
+        </div>
+      )}
     </>
   );
 }

@@ -251,6 +251,13 @@ export function AttendanceListPage() {
                         <Icon name="check" size={14} /> Check in
                       </button>
                     )}
+                    {/* After the service: ticking names off for a session already filled in. */}
+                    {canEdit && s.status === 'filled' && s.date <= todayIso && (
+                      <button className="btn sm outline" title="Tick who came, after the service"
+                        onClick={() => navigate(`/attendance/${s.id}/check-in`)}>
+                        Check in
+                      </button>
+                    )}
                     {canDelete && (
                       <button className="icon-btn" title="Delete session" onClick={(e) => handleDelete(e, s.id)}>
                         <Icon name="trash" size={15} />
