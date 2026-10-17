@@ -40,7 +40,7 @@ export const HELP_TOPICS: Record<string, HelpTopic> = {
   },
   liveCheckIn: {
     title: 'Check-in vs headcount',
-    body: 'These are two separate things and both are kept. The headcount on the session record stays the official attendance figure. Checking people in by name is what drives absence follow-up. Recording one does not change the other.',
+    body: 'These are two separate things and both are kept. The headcount on the session record stays the official attendance figure. Checking members in by name is what drives absence follow-up, and checking newcomers in builds their Friday attendance towards membership. Recording one does not change the other.',
   },
   followUpFields: {
     title: 'Why all four are required',

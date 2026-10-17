@@ -182,7 +182,7 @@ export function NewcomerProfilePage() {
         {readiness && <ReadinessCards r={readiness} />}
         <div className="muted" style={{ fontSize: '.8rem' }}>
           A newcomer is proposed once the Salvation milestone is recorded, they have attended at
-          least half the Friday services at their location since they first came, and they first
+          least half the Friday services at their location since their first check-in, and they first
           came at least six months ago. An administrator always confirms, and can
           add anyone at any time regardless, for example someone relocating from another church.
         </div>

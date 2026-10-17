@@ -276,26 +276,34 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
             return Response(
                 {"detail": f"This service is on {session.date:%-d %B}. People can be checked "
                            f"in on the day."}, status=400)
+        # A member or a newcomer, never both. Newcomers are checked in so
+        # their Friday attendance builds up towards membership.
         member_id = request.data.get("member_id")
-        if not member_id:
-            return Response({"member_id": "This field is required."}, status=400)
+        newcomer_id = request.data.get("newcomer_id")
+        if bool(member_id) == bool(newcomer_id):
+            return Response({"member_id": "Give either a member or a newcomer."}, status=400)
+        if newcomer_id:
+            from newcomers.models import Newcomer
+            if not Newcomer.objects.filter(pk=newcomer_id).exists():
+                return Response({"detail": "That newcomer was not found."}, status=404)
+            who = {"newcomer_id": newcomer_id}
+        else:
+            who = {"member_id": member_id}
 
         if request.method == "POST":
             mode = request.data.get("mode", AttendanceSessionMember.Mode.IN_PERSON)
-            AttendanceSessionMember.objects.update_or_create(
-                session=session, member_id=member_id, defaults={"mode": mode},
-            )
+            if mode not in AttendanceSessionMember.Mode.values:
+                return Response({"mode": "Must be 'in-person' or 'online'."}, status=400)
+            AttendanceSessionMember.objects.update_or_create(session=session, **who, defaults={"mode": mode})
         elif request.method == "DELETE":
-            AttendanceSessionMember.objects.filter(session=session, member_id=member_id).delete()
+            AttendanceSessionMember.objects.filter(session=session, **who).delete()
         elif request.method == "PATCH":
             mode = request.data.get("mode")
             if mode not in AttendanceSessionMember.Mode.values:
                 return Response({"mode": "Must be 'in-person' or 'online'."}, status=400)
-            updated = AttendanceSessionMember.objects.filter(
-                session=session, member_id=member_id,
-            ).update(mode=mode)
+            updated = AttendanceSessionMember.objects.filter(session=session, **who).update(mode=mode)
             if not updated:
-                return Response({"detail": "This member isn't checked in yet."}, status=404)
+                return Response({"detail": "This person isn't checked in yet."}, status=404)
 
         # session.attendees.all() would return the queryset's own
         # prefetch_related("attendees__member") cache, populated when
@@ -304,10 +312,36 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
         # end-to-end API test, not the unit tests, which checked the
         # database directly and so never exercised this response body.
         # Querying AttendanceSessionMember directly bypasses that cache.
-        fresh_attendees = AttendanceSessionMember.objects.filter(session=session).select_related("member")
+        fresh_attendees = AttendanceSessionMember.objects.filter(session=session).select_related("member", "newcomer")
         return Response({
             "attendees": AttendanceSessionMemberSerializer(fresh_attendees, many=True).data,
         })
+
+    @action(detail=True, methods=["get"], url_path="newcomer-roster")
+    def newcomer_roster(self, request, pk=None):
+        """
+        The newcomers who can be checked in to this session: everyone still
+        being followed up at its location, and anyone already checked in.
+        On Friday Worship each one carries their Fridays so far, the figure
+        the membership rule uses.
+        """
+        require(request.user, ("attendance", "can_edit"))
+        session = self.get_object()
+        from django.db.models import Q
+        from newcomers.membership import MAIN_SERVICE_ID, readiness
+        from newcomers.models import Newcomer
+        here = session.attendees.filter(newcomer__isnull=False).values_list("newcomer_id", flat=True)
+        qs = Newcomer.objects.filter(
+            Q(stage__in=["new", "contacted", "attending"], location_id=session.location_id) | Q(pk__in=list(here)))
+        fridays = session.meeting_type_id == MAIN_SERVICE_ID and not session.fellowship_id
+        out = []
+        for n in qs.order_by("name"):
+            row = {"id": n.id, "name": n.name, "stage": n.stage}
+            if fridays:
+                r = readiness(n)
+                row["fridays_attended"], row["fridays_held"] = r["services_attended"], r["services_held"]
+            out.append(row)
+        return Response({"fridays": fridays, "results": out})
 
 
 class FellowshipViewSet(viewsets.ModelViewSet):

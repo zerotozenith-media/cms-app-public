@@ -54,3 +54,26 @@ def create_auto_tasks(newcomer):
             due_date=timezone.localdate() + timedelta(days=days_out),
             assigned_to=newcomer.assigned_to,
         )
+
+
+def check_in_today(newcomer):
+    """
+    Somebody registering on the day of a service was at it, so they are
+    checked in to it, and their Friday attendance starts from the right
+    day. The meeting they named on the slip, or the only service held at
+    their location today. Nothing is guessed when it is unclear.
+    """
+    from attendance.models import AttendanceSession, AttendanceSessionMember
+    if not newcomer.location_id:
+        return None
+    today = timezone.localdate()
+    if newcomer.created_at != today:
+        return None
+    sessions = AttendanceSession.objects.filter(date=today, location_id=newcomer.location_id, fellowship__isnull=True)
+    if newcomer.meeting_attended_id:
+        sessions = sessions.filter(meeting_type_id=newcomer.meeting_attended_id)
+    sessions = list(sessions[:2])
+    if len(sessions) != 1:
+        return None
+    AttendanceSessionMember.objects.get_or_create(session=sessions[0], newcomer=newcomer)
+    return sessions[0]

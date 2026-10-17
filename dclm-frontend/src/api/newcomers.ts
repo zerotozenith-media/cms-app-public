@@ -222,6 +222,8 @@ export interface JourneyEvent {
 
 export interface Readiness {
   first_attended: string | null;
+  /** The date the six months count from: registration or the first check-in, whichever is earlier. */
+  first_came: string | null;
   services_held: number;
   services_attended: number;
   attendance_percent: number;

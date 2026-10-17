@@ -1,10 +1,13 @@
 """
 When a newcomer is ready to be proposed for membership.
 
-Two conditions, both required:
-  - the Salvation milestone is recorded, and
+Three conditions, all required:
+  - the Salvation milestone is recorded,
   - they attended at least half the Friday Worship services held since
-    their first attendance, over a six month window
+    their first check-in, and
+  - they first came at least six months ago (Kay, 16 Oct 2026: counted
+    from the First came date, not the first check-in, since Fridays were
+    only recorded by name from then)
 
 The system only ever proposes. An administrator confirms, and can add
 anyone at any time regardless, which covers someone relocating from
@@ -24,7 +27,9 @@ SALVATION = "Salvation"
 
 
 def _months_between(start, end):
-    return (end.year - start.year) * 12 + (end.month - start.month)
+    """Whole months: 1 July to 1 January is six, 31 July to 1 January five."""
+    months = (end.year - start.year) * 12 + (end.month - start.month)
+    return months - 1 if end.day < start.day else months
 
 
 def readiness(newcomer, today=None):
@@ -59,9 +64,15 @@ def readiness(newcomer, today=None):
         # A Friday they attended elsewhere counts too, as a service they had.
         held = len(set(held_qs.values_list("date", flat=True)) | set(dates))
         attended = len(dates)
-        months = _months_between(first_attended, today)
     else:
-        held = attended = months = 0
+        held = attended = 0
+
+    # First came: registration or the first check-in, whichever is
+    # earlier, the same date the profile shows.
+    first_came = newcomer.created_at
+    if first_attended and (first_came is None or first_attended < first_came):
+        first_came = first_attended
+    months = _months_between(first_came, today) if first_came else 0
 
     percent = round(attended / held * 100) if held else 0
     # A milestone counts only once it has a date. A row with no date is
@@ -75,6 +86,7 @@ def readiness(newcomer, today=None):
 
     return {
         "first_attended": first_attended,
+        "first_came": first_came,
         "services_held": held,
         "services_attended": attended,
         "attendance_percent": percent,

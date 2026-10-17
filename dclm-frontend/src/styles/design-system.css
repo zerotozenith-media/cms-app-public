@@ -1200,3 +1200,7 @@ td.td-actions .icon-btn + .icon-btn,.row-actions .icon-btn + .icon-btn,td.td-act
 .report-filled li svg{flex:none;margin-top:3px;color:#1E7A43}
 .report-note{font-size:.84rem;margin:4px 0 12px}
 .report-done{color:#1E7A43;font-weight:600;font-size:.88rem;margin:4px 0 10px}
+
+/* Live check-in: newcomers under the members */
+.checkin-newcomers{margin-top:14px;padding-top:4px;border-top:1px solid var(--line)}
+.checkin-newcomers-note{font-size:.8rem;margin:0 0 8px}

@@ -45,7 +45,9 @@ export function ReadinessCards({ r }: { r: Readiness }) {
           <Ring percent={r.attendance_percent} colour={r.attendance_met ? GREEN : AMBER} />
           <div>
             <div className="rc-value">{r.attendance_percent}%</div>
-            <div className="rc-sub">{r.services_attended} of {r.services_held} services</div>
+            <div className="rc-sub">
+              {r.services_held ? `${r.services_attended} of ${r.services_held} services` : 'Counts from their first Friday check-in'}
+            </div>
           </div>
         </div>
         <Foot met={r.attendance_met}
@@ -77,7 +79,7 @@ export function ReadinessCards({ r }: { r: Readiness }) {
           <div>
             <div className="rc-value">{r.months_attending} mo</div>
             <div className="rc-sub">
-              {r.first_attended ? `since ${r.first_attended}` : 'not yet attended'}
+              {r.first_came ? `since ${new Date(r.first_came + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : 'first came not known'}
             </div>
           </div>
         </div>

@@ -94,7 +94,7 @@ export function SessionRecordPage() {
     const members = session.attendees.filter((a) => a.member != null);
     const ids = new Set(members.map((a) => a.member as number));
     setAttendeeIds(ids);
-    const names = new Map(members.map((a) => [a.member as number, a.member_name] as const));
+    const names = new Map(members.map((a) => [a.member as number, a.member_name ?? ""] as const));
     setSelectedNames(names);
   }, [session]);
 

@@ -1,12 +1,13 @@
 import { Skeleton } from '../../components/ui/Skeleton';
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useSession, useCheckIn, useCheckOut, useSetCheckInMode } from '../../api/attendance';
+import { useSession, useCheckIn, useCheckOut, useSetCheckInMode, useNewcomerRoster, type RosterNewcomer } from '../../api/attendance';
 import { useMemberRoster } from '../../api/members';
 import { Icon } from '../../components/ui/Icon';
 import type { Member } from '../../types/members';
 import type { AttendanceSessionMember } from '../../types/attendance';
 import { HelpMark } from '../../components/ui/HelpMark';
+import { useAuth } from '../../context/AuthContext';
 
 const CATEGORY_ORDER = ['Worker', 'Worker in Training', 'General Member'] as const;
 
@@ -17,6 +18,10 @@ export function LiveCheckInPage() {
 
   const { data: session, isLoading: loadingSession } = useSession(sessionId);
   const { data: roster, isLoading: loadingRoster } = useMemberRoster(session?.location);
+  // Newcomers too, so their Friday attendance builds up towards membership.
+  // Only for those who can check people in, as the server allows.
+  const { hasPermission } = useAuth();
+  const { data: ncRoster } = useNewcomerRoster(sessionId, !!session && hasPermission('attendance', 'edit'));
   const checkIn = useCheckIn(sessionId);
   const checkOut = useCheckOut(sessionId);
   const setMode = useSetCheckInMode(sessionId);
@@ -30,7 +35,12 @@ export function LiveCheckInPage() {
   // state without scanning the attendee array on every keystroke.
   const attendeeByMember = useMemo(() => {
     const map = new Map<number, AttendanceSessionMember>();
-    (session?.attendees ?? []).forEach((a) => map.set(a.member, a));
+    (session?.attendees ?? []).forEach((a) => { if (a.member) map.set(a.member, a); });
+    return map;
+  }, [session?.attendees]);
+  const attendeeByNewcomer = useMemo(() => {
+    const map = new Map<number, AttendanceSessionMember>();
+    (session?.attendees ?? []).forEach((a) => { if (a.newcomer) map.set(a.newcomer, a); });
     return map;
   }, [session?.attendees]);
 
@@ -44,21 +54,39 @@ export function LiveCheckInPage() {
     });
     return out;
   }, [roster, query]);
+  const newcomers = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return (ncRoster?.results ?? []).filter((n) => !q || n.name.toLowerCase().includes(q));
+  }, [ncRoster, query]);
 
   if (loadingSession || loadingRoster) return <Skeleton shape="list" />;
   if (!session) return <div className="card">Session not found.</div>;
 
   const checkedCount = session.attendees.length;
-  const total = roster?.length ?? 0;
-  const anyVisible = CATEGORY_ORDER.some((c) => grouped[c].length > 0);
+  const total = (roster?.length ?? 0) + (ncRoster?.results.length ?? 0);
+  const anyVisible = CATEGORY_ORDER.some((c) => grouped[c].length > 0) || newcomers.length > 0;
 
   function toggle(member: Member) {
     // Each tap is its own request. Several ushers on different doors work
     // the same session at once, so nothing is batched into a form that
     // could overwrite someone else's taps on submit.
     setTapError('');
-    if (attendeeByMember.has(member.id)) checkOut.mutate(member.id, { onError: failed });
+    if (attendeeByMember.has(member.id)) checkOut.mutate({ memberId: member.id }, { onError: failed });
     else checkIn.mutate({ memberId: member.id }, { onError: failed });
+  }
+  function toggleNewcomer(n: RosterNewcomer) {
+    setTapError('');
+    if (attendeeByNewcomer.has(n.id)) checkOut.mutate({ newcomerId: n.id }, { onError: failed });
+    else checkIn.mutate({ newcomerId: n.id }, { onError: failed });
+  }
+  // Fridays so far, counting today once they are checked in.
+  function fridays(n: RosterNewcomer, checked: boolean) {
+    if (!ncRoster?.fridays || n.fridays_held === undefined) return '';
+    const attended = n.fridays_attended ?? 0;
+    if (!attended && !checked) return ' · No Fridays recorded yet';
+    // The roster is refreshed after every tap, so its figures already
+    // include today once they are checked in.
+    return ` · Fridays ${attended} of ${n.fridays_held}`;
   }
 
   return (
@@ -82,12 +110,12 @@ export function LiveCheckInPage() {
             <div className="muted" style={{ fontSize: '.78rem' }}>checked in</div>
           </div>
         </div>
-        <label htmlFor="checkin-search" className="sr-only">Search members</label>
+        <label htmlFor="checkin-search" className="sr-only">Search members and newcomers</label>
         <input
           id="checkin-search"
           className="search"
           style={{ width: '100%', marginTop: 10 }}
-          placeholder="Search members..."
+          placeholder="Search members and newcomers..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -138,9 +166,52 @@ export function LiveCheckInPage() {
               })}
             </div>
           );
-        }) : (
+        }).concat(newcomers.length ? [
+          <div key="newcomers" className="checkin-newcomers">
+            <div className="checkin-group">Newcomers</div>
+            <p className="muted checkin-newcomers-note">
+              Tap a newcomer as you would a member. Their Friday attendance builds up on their profile, towards membership.
+            </p>
+            {newcomers.map((n) => {
+              const att = attendeeByNewcomer.get(n.id);
+              const online = att?.mode === 'online';
+              return (
+                <div
+                  key={`n${n.id}`}
+                  className={`checkin-row${att ? ' checked' : ''}`}
+                  aria-pressed={!!att}
+                  onClick={() => toggleNewcomer(n)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleNewcomer(n); } }}
+                >
+                  <span className="avatar" style={att ? { background: 'var(--green-bg)', color: 'var(--green)' } : undefined}>
+                    {att ? <Icon name="check" size={18} /> : n.name.charAt(0)}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <b>{n.name}</b>
+                    <div className="muted" style={{ fontSize: '.78rem' }}>
+                      {att ? `Checked in · ${online ? 'Online' : 'In person'}` : 'Not checked in'}{fridays(n, !!att)}
+                    </div>
+                  </div>
+                  {att && (
+                    <button
+                      className="btn sm outline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMode.mutate({ newcomerId: n.id, mode: online ? 'in-person' : 'online' }, { onError: failed });
+                      }}
+                    >
+                      {online ? 'Mark in person' : 'Mark online'}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>,
+        ] : []) : (
           <div className="empty">
-            {query ? 'No members match this search.' : 'No members at this location yet.'}
+            {query ? 'Nobody matches this search.' : 'No members or newcomers at this location yet.'}
           </div>
         )}
       </div>
@@ -150,6 +221,9 @@ export function LiveCheckInPage() {
         anyone still not checked in is treated as absent and a follow-up task is created for
         their shepherd. This only happens for meetings marked
         <b> Counts toward absence follow-up</b> in Admin.
+        <br /><br />
+        Someone registered as a newcomer today, by QR code or Manual entry, is checked in to this
+        service automatically.
       </div>
     </>
   );

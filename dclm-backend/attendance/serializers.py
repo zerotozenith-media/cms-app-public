@@ -51,11 +51,13 @@ class MeetingTypeSerializer(serializers.ModelSerializer):
 
 
 class AttendanceSessionMemberSerializer(serializers.ModelSerializer):
-    member_name = serializers.CharField(source="member.full_name", read_only=True)
+    member_name = serializers.CharField(source="member.full_name", read_only=True, default=None)
+    # A row holds a member or a newcomer, never both.
+    newcomer_name = serializers.CharField(source="newcomer.name", read_only=True, default=None)
 
     class Meta:
         model = AttendanceSessionMember
-        fields = ["id", "member", "member_name", "mode", "checked_in_at"]
+        fields = ["id", "member", "member_name", "newcomer", "newcomer_name", "mode", "checked_in_at"]
         read_only_fields = ["id", "checked_in_at"]
 
 

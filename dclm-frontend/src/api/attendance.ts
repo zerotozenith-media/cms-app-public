@@ -147,39 +147,69 @@ export function useRecordSession(id: number) {
    different doors work the same session at once, and a batched
    "submit everything" form would let one overwrite another's taps. */
 
+/** Who a tap is for: a member, or a newcomer whose Friday attendance
+ *  builds up towards membership. */
+export type CheckInWho = { memberId: number } | { newcomerId: number };
+const whoBody = (w: CheckInWho) => ('memberId' in w ? { member_id: w.memberId } : { newcomer_id: w.newcomerId });
+
 export function useCheckIn(sessionId: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ memberId, mode }: { memberId: number; mode?: CheckInMode }) =>
+    mutationFn: async ({ mode, ...who }: CheckInWho & { mode?: CheckInMode }) =>
       (await apiClient.post<{ attendees: AttendanceSessionMember[] }>(
         `/attendance-sessions/${sessionId}/check_in/`,
-        { member_id: memberId, mode: mode ?? 'in-person' },
+        { ...whoBody(who as CheckInWho), mode: mode ?? 'in-person' },
       )).data,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['session', sessionId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['session', sessionId] });
+      qc.invalidateQueries({ queryKey: ['newcomer-roster', sessionId] });
+    },
   });
 }
 
 export function useCheckOut(sessionId: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (memberId: number) =>
+    mutationFn: async (who: CheckInWho) =>
       (await apiClient.delete<{ attendees: AttendanceSessionMember[] }>(
         `/attendance-sessions/${sessionId}/check_in/`,
-        { data: { member_id: memberId } },
+        { data: whoBody(who) },
       )).data,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['session', sessionId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['session', sessionId] });
+      qc.invalidateQueries({ queryKey: ['newcomer-roster', sessionId] });
+    },
   });
 }
 
 export function useSetCheckInMode(sessionId: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ memberId, mode }: { memberId: number; mode: CheckInMode }) =>
+    mutationFn: async ({ mode, ...who }: CheckInWho & { mode: CheckInMode }) =>
       (await apiClient.patch<{ attendees: AttendanceSessionMember[] }>(
         `/attendance-sessions/${sessionId}/check_in/`,
-        { member_id: memberId, mode },
+        { ...whoBody(who as CheckInWho), mode },
       )).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['session', sessionId] }),
+  });
+}
+
+export interface RosterNewcomer {
+  id: number;
+  name: string;
+  stage: string;
+  /** On Friday Worship only: Fridays so far, as the membership rule counts them. */
+  fridays_attended?: number;
+  fridays_held?: number;
+}
+
+/** Newcomers who can be checked in to this session. */
+export function useNewcomerRoster(sessionId: number, enabled = true) {
+  return useQuery({
+    queryKey: ['newcomer-roster', sessionId],
+    enabled,
+    queryFn: async () => (await apiClient.get<{ fridays: boolean; results: RosterNewcomer[] }>(
+      `/attendance-sessions/${sessionId}/newcomer-roster/`)).data,
   });
 }
 

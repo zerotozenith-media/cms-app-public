@@ -51,8 +51,11 @@ export type CheckInMode = 'in-person' | 'online';
 
 export interface AttendanceSessionMember {
   id: number;
-  member: number;
-  member_name: string;
+  /** A row is a member or a newcomer, never both. */
+  member: number | null;
+  member_name: string | null;
+  newcomer: number | null;
+  newcomer_name: string | null;
   /** Per attendee, not per session, so one hybrid service can have some
    *  people in person and others online. */
   mode: CheckInMode;

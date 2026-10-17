@@ -11,7 +11,7 @@ from rest_framework.response import Response
 
 from accounts.audit import log_audit
 from accounts.permissions import ModulePermission, LocationScopedQuerySetMixin
-from .intake import match_invited_by_member, create_auto_tasks
+from .intake import match_invited_by_member, create_auto_tasks, check_in_today
 from .models import (
     NewcomerContactAttempt,
     NewcomerSource, MilestoneType, Newcomer, NewcomerStatusHistory,
@@ -69,6 +69,7 @@ class NewcomerViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
         log_audit(self.request.user, "Created", "Newcomer", instance.name, instance=instance)
         hand_picked = instance.assigned_to_id
         create_auto_tasks(instance)
+        check_in_today(instance)
         from alerts.events import arrival, given
         if hand_picked:
             given([("newcomer", instance.pk, instance.name, hand_picked)], by=self.request.user)
@@ -401,6 +402,7 @@ def public_newcomer_registration(request):
             invited_by_member=invited_by_member, invited_by_name=data["invited_by_name"],
         )
         create_auto_tasks(newcomer)
+        check_in_today(newcomer)
         log_audit(None, "Created (QR self-registration)", "Newcomer", newcomer.name, instance=newcomer)
         from alerts.events import arrival
         newcomer.refresh_from_db()
