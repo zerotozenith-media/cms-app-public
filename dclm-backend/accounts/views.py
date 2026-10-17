@@ -183,6 +183,7 @@ class LogoutView(APIView):
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import viewsets, filters
+from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from .permissions import ModulePermission
@@ -289,7 +290,27 @@ class UserViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         self._check_within_reach(serializer.validated_data, serializer.instance)
-        serializer.save()
+        before = serializer.instance.member_id
+        instance = serializer.save()
+        if "member" in serializer.validated_data and instance.member_id != before:
+            log_audit(self.request.user, "Linked member record", "User", instance.email,
+                      instance.member.full_name if instance.member_id else "Not a member")
+
+    @action(detail=False, methods=["get"], url_path="member-choices")
+    def member_choices(self, request):
+        """
+        Members an account can be linked to, for Member record in Admin,
+        Users. Someone limited to one location sees that location's members.
+        """
+        from members.models import Member
+        qs = Member.objects.select_related("location").order_by("surname", "first_name")
+        actor = request.user
+        if not actor.is_superuser and actor.location_id:
+            qs = qs.filter(location_id=actor.location_id)
+        linked = dict(User.objects.exclude(member=None).values_list("member_id", "id"))
+        return Response([{"id": m.id, "name": m.full_name, "location": m.location_id,
+                          "location_name": m.location.name if m.location_id else "",
+                          "linked_to": linked.get(m.id)} for m in qs])
 
     def destroy(self, request, *args, **kwargs):
         # User.delete() raises django.core.exceptions.ValidationError for

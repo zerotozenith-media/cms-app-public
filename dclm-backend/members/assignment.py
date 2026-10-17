@@ -10,6 +10,9 @@ Confirmed design:
      open task counts fluctuate week to week and would cause churn.
   4. Only fills people with no shepherd unless reassign_everyone is set,
      so pairings someone chose on purpose are not silently overwritten.
+     The exception is a shepherd who breaks a rule: a man shepherding a
+     woman, a woman shepherding a man, or someone shepherding themselves.
+     Those are always proposed for correction (members/shepherd_rules.py).
   5. Nothing is saved until the caller applies the proposed changes.
 """
 from accounts.models import User
@@ -88,27 +91,40 @@ def build_assignment_preview(location=None, reassign_everyone=False):
     changes = []
     household_choice = {}  # household_id -> shepherd chosen during this run
 
-    def add(kind, obj, name, chosen_id, reason, warn):
+    def add(kind, obj, name, chosen_id, reason, warn, correction=False, never=()):
         changes.append({
             "kind": kind, "id": obj.id, "name": name, "gender": obj.gender or "",
+            "from_id": obj.assigned_to_id,
             "from_name": _shepherd_name(obj.assigned_to) if obj.assigned_to else None,
             "to_id": chosen_id,
             "to_name": _shepherd_name(by_id[chosen_id]) if chosen_id else None,
-            "reason": reason, "warn": warn,
+            "reason": reason, "warn": warn, "correction": correction,
+            # Shepherds the reviewer must not pick: the person themselves,
+            # and a shepherd being replaced for breaking a rule.
+            "never": sorted(never),
         })
         if chosen_id:
             load[chosen_id] = load.get(chosen_id, 0) + 1
+            if obj.assigned_to_id in load:
+                load[obj.assigned_to_id] -= 1
 
-    member_qs = Member.objects.select_related("assigned_to", "household")
+    from django.db.models import Q
+    from .shepherd_rules import is_self, problem, rule_breaks
+    member_qs = Member.objects.select_related("assigned_to", "assigned_to__member", "household")
     if location:
         member_qs = member_qs.filter(location=location)
     if not reassign_everyone:
-        member_qs = member_qs.filter(assigned_to__isnull=True)
+        broken = [m.id for m, _, _ in rule_breaks(member_qs)]
+        member_qs = member_qs.filter(Q(assigned_to__isnull=True) | Q(id__in=broken))
 
     for m in member_qs:
         chosen_id, reason, warn = None, "", False
-        # A person must never be their own shepherd.
-        me = {sid for sid in by_id if by_id[sid].member_id == m.id}
+        # A person must never be their own shepherd, and a shepherd who
+        # breaks a rule is never proposed again for the same person.
+        me = {sid for sid in by_id if is_self(by_id[sid], m)}
+        wrong = problem(m) if m.assigned_to_id else None
+        if wrong:
+            me.add(m.assigned_to_id)
 
         # Household first: keep families with the same shepherd, but only
         # where the gender matches (Kay). Checks people already assigned in
@@ -126,12 +142,16 @@ def build_assignment_preview(location=None, reassign_everyone=False):
         if chosen_id is None:
             chosen_id, reason, warn = choose(m.gender, load, order, by_id, exclude=me)
 
+        if wrong:
+            # Say what is wrong rather than how the new shepherd was picked.
+            reason = wrong[0] if chosen_id else f"{wrong[0]}. {reason}"
+            warn = True
         if chosen_id is None:
             # Nobody suitable: listed so the reviewer sees why, never applied.
-            add("member", m, m.full_name, None, reason, True)
+            add("member", m, m.full_name, None, reason, True, bool(wrong), me)
             continue
         if chosen_id != m.assigned_to_id:
-            add("member", m, m.full_name, chosen_id, reason, warn)
+            add("member", m, m.full_name, chosen_id, reason, warn, bool(wrong), me)
             if m.household_id and (m.household_id, m.gender) not in household_choice:
                 household_choice[(m.household_id, m.gender)] = chosen_id
 

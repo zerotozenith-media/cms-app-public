@@ -17,6 +17,14 @@ class MemberSerializer(serializers.ModelSerializer):
     category_history = MemberCategoryHistorySerializer(many=True, read_only=True)
     total_given = serializers.SerializerMethodField()
     assigned_to_name = serializers.SerializerMethodField()
+    # What is wrong with their shepherd, if anything, for the note under
+    # the shepherd's name: "A man shepherds her" (members/shepherd_rules.py).
+    shepherd_problem = serializers.SerializerMethodField()
+
+    def get_shepherd_problem(self, obj):
+        from .shepherd_rules import problem
+        p = problem(obj) if obj.assigned_to_id else None
+        return p[1] if p else ""
 
     # How they came to the church, where that is known. The only place
     # the journey work shows up on the member record.
@@ -42,6 +50,9 @@ class MemberSerializer(serializers.ModelSerializer):
             {u.id for u in eligible_shepherds()}
         if user.id not in allowed:
             raise serializers.ValidationError("Choose a shepherd: a Worker with an account at this location.")
+        from .shepherd_rules import is_self
+        if self.instance is not None and is_self(user, self.instance):
+            raise serializers.ValidationError("Nobody can shepherd themselves. Choose someone else.")
         from accounts.gender import can_pair, mismatch_message
         gender = self.initial_data.get("gender", getattr(self.instance, "gender", "")) or ""
         if not can_pair(gender, user):
@@ -56,6 +67,7 @@ class MemberSerializer(serializers.ModelSerializer):
             "category",  # read-only below , see note
             "location", "joined_date", "household", "household_name",
             "category_history", "total_given", "assigned_to", "assigned_to_name",
+            "shepherd_problem",
         ]
         read_only_fields = ["id", "category"]
         # `category` is deliberately read-only here: changing it directly via

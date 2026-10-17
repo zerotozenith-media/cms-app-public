@@ -47,7 +47,7 @@ class HouseholdViewSet(viewsets.ModelViewSet):
 class MemberViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
     module = "members"
     permission_classes = [ModulePermission]
-    queryset = Member.objects.select_related("location", "household", "assigned_to").prefetch_related("category_history")
+    queryset = Member.objects.select_related("location", "household", "assigned_to", "assigned_to__member").prefetch_related("category_history")
     serializer_class = MemberSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["surname", "first_name", "other_names", "email", "phone"]
@@ -149,6 +149,21 @@ class MemberViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
             "workers": base.filter(category="Worker").count(),
             "workers_in_training": base.filter(category="Worker in Training").count(),
             "general_members": base.filter(category="General Member").count(),
+        })
+
+    @action(detail=False, methods=["get"], url_path="shepherd-problems")
+    def shepherd_problems(self, request):
+        """
+        Members whose shepherd breaks a rule: a man shepherding a woman, a
+        woman shepherding a man, or someone shepherding themselves. Across
+        every page of the list, for the box at the top of Members.
+        """
+        from .shepherd_rules import rule_breaks
+        base = LocationScopedQuerySetMixin.get_queryset(self)
+        found = rule_breaks(base.order_by("surname", "first_name"))
+        return Response({
+            "count": len(found),
+            "people": [{"id": m.id, "name": m.full_name, "tag": tag} for m, _, tag in found],
         })
 
     def perform_destroy(self, instance):
@@ -416,6 +431,11 @@ class BulkAssignShepherdView(APIView):
         qs = Member.objects.filter(id__in=data["member_ids"])
         if not request.user.is_superuser and request.user.location_id:
             qs = qs.filter(location_id=request.user.location_id)
+        from .shepherd_rules import is_self
+        himself = [m for m in qs if is_self(shepherd, m)]
+        if himself:
+            return Response({"detail": f"Nobody can shepherd themselves. Not saved, because {himself[0].full_name} "
+                                       "is ticked. Untick them or choose someone else."}, status=400)
         from accounts.gender import can_pair, WORD
         clash = [m for m in qs if not can_pair(m.gender, shepherd)]
         if clash:
@@ -454,6 +474,12 @@ class EligibleShepherdsView(APIView):
         if not request.user.is_superuser and request.user.location_id:
             location = request.user.location_id
         shepherds = eligible_shepherds(location)
+        # On a member's profile, never offer that member themselves.
+        member = Member.objects.filter(id=request.query_params.get("member") or 0).first() \
+            if str(request.query_params.get("member") or "").isdigit() else None
+        if member:
+            from .shepherd_rules import is_self
+            shepherds = [s for s in shepherds if not is_self(s, member)]
         from accounts.gender import shepherd_gender
         return Response([
             {"id": s.id, "name": display_name(s), "gender": shepherd_gender(s)} for s in shepherds
@@ -482,6 +508,7 @@ def _apply_reviewer_edits(changes, data, location):
         if to_id in eligible:
             overrides[key] = to_id
     from accounts.gender import can_pair
+    from .shepherd_rules import is_self
     skips = set()
     for s in (data.get("skips") or []):
         try:
@@ -496,9 +523,13 @@ def _apply_reviewer_edits(changes, data, location):
             skipped += 1
             continue
         if key in overrides and overrides[key] != ch["to_id"]:
-            # Men follow up men, women follow up women (Kay). A hand pick
-            # that breaks this is ignored, like any other bad override.
-            if can_pair(ch.get("gender", ""), eligible[overrides[key]]):
+            # Men follow up men, women follow up women (Kay), and nobody
+            # shepherds themselves. A hand pick that breaks either is
+            # ignored, like any other bad override.
+            pick = eligible[overrides[key]]
+            selfpick = ch["kind"] == "member" and any(
+                is_self(pick, m) for m in Member.objects.filter(id=ch["id"]))
+            if can_pair(ch.get("gender", ""), pick) and not selfpick:
                 ch = dict(ch, to_id=overrides[key], reason="Chosen by hand")
                 hand_picked += 1
         if not ch.get("to_id"):
@@ -520,9 +551,11 @@ def _load_summary(location, changes):
     now = current_load(shepherds)
     from accounts.gender import shepherd_gender
     gained = Counter(ch["to_id"] for ch in changes if ch.get("to_id"))
+    # Someone moving to a new shepherd leaves their old one.
+    lost = Counter(ch.get("from_id") for ch in changes if ch.get("to_id") and ch.get("from_id"))
     return sorted(({
         "id": s.id, "name": _shepherd_name(s), "gender": shepherd_gender(s),
         "now": now.get(s.id, 0),
-        "after": now.get(s.id, 0) + gained.get(s.id, 0),
+        "after": now.get(s.id, 0) + gained.get(s.id, 0) - lost.get(s.id, 0),
     } for s in shepherds), key=lambda x: x["name"])
 

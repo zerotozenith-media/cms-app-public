@@ -169,6 +169,21 @@ class Command(BaseCommand):
                       "Auto-assign gives them nobody. In Admin, Users, choose Male or Female for each.")
         elif shepherds:
             self.ok(f"every shepherd has a gender set ({len(shepherds)})")
+        # Men shepherd men, women shepherd women, and nobody shepherds
+        # themselves (Kay, 17 October 2026). Older pairings were never
+        # rechecked, so they are counted here.
+        from members.models import Member
+        from members.shepherd_rules import rule_breaks
+        broken = rule_breaks(Member.objects.all())
+        if broken:
+            names = ", ".join(f"{m.full_name} ({tag.lower()})" for m, _, tag in broken[:5])
+            more = f" and {len(broken) - 5} more" if len(broken) > 5 else ""
+            self.warn(f"{len(broken)} member(s) have a shepherd who breaks the rules: {names}{more}",
+                      "In Members, press Correct with Auto-assign, check the proposal and press Apply.")
+        else:
+            self.ok("every member's shepherd keeps the rules: same gender, and nobody shepherds themselves")
+        linked = User.objects.exclude(member=None).count()
+        self.ok(f"{linked} of {count} account(s) linked to a member record")
 
     def check_scheduled_jobs(self):
         """

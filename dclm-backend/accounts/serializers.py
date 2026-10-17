@@ -51,6 +51,16 @@ class UserSerializer(serializers.ModelSerializer):
     def get_full_name(self, obj):
         return display_name(obj)
 
+    def validate_member(self, member):
+        """One member record belongs to one account."""
+        if member is None:
+            return None
+        other = User.objects.filter(member=member).exclude(pk=getattr(self.instance, "pk", None)).first()
+        if other:
+            raise serializers.ValidationError(
+                f"{member.full_name} is already the member record of {display_name(other)}.")
+        return member
+
     def validate_password(self, value):
         try:
             validate_password(value)
@@ -64,6 +74,11 @@ class UserSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"password": "Password is required when creating a user."})
         user = User(**validated_data)
         user.set_password(password)
+        if "member" not in validated_data:
+            # Linked by name where that is certain (accounts/linking.py).
+            from accounts.linking import find_member
+            from members.models import Member
+            user.member = find_member(user, Member, User)
         user.save()
         return user
 
