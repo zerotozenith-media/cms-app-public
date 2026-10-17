@@ -1157,6 +1157,11 @@ td.td-actions .icon-btn + .icon-btn,.row-actions .icon-btn + .icon-btn,td.td-act
 .kcard-gender{margin-top:6px}
 .load-group{font-weight:800;font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);align-self:center}
 .user-gender{min-width:120px;min-height:36px}
+.user-member{min-width:150px;max-width:220px;min-height:36px}
+.member-record-note{font-size:.82rem;margin:0 0 10px}
+.shepherd-problems{margin:0 0 14px}
+.shepherd-problems p{font-size:.86rem;margin:0 0 10px}
+.shepherd-problem-tag{display:block;font-size:.76rem;font-weight:600;color:#8A5E00;margin-top:2px}
 .field-note{font-size:.8rem;margin-top:4px}
 .load-item .gender-tag{margin:3px 6px 2px 0}
 .row-warn td{background:#FFFBEF}

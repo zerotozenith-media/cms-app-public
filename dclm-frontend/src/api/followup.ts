@@ -3,7 +3,7 @@ import { apiClient } from './client';
 import type { PaginatedResponse } from '../types/members';
 import type {
   MemberFollowUpTask, CompleteFollowUpPayload, FollowUpStats,
-  AssignmentPreview, AssignmentApplyResult,
+  AssignmentPreview, AssignmentApplyResult, ShepherdProblems,
 } from '../types/members';
 
 /* ---- Member follow-up tasks ---- */
@@ -137,12 +137,24 @@ export interface EligibleShepherd {
 /** Who the bulk-assign dropdown may offer. Comes from the same source
  *  the auto-assign engine uses, so the dropdown can never list someone
  *  the API would then reject. */
-export function useEligibleShepherds(location?: string) {
+export function useEligibleShepherds(location?: string, member?: number) {
   return useQuery({
-    queryKey: ['eligible-shepherds', location ?? ''],
+    queryKey: ['eligible-shepherds', location ?? '', member ?? ''],
     queryFn: async () =>
       (await apiClient.get<EligibleShepherd[]>('/members/eligible-shepherds/', {
-        params: location ? { location } : {} })).data,
+        // On a member's profile, the member themselves is never offered.
+        params: { ...(location ? { location } : {}), ...(member ? { member } : {}) } })).data,
+  });
+}
+
+/** Members whose shepherd breaks a rule: a man shepherding a woman, a
+ *  woman shepherding a man, or someone shepherding themselves. Under the
+ *  'members' key, so it refreshes whenever members do. */
+export function useShepherdProblems(enabled = true) {
+  return useQuery({
+    queryKey: ['members', 'shepherd-problems'],
+    enabled,
+    queryFn: async () => (await apiClient.get<ShepherdProblems>('/members/shepherd-problems/')).data,
   });
 }
 

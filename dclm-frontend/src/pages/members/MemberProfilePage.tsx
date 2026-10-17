@@ -47,7 +47,7 @@ export function MemberProfilePage() {
   const updateMember = useUpdateMember(memberId);
   // Who looks after this person, shown on the profile and changeable here.
   // It was missing entirely, so nobody could see it without the list.
-  const { data: shepherds } = useEligibleShepherds(member?.location);
+  const { data: shepherds } = useEligibleShepherds(member?.location, member?.id);
   const [shepherdError, setShepherdError] = useState('');
   async function changeShepherd(value: string) {
     setShepherdError('');
@@ -262,6 +262,11 @@ export function MemberProfilePage() {
             </div>
             {!member.gender && member.assigned_to && (
               <span className="gender-warn">Gender not known. Check this shepherd is right, then set the gender.</span>
+            )}
+            {member.shepherd_problem && (
+              <span className="gender-warn" role="status">
+                {member.shepherd_problem}. {canEdit ? 'Choose another shepherd.' : 'Someone who can change members can choose another shepherd.'}
+              </span>
             )}
             {shepherdError && <p className="form-error" role="alert">{shepherdError}</p>}
             <div className="pf"><span>Household</span><span>{household?.name ?? 'None'}</span></div>

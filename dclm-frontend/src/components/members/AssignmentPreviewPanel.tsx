@@ -48,13 +48,20 @@ export function AssignmentPreviewPanel({
     const out = new Map(load.map((s) => [s.id, s.now]));
     changes.forEach((c) => {
       const to = pick(c);
-      if (to !== SKIP) out.set(to, (out.get(to) ?? 0) + 1);
+      if (to !== SKIP) {
+        out.set(to, (out.get(to) ?? 0) + 1);
+        // Someone moving to a new shepherd leaves their old one.
+        if (c.from_id && out.has(c.from_id)) out.set(c.from_id, (out.get(c.from_id) ?? 0) - 1);
+      }
     });
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [changes, load, chosen]);
 
   const skipped = changes.filter((c) => pick(c) === SKIP).length;
+  // Shepherds who break a rule, being replaced rather than gaps filled.
+  const corrections = changes.filter((c) => c.correction).length;
+  const onlyCorrections = corrections > 0 && corrections === changes.length && !reassignEveryone;
   const applying_n = changes.length - skipped;
 
   function submit() {
@@ -72,14 +79,19 @@ export function AssignmentPreviewPanel({
   return (
     <div className="assign-preview">
       <div className="assign-preview-title">
-        <Icon name="alert" size={15} /> Review before applying: {changes.length} change
-        {changes.length === 1 ? '' : 's'}
+        <Icon name="alert" size={15} /> Review before applying: {changes.length}{' '}
+        {onlyCorrections ? `correction${changes.length === 1 ? '' : 's'}` : `change${changes.length === 1 ? '' : 's'}`}
       </div>
       <div className="muted" style={{ fontSize: '.8rem', marginBottom: 10 }}>
-        {reassignEveryone
-          ? 'Reassigning everyone, including people who already have a shepherd.'
-          : 'Only filling people who currently have no shepherd. Existing pairings are left alone.'}
-        {' '}Men go to men, women to women. A family stays with one shepherd only where the gender matches. Change any row before applying.
+        {onlyCorrections
+          ? `Nobody is waiting for a shepherd. ${corrections === 1 ? 'This one breaks' : `These ${corrections} break`} the rules, so ${corrections === 1 ? 'it is' : 'each is'} given a new shepherd: men go to men, women to women, and nobody shepherds themselves. Change any row before applying.`
+          : <>
+            {reassignEveryone
+              ? 'Reassigning everyone, including people who already have a shepherd.'
+              : 'Only filling people who currently have no shepherd. Existing pairings are left alone.'}
+            {!reassignEveryone && corrections > 0 && ` The exception is ${corrections === 1 ? 'one shepherd who breaks' : `${corrections} shepherds who break`} the rules, replaced below.`}
+            {' '}Men go to men, women to women, and nobody shepherds themselves. A family stays with one shepherd only where the gender matches. Change any row before applying.
+          </>}
       </div>
       {notice && <div className="gender-notice" role="status">{notice}</div>}
 
@@ -120,10 +132,10 @@ export function AssignmentPreviewPanel({
                     <select className="selectbox assign-to" value={to}
                       aria-label={`Shepherd for ${c.name}`}
                       onChange={(e) => setChosen({ ...chosen, [key(c)]: Number(e.target.value) })}>
-                      {load.filter((s) => canPair(c.gender, s.gender) || s.id === c.to_id).map((s) => (
+                      {load.filter((s) => (canPair(c.gender, s.gender) || s.id === c.to_id) && !(c.never ?? []).includes(s.id)).map((s) => (
                         <option key={s.id} value={s.id}>{s.name}</option>
                       ))}
-                      <option value={SKIP}>Leave unassigned</option>
+                      <option value={SKIP}>{c.correction ? 'Leave as it is' : 'Leave unassigned'}</option>
                     </select>
                   </td>
                   <td data-label="Why">

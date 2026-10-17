@@ -24,11 +24,11 @@ export const HELP_TOPICS: Record<string, HelpTopic> = {
   fuKeepInTouch: { title: 'Keep in touch', body: 'Ticked, they receive a short word of encouragement from the person following them up. They can ask to stop at any time.' },
   shepherd: {
     title: 'Assigned shepherd',
-    body: 'The worker responsible for checking on this person if they miss a service. When an absence is detected, the follow-up task goes to them automatically. Someone with no shepherd still gets a task, it just shows as Unassigned so it can be picked up.',
+    body: 'The worker responsible for checking on this person if they miss a service. When an absence is detected, the follow-up task goes to them automatically. Someone with no shepherd still gets a task, it just shows as Unassigned so it can be picked up. Men shepherd men, women shepherd women, and nobody shepherds themselves.',
   },
   autoAssign: {
     title: 'How auto-assign decides',
-    body: 'Two rules, in order. First, if someone else in the same household already has a shepherd, the same person is used so families are not split across different workers. Everyone else goes to whichever worker currently carries the fewest people. Only members in the Worker category can be shepherds. Nothing is saved until you review the proposed changes and press Apply. You can change or skip any row first.',
+    body: 'Two rules, in order. First, if someone else in the same household already has a shepherd, the same person is used so families are not split across different workers. Everyone else goes to whichever shepherd currently carries the fewest people. Men go to men, women to women, and nobody is given themselves. Only accounts ticked Can shepherd others in Admin can be shepherds. Anyone whose shepherd breaks those rules is also proposed for a new one, marked with the reason. Nothing is saved until you review the proposed changes and press Apply. You can change or skip any row first.',
   },
   reassignEveryone: {
     title: 'Reassign everyone',

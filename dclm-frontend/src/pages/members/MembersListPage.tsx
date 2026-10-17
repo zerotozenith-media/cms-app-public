@@ -4,7 +4,7 @@ import { useHouseholds, useMembers, useMemberStats, useDeleteMember } from '../.
 import { StatRow, type StatItem } from '../../components/ui/StatRow';
 import {
   useFollowUpStats, useEligibleShepherds,
-  useAssignmentPreview, useApplyAssignment, useBulkAssignShepherd,
+  useAssignmentPreview, useApplyAssignment, useBulkAssignShepherd, useShepherdProblems,
 } from '../../api/followup';
 import { AssignmentPreviewPanel } from '../../components/members/AssignmentPreviewPanel';
 import { Skeleton } from '../../components/ui/Skeleton';
@@ -14,6 +14,21 @@ import { Icon } from '../../components/ui/Icon';
 import { HelpMark } from '../../components/ui/HelpMark';
 import { useAuth } from '../../context/AuthContext';
 import { useLocationName } from '../../api/locations';
+
+/** "Gloria Afari is shepherded by a man, Chinedu Uguru is shepherded by a
+ *  woman, and Kwabena Afari shepherds himself." Names the first four. */
+function problemSentence(people: { name: string; tag: string }[]): string {
+  const part = (p: { name: string; tag: string }) => {
+    const t = p.tag.toLowerCase();
+    if (t.startsWith('a man')) return `${p.name} is shepherded by a man`;
+    if (t.startsWith('a woman')) return `${p.name} is shepherded by a woman`;
+    return `${p.name} ${t}`;
+  };
+  const shown = people.slice(0, 4).map(part);
+  if (people.length > 4) shown.push(`${people.length - 4} more`);
+  const list = shown.length === 1 ? shown[0] : `${shown.slice(0, -1).join(', ')} and ${shown[shown.length - 1]}`;
+  return `${list}.`;
+}
 
 function categoryBadgeColor(cat: string): 'green' | 'amber' | 'gray' {
   if (cat === 'Worker') return 'green';
@@ -48,6 +63,7 @@ export function MembersListPage() {
   const { data: households } = useHouseholds();
 
   const { data: shepherds } = useEligibleShepherds();
+  const { data: problems } = useShepherdProblems();
   const preview = useAssignmentPreview(previewMode === 'everyone', previewMode !== null);
   const applyAssignment = useApplyAssignment();
   const bulkAssign = useBulkAssignShepherd();
@@ -177,6 +193,21 @@ export function MembersListPage() {
           </div>
         )}
 
+        {/* Shepherds who break a rule: a man shepherding a woman, a woman
+            shepherding a man, or someone shepherding themselves (Kay). */}
+        {!previewMode && (problems?.count ?? 0) > 0 && (
+          <div className="assign-preview shepherd-problems" role="status">
+            <div className="assign-preview-title">
+              <Icon name="alert" size={15} /> {problems!.count === 1 ? '1 member has' : `${problems!.count} members have`} a shepherd who breaks the rules
+            </div>
+            <p className="muted">
+              {problemSentence(problems!.people)} Men shepherd men, women shepherd women, and nobody shepherds themselves.
+              {canEdit ? ' Auto-assign proposes a correct shepherd for each, and you check before anything changes.' : ' Someone who can change members can correct this with Auto-assign.'}
+            </p>
+            {canEdit && <button className="btn sm" onClick={() => setPreviewMode('unassigned')}>Correct with Auto-assign</button>}
+          </div>
+        )}
+
         {previewMode && preview.data && preview.data.changes.length > 0 && (
           <AssignmentPreviewPanel
             notice={preview.data.notice}
@@ -288,7 +319,10 @@ export function MembersListPage() {
                   <td data-label="Category">
                     <Badge color={categoryBadgeColor(m.category)}>{m.category}</Badge>
                   </td>
-                  <td data-label="Shepherd">{m.assigned_to_name || <span className="muted">Unassigned</span>}</td>
+                  <td data-label="Shepherd">
+                    {m.assigned_to_name || <span className="muted">Unassigned</span>}
+                    {m.shepherd_problem && <span className="shepherd-problem-tag">{m.shepherd_problem}</span>}
+                  </td>
                   <td data-label="Household">{m.household_name || <span className="muted">–</span>}</td>
                   <td data-label="How they came">{m.arrived_via || <span className="muted">–</span>}</td>
                   <td data-label="Location">{locationName(m.location)}</td>

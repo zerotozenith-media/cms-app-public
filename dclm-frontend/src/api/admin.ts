@@ -29,7 +29,7 @@ export function useDeleteUser() {
 export function useUpdateUser() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...data }: { id: number; can_shepherd?: boolean; gender?: string }) => {
+    mutationFn: async ({ id, ...data }: { id: number; can_shepherd?: boolean; gender?: string; member?: number | null }) => {
       const r = await apiClient.patch(`/users/${id}/`, data);
       return r.data;
     },
@@ -39,7 +39,27 @@ export function useUpdateUser() {
       qc.invalidateQueries({ queryKey: ['admin-users'] });
       qc.invalidateQueries({ queryKey: ['eligible-shepherds'] });
       qc.invalidateQueries({ queryKey: ['enquiry-followup-people'] });
+      // Linking a member record can show or clear "Shepherds himself".
+      qc.invalidateQueries({ queryKey: ['members'] });
+      qc.invalidateQueries({ queryKey: ['member-choices'] });
     },
+  });
+}
+
+export interface MemberChoice {
+  id: number;
+  name: string;
+  location: string | null;
+  location_name: string;
+  /** The account already linked to this member, if any. */
+  linked_to: number | null;
+}
+
+/** Members an account can be linked to, for Member record in Admin, Users. */
+export function useMemberChoices() {
+  return useQuery({
+    queryKey: ['member-choices'],
+    queryFn: async () => (await apiClient.get<MemberChoice[]>('/users/member-choices/')).data,
   });
 }
 

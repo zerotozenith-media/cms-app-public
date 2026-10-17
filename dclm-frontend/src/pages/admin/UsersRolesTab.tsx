@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAdminUsers, useCreateUser, useDeleteUser, useUpdateUser, useRoles, useCreateRole, useDeleteRole } from '../../api/admin';
+import { useAdminUsers, useCreateUser, useDeleteUser, useUpdateUser, useRoles, useCreateRole, useDeleteRole, useMemberChoices } from '../../api/admin';
 import { useMyLocations } from '../../api/locations';
 import { RolePermissionMatrix } from '../../components/admin/RolePermissionMatrix';
 import { Skeleton } from '../../components/ui/Skeleton';
@@ -23,6 +23,19 @@ export function UsersRolesTab() {
   const canEditUser = hasPermission('admin', 'edit');
   const [canShepherd, setCanShepherd] = useState(false);
   const [gender, setGender] = useState('');
+  // Member record: which person on the member roll each account is, so
+  // nobody is ever given themselves to shepherd (Kay, 17 October 2026).
+  const { data: memberChoices } = useMemberChoices();
+  const [linkError, setLinkError] = useState('');
+  const manyPlaces = new Set((memberChoices ?? []).map((m) => m.location)).size > 1;
+  async function linkMember(userId: number, value: string) {
+    setLinkError('');
+    try {
+      await updateUser.mutateAsync({ id: userId, member: value ? Number(value) : null });
+    } catch (e: any) {
+      setLinkError(e?.response?.data?.member?.[0] ?? 'The member record could not be saved. Try again.');
+    }
+  }
   const deleteUser = useDeleteUser();
   const createRole = useCreateRole();
   const deleteRole = useDeleteRole();
@@ -157,9 +170,15 @@ export function UsersRolesTab() {
             <b>{noGender.join(', ')}</b> {noGender.length === 1 ? 'can' : 'can each'} shepherd others but {noGender.length === 1 ? 'has' : 'have'} no gender set. Auto-assign will not give them anyone until you set it.
           </div>
         )}
+        {canEditUser && <p className="muted member-record-note">
+          <b>Member record</b> links an account to that person on the member roll, so nobody is ever given
+          themselves to shepherd. Accounts are linked where the names match exactly. Leave <b>Not a member</b> for
+          someone who is not on the roll.
+        </p>}
+        {linkError && <div className="form-error" role="alert">{linkError}</div>}
         <div style={{ overflowX: 'auto' }}>
           <table className="cardtable">
-            <thead><tr><th>Name</th><th>Role</th><th>Gender</th><th>Location</th><th></th></tr></thead>
+            <thead><tr><th>Name</th><th>Role</th><th>Gender</th><th>Member record</th><th>Location</th><th></th></tr></thead>
             <tbody>
               {(users ?? []).map((u) => (
                 <tr key={u.id}>
@@ -181,6 +200,18 @@ export function UsersRolesTab() {
                         <option value="">Not set</option><option>Male</option><option>Female</option>
                       </select>
                     ) : <span>{u.gender || <span className="muted">Not set</span>}</span>}
+                  </td>
+                  <td data-label="Member record">
+                    {canEditUser ? (
+                      <select className="selectbox user-member" aria-label={`Member record of ${u.full_name}`}
+                        value={u.member ?? ''} disabled={updateUser.isPending}
+                        onChange={(e) => linkMember(u.id, e.target.value)}>
+                        <option value="">Not a member</option>
+                        {(memberChoices ?? []).filter((m) => !m.linked_to || m.linked_to === u.id).map((m) => (
+                          <option key={m.id} value={m.id}>{m.name}{manyPlaces && m.location_name ? ` · ${m.location_name}` : ''}</option>
+                        ))}
+                      </select>
+                    ) : <span>{(memberChoices ?? []).find((m) => m.id === u.member)?.name ?? <span className="muted">Not a member</span>}</span>}
                   </td>
                   <td data-label="Location">{u.location_name ?? 'All locations'}</td>
                   <td className="td-actions">

@@ -36,6 +36,15 @@ export interface Member {
    *  attached and shows in the Unassigned count. */
   assigned_to: number | null;
   assigned_to_name: string | null;
+  /** What is wrong with their shepherd, such as "A man shepherds her",
+   *  or empty when the pairing keeps the rules. */
+  shepherd_problem?: string;
+}
+
+/** Members whose shepherd breaks a rule, for the box at the top of Members. */
+export interface ShepherdProblems {
+  count: number;
+  people: { id: number; name: string; tag: string }[];
 }
 
 export interface Household {
@@ -128,7 +137,12 @@ export interface AssignmentChange {
   id: number;
   name: string;
   gender?: string;
+  from_id?: number | null;
   from_name: string | null;
+  /** A shepherd who breaks a rule is being replaced, not a gap filled. */
+  correction?: boolean;
+  /** Shepherds never offered for this person: themselves, and one being replaced. */
+  never?: number[];
   /** null when nobody suitable exists, shown so the reviewer sees why. */
   to_id: number | null;
   to_name: string | null;
