@@ -246,7 +246,7 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
         # Manual check: undoing a check-in by tapping again was refused for
         # ushers, because the general rule treats any DELETE as deleting a
         # record. check_in applies its own rule (edit attendance) inside.
-        if getattr(self, "action", None) == "check_in":
+        if getattr(self, "action", None) in ("check_in", "follow_up_absent"):
             from rest_framework.permissions import IsAuthenticated
             return [IsAuthenticated()]
         return super().get_permissions()
@@ -315,6 +315,45 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
         fresh_attendees = AttendanceSessionMember.objects.filter(session=session).select_related("member", "newcomer")
         return Response({
             "attendees": AttendanceSessionMemberSerializer(fresh_attendees, many=True).data,
+        })
+
+    @action(detail=True, methods=["get", "post"], url_path="follow-up-absent")
+    def follow_up_absent(self, request, pk=None):
+        """
+        "Follow up those not ticked" on a service ticked off afterwards
+        (Kay, 17 Oct 2026). The automatic check covers services that follow
+        up absence for 7 days; anything older, or any other meeting, is
+        followed up only when somebody asks. GET says how many, POST makes
+        the tasks. The same rules as the automatic check apply.
+        """
+        require(request.user, ("attendance", "can_edit"))
+        session = self.get_object()
+        from .absence import create_tasks, followed_up_automatically, plan
+        if session.date >= timezone.localdate():
+            return Response({"detail": "This is for services on an earlier day. Today's are followed up automatically."}, status=400)
+        if followed_up_automatically(session):
+            return Response({"detail": "This service is followed up automatically, so there is nothing to do here."}, status=400)
+        p = plan(session)
+        if not p["ticked"]:
+            msg = "Tick who came first. With nobody ticked, everyone would be followed up."
+            if request.method == "POST":
+                return Response({"detail": msg}, status=400)
+            return Response({"blocked": msg, "to_follow_up": 0, "names": [], "ticked": [], "already": 0,
+                             "open_elsewhere": 0, "tracked": bool(session.meeting_type.counts_for_absence)})
+        names = lambda ms: [m.full_name for m in ms]
+        if request.method == "POST":
+            made = create_tasks(session, p["to_follow_up"])
+            log_audit(request.user, "Followed up absentees", "Attendance Session", str(session),
+                      f"{made} follow-up task(s) for members not ticked", instance=session)
+            return Response({"created": made}, status=201)
+        from members.models import Member
+        return Response({
+            "to_follow_up": len(p["to_follow_up"]),
+            "names": names(p["to_follow_up"]),
+            "ticked": names(Member.objects.filter(id__in=p["ticked"]).order_by("surname", "first_name")),
+            "already": len(p["already"]),
+            "open_elsewhere": len(p["open_elsewhere"]),
+            "tracked": bool(session.meeting_type.counts_for_absence),
         })
 
     @action(detail=True, methods=["get"], url_path="newcomer-roster")

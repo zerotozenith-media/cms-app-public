@@ -29,12 +29,13 @@ from django.utils import timezone
 from attendance.models import AttendanceSession, MeetingType
 from members.models import Member, MemberFollowUpTask
 
+from attendance.absence import AUTO_LOOKBACK_DAYS, FOLLOWUP_DUE_IN_DAYS  # noqa: F401
+
 HOURS_AFTER_START = 3
-FOLLOWUP_DUE_IN_DAYS = 2
 # A session whose headcount was saved early is still checked, for this
 # many days after it, so switching this on never reaches back to old
 # services and floods shepherds with tasks for months ago.
-FILLED_LOOKBACK_DAYS = 7
+FILLED_LOOKBACK_DAYS = AUTO_LOOKBACK_DAYS
 
 
 class Command(BaseCommand):
@@ -76,49 +77,8 @@ class Command(BaseCommand):
         ))
 
     def _process_session(self, session):
-        # Only chase the people who were actually expected. Without this,
-        # a workers meeting marked for absence follow-up would create a
-        # task for every general member who was never invited, and the
-        # follow-up list would become noise workers learn to ignore.
-        roster = Member.objects.filter(location=session.location)
-        audience = getattr(session.meeting_type, "audience", MeetingType.Audience.EVERYONE)
-        if audience == MeetingType.Audience.WORKERS:
-            roster = roster.filter(category=Member.Category.WORKER)
-        elif audience == MeetingType.Audience.LEADERSHIP:
-            roster = roster.filter(is_leader=True)
-
-        checked_in_ids = set(session.attendees.values_list("member_id", flat=True))
-        absentees = roster.exclude(id__in=checked_in_ids)
-
-        created = 0
-        for member in absentees:
-            # Idempotency against re-running the command on the same
-            # session , regardless of done status, this exact session's
-            # absence for this exact member is only ever recorded once.
-            already_processed = MemberFollowUpTask.objects.filter(
-                member=member, missed_session=session,
-            ).exists()
-            if already_processed:
-                continue
-
-            # The confirmed "don't stack tasks" rule , a genuinely
-            # different, still-open follow-up from an earlier absence
-            # blocks a new one; a *resolved* earlier one does not.
-            has_other_open_task = MemberFollowUpTask.objects.filter(
-                member=member, done=False,
-            ).exclude(missed_session=session).exists()
-            if has_other_open_task:
-                continue
-
-            MemberFollowUpTask.objects.create(
-                member=member,
-                text=f"Missed {session.meeting_type.name}, check in with them",
-                due_date=timezone.localdate() + datetime.timedelta(days=FOLLOWUP_DUE_IN_DAYS),
-                assigned_to=member.assigned_to,
-                missed_session=session,
-                missed_meeting_name=session.meeting_type.name,
-                missed_date=session.date,
-            )
-            created += 1
-
-        return created
+        # Only the people expected at the meeting, once per service, and
+        # never stacked on an open follow-up: the rules live in absence.py,
+        # shared with "Follow up those not ticked".
+        from attendance.absence import create_tasks, plan
+        return create_tasks(session, plan(session)["to_follow_up"])

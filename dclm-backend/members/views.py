@@ -252,9 +252,12 @@ class MemberFollowUpTaskViewSet(LocationScopedMixin, viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         instance = self._save_within_reach(serializer)
+        # A task added by hand on the profile has no missed service.
+        detail = (f"Missed {instance.missed_meeting_name} on {instance.missed_date}" if instance.missed_meeting_name
+                  else instance.text)
         log_audit(
             self.request.user, "Created follow-up task", "Member", instance.member.full_name,
-            f"Missed {instance.missed_meeting_name} on {instance.missed_date}", instance=instance,
+            detail, instance=instance,
         )
 
     @action(detail=True, methods=["post"])

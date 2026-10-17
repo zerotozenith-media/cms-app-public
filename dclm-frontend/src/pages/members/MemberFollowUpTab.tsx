@@ -113,7 +113,7 @@ export function MemberFollowUpTab() {
                 <b style={{ cursor: 'pointer', color: 'var(--blue-deep)' }}
                   onClick={() => navigate(`/members/${t.member}`)}>{t.member_name}</b>
                 <div className="muted" style={{ fontSize: '.8rem' }}>
-                  Missed {t.missed_meeting_name} on {t.missed_date} · Shepherd: {t.assigned_to_name || 'Unassigned'}
+                  {t.missed_meeting_name ? `Missed ${t.missed_meeting_name} on ${t.missed_date}` : t.text} · Shepherd: {t.assigned_to_name || 'Unassigned'}
                 </div>
                 {t.done && <CompletedFollowUpLog log={t} />}
               </div>

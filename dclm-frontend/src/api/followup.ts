@@ -145,3 +145,17 @@ export function useEligibleShepherds(location?: string) {
         params: location ? { location } : {} })).data,
   });
 }
+
+/** A follow-up task added by hand on a member's profile. Goes to their
+ *  shepherd unless somebody else is chosen. */
+export function useAddMemberTask(memberId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { text: string; due_date: string; assigned_to: number | null }) =>
+      (await apiClient.post<MemberFollowUpTask>('/member-followup-tasks/', { member: memberId, ...payload })).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['member-followup-tasks'] });
+      qc.invalidateQueries({ queryKey: ['person', 'members', memberId] });
+    },
+  });
+}

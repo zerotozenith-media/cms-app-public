@@ -142,8 +142,10 @@ class MemberFollowUpTask(models.Model):
         "attendance.AttendanceSession", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="generated_followups",
     )
-    missed_meeting_name = models.CharField(max_length=150)
-    missed_date = models.DateField()
+    # Blank for a task added by hand on the member's profile (Kay, 17 Oct
+    # 2026), which is not about a particular missed service.
+    missed_meeting_name = models.CharField(max_length=150, blank=True, default="")
+    missed_date = models.DateField(null=True, blank=True)
     # Visitation-outcome logging , the same real gap fixed on NewcomerTask,
     # fixed here too rather than only on one of the two.
     contact_date = models.DateField(null=True, blank=True)

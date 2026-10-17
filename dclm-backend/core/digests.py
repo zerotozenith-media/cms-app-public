@@ -8,6 +8,8 @@ touching scheduling or delivery.
 Tone follows the rest of the system: plain, specific, and pointing at
 the one thing the reader should do next.
 """
+from html import escape
+
 from django.conf import settings
 from django.utils import timezone
 
@@ -47,7 +49,8 @@ def build_shepherd_digest(shepherd_name, tasks, today=None):
     ]
     for t in sorted(tasks, key=lambda x: x.due_date):
         marker = "OVERDUE" if t.due_date < today else f"due {t.due_date}"
-        lines.append(f"  {t.member.full_name}, missed {t.missed_meeting_name} on {t.missed_date} ({marker})")
+        what = f"missed {t.missed_meeting_name} on {t.missed_date}" if t.missed_meeting_name else t.text
+        lines.append(f"  {t.member.full_name}, {what} ({marker})")
 
     lines += [
         "",
@@ -61,9 +64,13 @@ def build_shepherd_digest(shepherd_name, tasks, today=None):
 
     text = "\n".join(lines)
 
+    def _what(t):
+        if t.missed_meeting_name:
+            return f"missed {escape(t.missed_meeting_name)} on {t.missed_date}"
+        return escape(t.text)
+
     rows = "".join(
-        f"<li><strong>{t.member.full_name}</strong>, missed {t.missed_meeting_name} "
-        f"on {t.missed_date} "
+        f"<li><strong>{escape(t.member.full_name)}</strong>, {_what(t)} "
         f"({'<span style=\"color:#D6202C\">overdue</span>' if t.due_date < today else f'due {t.due_date}'})</li>"
         for t in sorted(tasks, key=lambda x: x.due_date)
     )

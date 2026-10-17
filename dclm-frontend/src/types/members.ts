@@ -90,8 +90,9 @@ export interface MemberFollowUpTask {
   /** A durable snapshot of what triggered this, kept as text so the task
    *  still reads correctly even if the session is later deleted. */
   missed_session: number | null;
+  /** Blank for a task added by hand, which is not about a missed service. */
   missed_meeting_name: string;
-  missed_date: string;
+  missed_date: string | null;
   contact_date: string | null;
   contact_method: ContactMethod | '';
   /** The four structured outcome fields. All required when completing,

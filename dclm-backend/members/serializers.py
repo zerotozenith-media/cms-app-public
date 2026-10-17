@@ -129,6 +129,18 @@ class MemberFollowUpTaskSerializer(serializers.ModelSerializer):
             return None
         return display_name(obj.assigned_to)
 
+    def validate(self, attrs):
+        # A task added by hand goes to the member's shepherd unless
+        # somebody else is chosen, and only to someone who can follow up.
+        if self.instance is None and "assigned_to" not in attrs and attrs.get("member"):
+            attrs["assigned_to"] = attrs["member"].assigned_to
+        who = attrs.get("assigned_to")
+        if who is not None and not (who.is_active and who.can_shepherd):
+            raise serializers.ValidationError({"assigned_to": "Choose someone who can shepherd others."})
+        if self.instance is None and not (attrs.get("text") or "").strip():
+            raise serializers.ValidationError({"text": "Say what needs doing."})
+        return attrs
+
 
 class CompleteMemberFollowUpTaskSerializer(serializers.Serializer):
     """All four outcome fields are required. A tick with no record of what

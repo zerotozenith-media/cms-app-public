@@ -270,3 +270,36 @@ export function useUpdateMeetingType() {
     },
   });
 }
+
+export interface AbsentPreview {
+  /** Why nothing can be done yet, such as nobody ticked. */
+  blocked?: string;
+  to_follow_up: number;
+  names: string[];
+  ticked: string[];
+  already: number;
+  open_elsewhere: number;
+  /** Whether the meeting follows up absence on its own (for 7 days). */
+  tracked: boolean;
+}
+
+/** "Follow up those not ticked": who would get a task. Refreshed after every tap. */
+export function useAbsentPreview(sessionId: number, ticks: number, enabled: boolean) {
+  return useQuery({
+    queryKey: ['absent-preview', sessionId, ticks],
+    enabled,
+    retry: false,
+    queryFn: async () => (await apiClient.get<AbsentPreview>(`/attendance-sessions/${sessionId}/follow-up-absent/`)).data,
+  });
+}
+
+export function useFollowUpAbsent(sessionId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => (await apiClient.post<{ created: number }>(`/attendance-sessions/${sessionId}/follow-up-absent/`)).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['absent-preview', sessionId] });
+      qc.invalidateQueries({ queryKey: ['member-followup-tasks'] });
+    },
+  });
+}

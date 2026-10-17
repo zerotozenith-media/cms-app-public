@@ -60,7 +60,8 @@ def points(user, today=None):
     got["became_member"] = Member.objects.filter(from_newcomer__assigned_to=user, joined_date__range=(start, today)).count()
     got["baptised"] = NewcomerMilestone.objects.filter(newcomer__assigned_to=user, milestone_type__name__iexact="Water Baptism",
                                                        achieved_date__range=(start, today)).count()
-    for t in MemberFollowUpTask.objects.filter(assigned_to=user, done=True, contact_date__range=(start, today)):
+    for t in MemberFollowUpTask.objects.filter(assigned_to=user, done=True, contact_date__range=(start, today),
+                                               missed_date__isnull=False):
         if AttendanceSessionMember.objects.filter(member=t.member, session__date__gt=t.missed_date, session__date__lte=today).exists():
             got["member_returned"] += 1
 

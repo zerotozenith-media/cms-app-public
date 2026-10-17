@@ -98,7 +98,7 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
     },
     {
       h: 'Can I tick names after the service?',
-      p: 'Yes. A session already filled in has a white Check in on its row in All sessions. Tick everyone who came that day. The headcount is not changed, and newcomers ticked count towards their Fridays for membership. On a service from the last 7 days that follows up absence, members not ticked get a follow-up task.',
+      p: 'Yes. A session already filled in has a white Check in on its row in All sessions. Tick everyone who came that day. The headcount is not changed, and newcomers ticked count towards their Fridays for membership. On a service from the last 7 days that follows up absence, members not ticked get a follow-up task automatically. For an older service, or a meeting that is not followed up automatically, press the Follow up button under Follow up those not ticked, at the bottom of the page, once you have ticked everyone who came. It says how many and asks you to confirm first.',
     },
     {
       h: 'What if I forget to check anyone in?',
@@ -109,7 +109,7 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
   shepherd: [
     {
       h: 'How you find out someone missed church',
-      p: 'You do not have to watch for it. A few hours after a service, anyone not checked in gets a follow-up task created automatically, assigned to whoever is their shepherd. If that is you, it shows up in your list.',
+      p: 'You do not have to watch for it. A few hours after a service, anyone not checked in gets a follow-up task created automatically, assigned to whoever is their shepherd. If that is you, it shows up in your list. Tasks also arrive when someone presses Follow up those not ticked on an older service, or adds one by hand on a member\'s profile.',
     },
     {
       h: 'Seeing what is waiting for you',
@@ -259,7 +259,7 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
     { h: 'A shepherd is stopping', p: 'In Admin, untick Shepherd under their role. Then press Auto-assign on the Members page, choose Reassign everyone instead, check the proposal and press Apply.' },
     { h: 'I am locked out', p: 'After five wrong passwords, sign-in is locked for 15 minutes. The fourth attempt warns you first. Wait, or reset your password with Forgotten your password?' },
     { h: 'Someone new walked in today', p: 'Register them before they leave. Newcomers & Follow-up, then either QR Registration for them to fill in themselves, or Manual Entry if you have their paper card.' },
-    { h: 'A member has stopped coming', p: 'If the meeting has absence follow-up switched on, a task was already created for their shepherd. Check Members, Follow-up tab. If nothing is there, the meeting may not be set to track absences, or nobody checked them in that week.' },
+    { h: 'A member has stopped coming', p: 'If the meeting has absence follow-up switched on, a task was already created for their shepherd. Check Members, Follow-up tab. If nothing is there, the meeting may not be set to track absences, or nobody was checked in that week. Tick who came with the white Check in and press the Follow up button under Follow up those not ticked, or add a task by hand on their profile, on the Follow-ups tab.' },
     { h: 'I typed the wrong attendance number or count', p: 'Open the session again from the Attendance list, correct the numbers, and save. It simply overwrites the old figure.' },
     { h: 'I ticked the wrong person at check-in', p: 'Tap their name again. It unticks straight away.' },
     { h: 'Someone told us they would be away', p: 'A task will still be created. There is no way yet to log a planned absence in advance. The shepherd can close it, recording that the absence was already known.' },
@@ -281,7 +281,8 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
     { h: 'Occasional meetings', p: 'For GCK, Ministerial Renewal and other occasional meetings, a new session asks for the Edition name and Where it is held, the host city or venue. They show under the meeting name in All sessions.' },
     { h: 'Two ways attendance is recorded', p: 'Headcounts are the official figure: how many men, women, youth and children were present. Named check-in records exactly which members came. Both are kept, and recording one does not change the other.' },
     { h: 'Recording a headcount', p: 'Open the session from the Attendance list and fill in the numbers. Whether you see six boxes or two depends on whether that meeting type is set to Detailed or Simple. If the meeting collects an offering, enter it in the Offering collected box on the same form. It is recorded as giving for that service, dated to it. Save it and the session moves from Pending to Filled. A service that has not happened yet cannot be recorded.' },
-    { h: 'Live check-in during a service', p: 'On the day of the service, press Check in on its row in the Attendance list. You get the member list grouped by category. Tap a name as each person arrives and it saves immediately, so several ushers on different doors can work at the same time without overwriting each other. Tap again to undo. Use Mark online for anyone joining remotely.' },
+    { h: 'Live check-in during a service', p: 'On the day of the service, press Check in on its row in the Attendance list. You get the member list grouped by category, then the newcomers at that location. Tap a name as each person arrives and it saves immediately, so several ushers on different doors can work at the same time without overwriting each other. Tap again to undo. Use Mark online for anyone joining remotely. Newcomers checked in build their Friday attendance towards membership.' },
+    { h: 'Checking in after the service', p: 'A session already filled in has a white Check in on its row. It opens the same list with a note saying which day it was. The headcount is not changed. At the bottom, the Follow up button under Follow up those not ticked makes tasks for members who were not ticked, when the service is not followed up automatically.' },
     { h: 'Where sessions come from', p: 'Sessions for regular weekly meetings are created automatically. You do not need to make one each week. A house fellowship meeting gets one session per fellowship, at the location where each fellowship meets. Use New session only for one-off meetings.' },
   ],
 
@@ -295,7 +296,9 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
   ],
 
   followup: [
-    { h: 'How a follow-up starts', p: 'Nobody has to press anything. A few hours after a service that counts toward absence follow-up, anyone not checked in is treated as absent and a task is created for their shepherd, due two days later.' },
+    { h: 'How a follow-up starts', p: 'Nobody has to press anything. A few hours after a service that counts toward absence follow-up, anyone not checked in is treated as absent and a task is created for their shepherd, due two days later. This also happens when the headcount was saved early, as long as at least one member was ticked by name, for services up to 7 days old.' },
+    { h: 'Older services and other meetings', p: 'For a service ticked off more than 7 days later, or a meeting not set to follow up absence, open its check-in page from the white Check in, tick everyone who came, and press the Follow up button under Follow up those not ticked at the bottom. It shows how many members were not ticked, names who was ticked, and makes nothing until you confirm. People who already have an open follow-up are skipped.' },
+    { h: 'Adding a task by hand', p: 'On a member\'s profile, open the Follow-ups tab. Type the Task, choose the Due date, and choose who it is For: their shepherd by default, or another shepherd. Press Add task. It appears on the Follow-up tab under Members like any other task, and is completed the same way.' },
     { h: 'Which meetings count', p: 'Only the ones switched on in Admin under Meeting types. Friday Worship is on by default. Leave it off for meetings where attendance is not expected of everyone.' },
     { h: 'No duplicate pile-ups', p: 'If someone already has an open follow-up, missing again does not stack another one on top. Once the first is resolved, a later absence does create a new task.' },
     { h: 'Recording what happened', p: 'Press Mark done and record four things: the goal of the visit, the scripture shared, the root cause, and the next step agreed. All four are required, because a tick with no record is not much use to whoever reads it next month. If there was genuinely no opening for scripture, write "None this time" rather than inventing one.' },

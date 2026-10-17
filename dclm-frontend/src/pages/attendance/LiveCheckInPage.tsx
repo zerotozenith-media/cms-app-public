@@ -1,7 +1,7 @@
 import { Skeleton } from '../../components/ui/Skeleton';
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useSession, useCheckIn, useCheckOut, useSetCheckInMode, useNewcomerRoster, type RosterNewcomer } from '../../api/attendance';
+import { useSession, useCheckIn, useCheckOut, useSetCheckInMode, useNewcomerRoster, useAbsentPreview, useFollowUpAbsent, type RosterNewcomer } from '../../api/attendance';
 import { useMemberRoster } from '../../api/members';
 import { Icon } from '../../components/ui/Icon';
 import type { Member } from '../../types/members';
@@ -233,6 +233,11 @@ export function LiveCheckInPage() {
         )}
       </div>
 
+      {past && !recentAbsence && (
+        <FollowUpNotTicked sessionId={sessionId} tracked={!!session.counts_for_absence}
+          ticks={session.attendees.filter((a) => a.member != null).length} />
+      )}
+
       {!past && (
         <div className="card section-gap checkin-note">
           Nobody needs to press a finish button. A few hours after this meeting's start time,
@@ -245,5 +250,67 @@ export function LiveCheckInPage() {
         </div>
       )}
     </>
+  );
+}
+
+/** "Follow up those not ticked" on a service ticked off afterwards: the
+ *  automatic check does not cover it, so somebody asks for it here. */
+function FollowUpNotTicked({ sessionId, tracked, ticks }: { sessionId: number; tracked: boolean; ticks: number }) {
+  const { data, error, isLoading } = useAbsentPreview(sessionId, ticks, true);
+  const make = useFollowUpAbsent(sessionId);
+  const [confirming, setConfirming] = useState(false);
+  const [done, setDone] = useState<number | null>(null);
+  const [failed, setFailed] = useState('');
+  const why = tracked
+    ? 'This service is more than 7 days old, so nobody was followed up automatically.'
+    : 'This meeting is not followed up automatically.';
+  const refused = data?.blocked || ((error as any)?.response?.data?.detail as string | undefined);
+  const n = data?.to_follow_up ?? 0;
+  const people = (k: number) => `${k} member${k === 1 ? '' : 's'}`;
+
+  async function create() {
+    setFailed('');
+    try {
+      const r = await make.mutateAsync();
+      setDone(r.created);
+      setConfirming(false);
+    } catch (e: any) {
+      setFailed(e?.response?.data?.detail || 'The tasks could not be made. Please try again.');
+    }
+  }
+
+  return (
+    <div className="card section-gap followup-absent">
+      <h3>Follow up those not ticked</h3>
+      {isLoading ? <p className="muted">Working out who was not ticked…</p> : refused ? (
+        <p className="muted">{refused}</p>
+      ) : data && (
+        <>
+          <p className="muted">
+            {why}{' '}
+            {n ? <><b>{people(n)}</b> {n === 1 ? 'was' : 'were'} not ticked. Each gets a follow-up task for their shepherd, due in 2 days.</>
+               : 'Everyone not ticked already has a follow-up.'}
+            {data.open_elsewhere ? ` ${people(data.open_elsewhere)} with an open follow-up already ${data.open_elsewhere === 1 ? 'is' : 'are'} skipped.` : ''}
+          </p>
+          {done !== null && <p className="report-done" role="status">{done} follow-up task{done === 1 ? '' : 's'} made. They are in Members, on the Follow-up tab.</p>}
+          {failed && <p className="form-error" role="alert">{failed}</p>}
+          {n > 0 && !confirming && (
+            <button className="btn sm" onClick={() => { setConfirming(true); setDone(null); }}>Follow up {people(n)}</button>
+          )}
+          {n > 0 && confirming && (
+            <div className="followup-confirm">
+              <b>Create {n} follow-up task{n === 1 ? '' : 's'}?</b>
+              <div className="muted">
+                For {data.names.join(', ')}.{data.ticked.length ? ` ${data.ticked.join(', ')} ${data.ticked.length === 1 ? 'was' : 'were'} ticked, so ${data.ticked.length === 1 ? 'is' : 'are'} left out.` : ''}
+              </div>
+              <div className="form-actions-row">
+                <button className="btn sm" onClick={create} disabled={make.isPending}>{make.isPending ? 'Creating…' : 'Create tasks'}</button>
+                <button className="btn sm ghost" onClick={() => setConfirming(false)}>Cancel</button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 }

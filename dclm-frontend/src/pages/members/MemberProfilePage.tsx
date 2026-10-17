@@ -19,7 +19,7 @@ import { AttendanceList, JourneyTimeline, MilestoneChips, OpenFollowUps, PersonS
 import { useAuth } from '../../context/AuthContext';
 import { useLocationName } from '../../api/locations';
 
-import { useEligibleShepherds } from '../../api/followup';
+import { useEligibleShepherds, useAddMemberTask } from '../../api/followup';
 import { canPair } from '../../lib/gender';
 const CATEGORIES = ['General Member', 'Worker in Training', 'Worker'];
 
@@ -181,7 +181,14 @@ export function MemberProfilePage() {
     ) },
     { key: 'journey', label: 'Journey', body: person ? (<><MilestoneChips p={person} /><JourneyTimeline p={person} /></>) : null },
     { key: 'followups', label: 'Follow-ups', body: person ? (
-      <OpenFollowUps p={person} onOpen={(t) => navigate(t.kind === 'newcomer' ? `/newcomers/${person.newcomer_id}` : '/members?tab=follow-up')} />
+      <>
+        <OpenFollowUps p={person} onOpen={(t) => navigate(t.kind === 'newcomer' ? `/newcomers/${person.newcomer_id}` : '/members/follow-up')} />
+        {hasPermission('members', 'create') && (
+          <AddMemberTask memberId={memberId} shepherdId={member.assigned_to ?? null}
+            shepherds={(shepherds ?? []).filter((s: any) => canPair(member.gender, s.gender))}
+            currentName={member.assigned_to_name ?? ''} />
+        )}
+      </>
     ) : null },
     { key: 'attendance', label: 'Attendance', body: person ? <AttendanceList p={person} /> : null },
     ...(hasPermission('newcomers', 'view') ? [{ key: 'messages', label: 'Messages', body: <PersonMessages kind="member" id={memberId} /> }] : []),
@@ -266,5 +273,60 @@ export function MemberProfilePage() {
         <PersonTabs tabs={tabs} />
       </div>
     </>
+  );
+}
+
+/** A follow-up added by hand, for anything a member needs, not only a
+ *  missed service. Goes to their shepherd unless somebody else is chosen. */
+function AddMemberTask({ memberId, shepherdId, shepherds, currentName }: {
+  memberId: number; shepherdId: number | null; shepherds: { id: number; name: string }[]; currentName: string;
+}) {
+  const add = useAddMemberTask(memberId);
+  const inTwoDays = () => { const d = new Date(); d.setDate(d.getDate() + 2); return d.toLocaleDateString('en-CA'); };
+  const [text, setText] = useState('');
+  const [due, setDue] = useState(inTwoDays());
+  const [who, setWho] = useState<string>(shepherdId ? String(shepherdId) : '');
+  const [error, setError] = useState('');
+  const [done, setDone] = useState('');
+  const options = [...shepherds];
+  if (shepherdId && !options.some((s) => s.id === shepherdId)) options.unshift({ id: shepherdId, name: currentName });
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(''); setDone('');
+    try {
+      await add.mutateAsync({ text: text.trim(), due_date: due, assigned_to: who ? Number(who) : null });
+      setDone('Task added. It is also on the Follow-up tab in Members.');
+      setText(''); setDue(inTwoDays());
+    } catch (err: any) {
+      const d = err?.response?.data;
+      setError(d?.text?.[0] || d?.assigned_to?.[0] || d?.due_date?.[0] || 'The task could not be added. Please try again.');
+    }
+  }
+
+  return (
+    <form className="form-card section-gap" onSubmit={submit}>
+      <div className="form-row">
+        <div className="field" style={{ marginBottom: 8 }}>
+          <label htmlFor="member-task-text">Task</label>
+          <input id="member-task-text" value={text} maxLength={300} onChange={(e) => setText(e.target.value)}
+            placeholder="e.g. Call to check on him" required />
+        </div>
+        <div className="field" style={{ marginBottom: 8 }}>
+          <label htmlFor="member-task-due">Due date</label>
+          <input id="member-task-due" type="date" value={due} onChange={(e) => setDue(e.target.value)} required />
+        </div>
+      </div>
+      <div className="field" style={{ marginBottom: 8 }}>
+        <label htmlFor="member-task-for">For</label>
+        <select id="member-task-for" value={who} onChange={(e) => setWho(e.target.value)}>
+          <option value="">Nobody yet</option>
+          {options.map((s) => <option key={s.id} value={s.id}>{s.name}{s.id === shepherdId ? ' (their shepherd)' : ''}</option>)}
+        </select>
+      </div>
+      {error && <p className="form-error" role="alert">{error}</p>}
+      {done && <p className="report-done" role="status">{done}</p>}
+      <button className="btn sm" type="submit" disabled={add.isPending}><Icon name="plus" size={14} /> Add task</button>
+    </form>
   );
 }
