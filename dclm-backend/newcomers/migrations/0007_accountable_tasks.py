@@ -6,21 +6,9 @@ from django.conf import settings
 from django.db import migrations, models
 
 
-def label_old_tasks(apps, schema_editor):
-    """The three tasks made from the welcome form are first-visit tasks; a
-    done task with an outcome was a person reached. An attempt's time is
-    taken as midday on its date."""
-    import datetime
-    from django.utils import timezone
-    T = apps.get_model("newcomers", "NewcomerTask")
-    T.objects.filter(text__in=["Schedule a home visit", "Share more about the church",
-                               "Have a salvation conversation"]).update(kind="first-visit")
-    T.objects.filter(done=True).update(result="reached")
-    A = apps.get_model("newcomers", "NewcomerContactAttempt")
-    for a in A.objects.all():
-        a.at = timezone.make_aware(datetime.datetime.combine(a.date, datetime.time(12, 0)))
-        a.save(update_fields=["at"])
-
+# The labelling of older tasks is in 0010_label_old_tasks: on PostgreSQL a
+# data update in the same migration as new foreign keys stops their indexes
+# being made ("pending trigger events").
 
 
 class Migration(migrations.Migration):
@@ -221,5 +209,4 @@ class Migration(migrations.Migration):
             name="result_note",
             field=models.TextField(blank=True, default=""),
         ),
-        migrations.RunPython(label_old_tasks, migrations.RunPython.noop),
     ]

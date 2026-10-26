@@ -6,13 +6,9 @@ from django.conf import settings
 from django.db import migrations, models
 
 
-def label_old_tasks(apps, schema_editor):
-    """Tasks made before 26 October 2026: absence tasks are the ones about a
-    missed service, and a done task with an outcome was a person reached."""
-    T = apps.get_model("members", "MemberFollowUpTask")
-    T.objects.exclude(missed_meeting_name="").update(kind="absence")
-    T.objects.filter(missed_session__isnull=False).update(kind="absence")
-    T.objects.filter(done=True).update(result="reached")
+# The labelling of older tasks is in 0010_label_old_tasks: on PostgreSQL a
+# data update in the same migration as new foreign keys stops their indexes
+# being made ("pending trigger events").
 
 
 class Migration(migrations.Migration):
@@ -260,5 +256,4 @@ class Migration(migrations.Migration):
                 "ordering": ["-at", "-id"],
             },
         ),
-        migrations.RunPython(label_old_tasks, migrations.RunPython.noop),
     ]
