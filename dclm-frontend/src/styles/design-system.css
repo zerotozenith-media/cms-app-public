@@ -1034,7 +1034,7 @@
 
 /* Issue 1: the narrowest phones get slightly smaller round controls in the
    top bar, so the page title always fits on two lines. */
-@media (max-width:380px){
+@media (max-width:430px){
   .topbar{padding-left:8px;padding-right:8px}
   .tb-loc{width:32px;min-height:32px}
   .tb-service-btn{min-width:34px;min-height:34px}
@@ -1326,7 +1326,6 @@ td.td-actions .icon-btn + .icon-btn,.row-actions .icon-btn + .icon-btn,td.td-act
 .help-flash{animation:help-flash 2s ease-out 1}
 @keyframes help-flash{0%{background:#FFF3C4}100%{background:transparent}}
 @media (prefers-reduced-motion:reduce){.help-flash{animation:none}}
-@media (max-width:380px){.tb-help{width:34px;height:34px;min-width:34px}}
 @media (max-width:600px){.help-top-btns .btn{flex:1 1 100%}}
 .help-ok{background:#EAF6EE;border-left:3px solid #2E8B57;border-radius:7px;padding:8px 11px;font-size:.84rem;line-height:1.5;color:var(--ink)}
 .tb-help-menu .help-ok{margin:4px 10px}
@@ -1334,4 +1333,18 @@ td.td-actions .icon-btn + .icon-btn,.row-actions .icon-btn + .icon-btn,td.td-act
 .help-img{min-height:60px}
 .tb-help{position:relative;display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border:0;border-radius:50%;background:transparent;color:var(--ink);cursor:pointer}
 .tb-help:hover,.tb-help[aria-expanded="true"]{background:var(--sky)}
-@media (max-width:380px){.tb-help{width:34px;height:34px;min-width:34px}}
+@media (max-width:430px){.tb-help{width:34px;height:34px;min-width:34px}}
+/* The smallest phones (320 px): the title keeps its whole words. */
+@media (max-width:340px){
+  .topbar{padding-left:6px;padding-right:6px}
+  .topbar .right{gap:4px}
+  .tb-left .menu-btn{width:32px;min-width:32px}
+  .tb-left{gap:4px}
+  .tb-left .page-title{font-size:.78rem}
+  .tb-loc{width:32px;min-height:32px;padding:0}
+  .tb-help,.tb-bell{width:32px;height:32px;min-width:32px}
+  .tb-service-btn{min-width:32px;min-height:32px}
+  .tb-service-btn .level-badge{width:28px!important;height:28px!important;padding:4px!important}
+  .tb-badge{width:32px;height:32px;min-width:32px}
+  .tb-badge .tb-face.sm{width:28px;height:28px;font-size:.7rem}
+}
