@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     NewcomerSourceViewSet, MilestoneTypeViewSet, FollowUpUrgencySettingViewSet,
     NewcomerViewSet, NewcomerTaskViewSet, NewcomerStatusHistoryViewSet,
-    public_newcomer_registration,
+    public_newcomer_registration, registration_blocks, BulkAssignNewcomersView,
 )
 
 router = DefaultRouter()
@@ -17,4 +17,6 @@ router.register("newcomer-status-history", NewcomerStatusHistoryViewSet, basenam
 
 urlpatterns = router.urls + [
     path("public/newcomer-registration/", public_newcomer_registration, name="public-newcomer-registration"),
+    path("newcomers-registration-blocks/", registration_blocks, name="registration-blocks"),
+    path("newcomers-bulk-assign/", BulkAssignNewcomersView.as_view(), name="newcomers-bulk-assign"),
 ]

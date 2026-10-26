@@ -9,7 +9,7 @@ from .serializers import GoalSerializer
 class GoalViewSet(viewsets.ModelViewSet):
     module = "goals"
     permission_classes = [ModulePermission]
-    queryset = Goal.objects.select_related("calculation_meeting_type", "calculation_milestone_type")
+    queryset = Goal.objects.select_related("calculation_meeting_type", "calculation_milestone_type", "calculation_location", "calculation_fund")
     serializer_class = GoalSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ["name", "source"]

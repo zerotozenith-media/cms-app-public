@@ -65,6 +65,7 @@ export function FollowUpMessagesPage() {
         {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}. Sent from your own WhatsApp.
       </p>
       {starting && <StartPanel onClose={() => setStarting(false)} />}
+      <MissedCard />
       <div className="fu-chips" role="group" aria-label="Show a journey">
         {(['all', ...JOURNEY_ORDER] as string[]).map((k) => (
           <button key={k} className={filter === k ? 'on' : ''} onClick={() => setFilter(k)}>
@@ -79,6 +80,65 @@ export function FollowUpMessagesPage() {
         <div className="card empty">No messages due today. New people appear here on their planned days.</div>
       ) : shown.map((e) => <MessageCard key={e.enrolment} entry={e} />)}
     </>
+  );
+}
+
+interface MissedRow extends Omit<TodayEntry, 'done' | 'plan' | 'belonging'> { date: string; skipped: boolean }
+
+/**
+ * Item 10 (Kay, 26 October 2026): planned messages from the last 14 days
+ * that were not sent, or were skipped. Send now opens WhatsApp with the
+ * message and records it on that day's plan once confirmed. Dismiss takes
+ * it off this list.
+ */
+function MissedCard() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  const { data } = useQuery({ queryKey: ['followup-missed'], queryFn: async () => (await apiClient.get<{ results: MissedRow[] }>('/followup/missed/')).data });
+  const [confirming, setConfirming] = useState<{ row: MissedRow; text: string } | null>(null);
+  const [err, setErr] = useState('');
+  const act = useMutation({
+    mutationFn: async (body: Record<string, unknown>) => (await apiClient.post('/followup/missed/', body)).data,
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['followup-missed'] }); qc.invalidateQueries({ queryKey: ['followup-today'] }); setConfirming(null); },
+    onError: (e: any) => setErr(e?.response?.data?.detail || 'That could not be recorded. Try again.'),
+  });
+  const rows = data?.results ?? [];
+  if (!rows.length) return null;
+  const sender = user?.name || 'Your shepherd';
+  const day = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+  function sendNow(r: MissedRow) {
+    setErr('');
+    const text = toWhatsApp(messageHTML(r.template!, r.person.first, { nextService: r.next_service, sender }));
+    window.open(waLink(r.person.phone, text), '_blank', 'noopener');
+    setConfirming({ row: r, text });
+  }
+  return (
+    <div className="card fu-missed">
+      <h3 style={{ margin: '0 0 2px' }}>Missed ({rows.length})<HelpMark topic="fuMissed" /></h3>
+      <p className="muted" style={{ margin: '0 0 6px', fontSize: '.84rem' }}>Planned messages from the last 14 days that were not sent, or were skipped. Send now records it on that day's plan. Dismiss removes it from this list.</p>
+      {rows.map((r) => (
+        <div className="fu-missed-row" key={`${r.enrolment}-${r.date}`}>
+          <span style={{ flex: 1, minWidth: 180 }}>
+            <b>{r.person.name}</b><br />
+            <span className="muted" style={{ fontSize: '.84rem' }}>Day {r.day}, {r.template?.theme}</span><br />
+            <span className={r.skipped ? 'fu-missed-skip' : 'fu-missed-miss'}>{r.skipped ? 'Skipped' : 'Missed'} on {day(r.date)}</span>
+          </span>
+          {confirming?.row === r ? (
+            <span className="fu-acts" style={{ margin: 0 }}>
+              <span style={{ fontSize: '.84rem' }}>Did it send?</span>
+              <button className="btn sm" disabled={act.isPending} onClick={() => act.mutate({ enrolment: r.enrolment, date: r.date, action: 'sent', text: confirming.text })}>Yes, sent</button>
+              <button className="btn sm ghost" onClick={() => setConfirming(null)}>Not yet</button>
+            </span>
+          ) : (
+            <span className="fu-acts" style={{ margin: 0 }}>
+              <button className="btn sm" disabled={!r.person.phone} title={r.person.phone ? undefined : 'No phone number on file'} onClick={() => sendNow(r)}>Send now</button>
+              <button className="btn sm ghost" disabled={act.isPending} onClick={() => act.mutate({ enrolment: r.enrolment, date: r.date, action: 'dismiss' })}>Dismiss</button>
+            </span>
+          )}
+        </div>
+      ))}
+      {err && <p className="form-error" role="alert">{err}</p>}
+    </div>
   );
 }
 
@@ -263,10 +323,12 @@ export function StartPanel({ onClose, kind = 'newcomers' }: { onClose: () => voi
   const qc = useQueryClient();
   const contacts = kind === 'contacts';
   const { data, isLoading } = useQuery({ queryKey: ['followup-startable', kind],
-    queryFn: async () => (await apiClient.get<{ results: { id: number; name: string; stage: string; shepherd: string; has_phone: boolean }[] }>('/followup/start-many/', { params: contacts ? { kind: 'contacts' } : {} })).data });
+    queryFn: async () => (await apiClient.get<{ results: { id: number; name: string; stage: string; shepherd: string; has_phone: boolean }[]; said_no?: { id: number; name: string; stage: string; shepherd: string; since: string }[] }>('/followup/start-many/', { params: contacts ? { kind: 'contacts' } : {} })).data });
   const rows = data?.results ?? [];
+  const saidNo = data?.said_no ?? [];
+  // P5: nobody is ticked to begin with. Each person is chosen on purpose.
   const [picked, setPicked] = useState<Set<number> | null>(null);
-  const chosen = picked ?? new Set(rows.map((r) => r.id));
+  const chosen = picked ?? new Set<number>();
   const [err, setErr] = useState('');
   const start = useMutation({
     mutationFn: async () => (await apiClient.post('/followup/start-many/', contacts ? { enquiries: [...chosen] } : { newcomers: [...chosen] })).data,
@@ -282,6 +344,7 @@ export function StartPanel({ onClose, kind = 'newcomers' }: { onClose: () => voi
         : "Newcomers not yet on a journey. Each starts on day 1 today, sent from their shepherd's WhatsApp."}</p>
       {isLoading ? <Skeleton shape="rows" rows={4} /> : rows.length === 0 ? <p className="muted">{contacts ? 'Every current contact is already on a journey.' : 'Every current newcomer is already on a journey.'}</p> : (
         <>
+          {chosen.size === 0 && <div className="fr-box-note" style={{ margin: '8px 0' }}><b>Nobody is ticked to begin with.</b> Tick each person you know is happy to hear from us.</div>}
           <label className="fu-start-row all"><input type="checkbox" checked={chosen.size === rows.length} onChange={(e) => setPicked(e.target.checked ? new Set(rows.map((r) => r.id)) : new Set())} /> Select all ({rows.length})</label>
           {rows.map((r) => (
             <label className="fu-start-row" key={r.id}>
@@ -292,8 +355,21 @@ export function StartPanel({ onClose, kind = 'newcomers' }: { onClose: () => voi
           ))}
           <p className="fu-start-note">{contacts
             ? 'Start only those who are happy to hear from us. Give each a follow-up person first, so their messages reach the right person.'
-            : 'They were not asked at registration about keeping in touch. Start only those you know are happy to hear from us.'}</p>
+            : 'Everyone listed ticked Keep in touch on their form, or was added before that question existed. Start only those you know are happy to hear from us.'}</p>
         </>
+      )}
+      {!contacts && saidNo.length > 0 && (
+        <div className="fa-saidno">
+          <b>Asked not to be contacted ({saidNo.length})</b>
+          <div className="muted" style={{ fontSize: '.82rem', margin: '2px 0 8px' }}>They unticked Keep in touch on their form, so they cannot be started here. Their shepherd can still message them personally.</div>
+          {saidNo.map((r) => (
+            <div className="fu-start-row" key={r.id} style={{ opacity: .65 }}>
+              <input type="checkbox" disabled aria-label={`${r.name} asked not to be contacted`} />
+              <span><b>{r.name}</b><br /><span className="muted">{r.stage}, {r.shepherd ? `shepherd ${r.shepherd}` : 'no shepherd yet'}</span></span>
+              <span className="muted">Said no on {new Date(`${r.since}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+            </div>
+          ))}
+        </div>
       )}
       {err && <p className="form-error" role="alert">{err}</p>}
       <div className="fu-acts">

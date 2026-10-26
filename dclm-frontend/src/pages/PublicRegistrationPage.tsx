@@ -18,6 +18,15 @@ export function PublicRegistrationPage() {
   const [submitting, setSubmitting] = useState(false);
   const formLoadedAt = useRef(new Date().toISOString());
 
+  /** P10: each phone is counted by itself, not the shared church Wi-Fi. */
+  function deviceId() {
+    try {
+      let id = localStorage.getItem('dclm_device');
+      if (!id) { id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`; localStorage.setItem('dclm_device', id); }
+      return id;
+    } catch { return ''; }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -29,7 +38,7 @@ export function PublicRegistrationPage() {
       await submitPublicRegistration({
         ...rest, name: intakeFullName(values),
         meeting_attended: values.meeting_attended || null,
-        website, form_loaded_at: formLoadedAt.current,
+        website, form_loaded_at: formLoadedAt.current, device_id: deviceId(),
         // The location this QR code was made for, so the visitor lands in
         // that location's pipeline. The server checks it exists.
         ...(new URLSearchParams(window.location.search).get('location')
@@ -38,7 +47,7 @@ export function PublicRegistrationPage() {
       setSubmitted(true);
     } catch (err: any) {
       if (err?.response?.status === 429) {
-        setError('Too many submissions from this connection. Please see a leader at the welcome desk.');
+        setError('This phone has already sent 5 forms today. Please see a leader at the welcome desk, who can add you.');
       } else if (err?.response?.data?.name) {
         setError('Please enter your name.');
       } else {

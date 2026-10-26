@@ -58,6 +58,7 @@ export function SessionRecordPage() {
   // What was collected, by fund. Saved as giving linked to this meeting
   // rather than as a second copy of the same money.
   const [offering, setOffering] = useState<Record<string, string>>({});
+  const savedOffering = useRef('{}');
   const [trackNamed, setTrackNamed] = useState(false);
   const [attendeeIds, setAttendeeIds] = useState<Set<number>>(new Set());
   // A refused save says why, instead of leaving the form unchanged.
@@ -87,6 +88,14 @@ export function SessionRecordPage() {
     });
     setTrackNamed(session.track_named);
     setMode(session.mode);
+    // O1: everything saved comes back, so pressing Save never wipes it.
+    setNewComers(session.new_comers ?? 0);
+    setNewConverts(session.new_converts ?? 0);
+    setLedBy(session.led_by ?? '');
+    setLesson(session.lesson ?? '');
+    const saved = (session as any).offering ?? {};
+    setOffering(saved);
+    savedOffering.current = JSON.stringify(saved);
     setEditionName(session.edition_name ?? '');
     setEditionPlace(session.edition_place ?? '');
     // Members only: newcomers checked in at the door have no member number,
@@ -155,6 +164,12 @@ export function SessionRecordPage() {
     navigate('/attendance');
   }
 
+  function offeringChanged() {
+    const clean = (o: Record<string, string>) => JSON.stringify(Object.fromEntries(
+      Object.entries(o).filter(([, v]) => Number(v) > 0).map(([k, v]) => [k, Number(v).toFixed(3)]).sort()));
+    return clean(offering) !== clean(JSON.parse(savedOffering.current));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaveError('');
@@ -168,7 +183,9 @@ export function SessionRecordPage() {
       new_comers: newComers, new_converts: newConverts,
       ...(isFellowship ? { led_by: ledBy === '' ? null : ledBy, lesson } : {}),
       ...(isOccasional ? { edition_name: editionName, edition_place: editionPlace } : {}),
-      ...(collectsOffering ? { offering } : {}),
+      // O2: the offering is sent only when its boxes were changed, so
+      // giving corrected since is never rewritten.
+      ...(collectsOffering && offeringChanged() ? { offering } : {}),
       track_named: trackNamed,
       attendee_ids: Array.from(attendeeIds),
     });
@@ -306,7 +323,10 @@ export function SessionRecordPage() {
                 <div className="followup-guide-title">
                   <Icon name="coin" size={14} /> Offering collected
                 </div>
-                <div className="followup-guide-note">Leave anything not collected at zero.</div>
+                <div className="followup-guide-note">
+                  Leave anything not collected at zero.
+                  {Object.keys((session as any).offering ?? {}).length > 0 && <> Recorded in Giving as {Object.keys((session as any).offering).length} {Object.keys((session as any).offering).length === 1 ? 'entry' : 'entries'} for this service. Correct them here, not on the Giving page. Saving keeps them unless you change these boxes.</>}
+                </div>
               </div>
               <div className="form-row">
                 {OFFERING_FUNDS.slice(0, 2).map((f) => (

@@ -31,6 +31,8 @@ import { ReportsPage } from './pages/reports/ReportsPage';
 import { AdminPage } from './pages/admin/AdminPage';
 import { PublicRegistrationPage } from './pages/PublicRegistrationPage';
 import { HelpPage } from './pages/HelpPage';
+import { MyFollowUpPage } from './pages/followup/MyFollowUpPage';
+import { FollowUpReviewPage } from './pages/followup/FollowUpReviewPage';
 
 function page(title: string, module: string | undefined, children: React.ReactNode) {
   return (
@@ -56,6 +58,8 @@ export default function App() {
       <Route path="/attendance/:id/check-in" element={page('Attendance', 'attendance', <LiveCheckInPage />)} />
       <Route path="/attendance/:id" element={page('Attendance', 'attendance', <SessionRecordPage />)} />
 
+      <Route path="/follow-up" element={page('My follow-up', undefined, <MyFollowUpPage />)} />
+      <Route path="/followup-review" element={page('Follow-up Review', undefined, <FollowUpReviewPage />)} />
       <Route path="/members" element={page('Members', 'members', <MembersListPage />)} />
       <Route path="/members/new" element={page('Members', 'members', <AddMemberPage />)} />
       <Route path="/members/follow-up" element={page('Members', 'members', <MemberFollowUpTab />)} />

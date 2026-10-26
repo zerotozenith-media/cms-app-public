@@ -105,6 +105,8 @@ class MessageLog(models.Model):
     # Kay: a message chosen or written on any day, besides the plan. It never
     # takes the place of that day's planned message.
     extra = models.BooleanField(default=False)
+    # Item 10 (Kay, 26 October 2026): taken off the Missed list.
+    dismissed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

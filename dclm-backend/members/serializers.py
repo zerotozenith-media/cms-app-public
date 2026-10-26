@@ -36,6 +36,18 @@ class MemberSerializer(serializers.ModelSerializer):
             return n.source.name
         return ""
 
+    def validate(self, attrs):
+        get = lambda f: attrs.get(f, getattr(self.instance, f, None))
+        a, b = get("away_from"), get("away_to")
+        if bool(a) != bool(b):
+            raise serializers.ValidationError({"away_to": "Give both the first and the last day away, or neither."})
+        if a and b and b < a:
+            raise serializers.ValidationError({"away_to": "The last day away must be on or after the first."})
+        if "status" in attrs and attrs["status"] != "active" and not attrs.get("status_date"):
+            from django.utils import timezone
+            attrs["status_date"] = timezone.localdate()
+        return attrs
+
     def validate_assigned_to(self, user):
         """
         Only a shepherd may be assigned: a Worker with an account, at the
@@ -67,13 +79,32 @@ class MemberSerializer(serializers.ModelSerializer):
             "category",  # read-only below , see note
             "location", "joined_date", "household", "household_name",
             "category_history", "total_given", "assigned_to", "assigned_to_name",
-            "shepherd_problem",
+            "shepherd_problem", "is_leader",
+            "status", "status_date", "status_note",
+            "away_from", "away_to", "away_reason", "away_note",
         ]
         read_only_fields = ["id", "category"]
+        # Help 11.14: say who already has the number, in plain words.
+        extra_kwargs = {"phone": {"validators": []}}
         # `category` is deliberately read-only here: changing it directly via
         # PATCH would bypass MemberCategoryHistory logging entirely. The only
         # correct way to change it is MemberViewSet.move_category(), which
         # creates the history entry and updates the field together, atomically.
+
+    def validate_phone(self, value):
+        """Help 11.14: a phone number already on the roll names who has it,
+        so the person can check whether they are already a member."""
+        if not value:
+            return value
+        clash = Member.objects.filter(phone=value)
+        if self.instance is not None:
+            clash = clash.exclude(pk=self.instance.pk)
+        other = clash.first()
+        if other:
+            raise serializers.ValidationError(
+                f"{other.full_name} already has this phone number. Search Members for it first: "
+                f"they may already be on the roll.")
+        return value
 
     def get_assigned_to_name(self, obj):
         if not obj.assigned_to_id:
@@ -111,7 +142,10 @@ class MoveCategorySerializer(serializers.Serializer):
     to_category = serializers.ChoiceField(choices=Member.Category.choices)
 
 
-class MemberFollowUpTaskSerializer(serializers.ModelSerializer):
+from core.task_views import AccountableFieldsMixin
+
+
+class MemberFollowUpTaskSerializer(AccountableFieldsMixin, serializers.ModelSerializer):
     member_name = serializers.CharField(source="member.full_name", read_only=True)
     assigned_to_name = serializers.SerializerMethodField()
 
@@ -122,11 +156,11 @@ class MemberFollowUpTaskSerializer(serializers.ModelSerializer):
             "missed_session", "missed_meeting_name", "missed_date",
             "contact_date", "contact_method", "contact_notes",
             "contact_goal", "contact_scripture", "contact_root_cause", "contact_next_step",
-        ]
+        ] + AccountableFieldsMixin.ACCOUNTABLE
         read_only_fields = [
             "id", "done", "contact_date", "contact_method", "contact_notes",
             "contact_goal", "contact_scripture", "contact_root_cause", "contact_next_step",
-        ]
+        ] + AccountableFieldsMixin.ACCOUNTABLE
         # Same principle as NewcomerTask: done (and the log fields) are
         # only settable through complete(), never plain PATCH , a checked
         # box with no record of what was discussed isn't useful later.
@@ -152,6 +186,17 @@ class MemberFollowUpTaskSerializer(serializers.ModelSerializer):
         if self.instance is None and not (attrs.get("text") or "").strip():
             raise serializers.ValidationError({"text": "Say what needs doing."})
         return attrs
+
+    def create(self, validated):
+        # Made by hand: due at the clock start on its due date.
+        from django.utils import timezone
+        from core.followup_rules import at, rules
+        validated.setdefault("created_at", timezone.now())
+        if validated.get("due_date") and not validated.get("due_at"):
+            validated["due_at"] = at(validated["due_date"], rules().clock_start)
+        if not validated.get("kind") or validated.get("kind") == "manual":
+            validated["kind"] = "absence" if validated.get("missed_meeting_name") else "manual"
+        return super().create(validated)
 
 
 class CompleteMemberFollowUpTaskSerializer(serializers.Serializer):

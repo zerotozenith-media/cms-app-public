@@ -48,7 +48,64 @@ def compute_goal_value(goal):
         return _member_category_moves(goal)
     if calc == "milestone_count":
         return _milestone_count(goal)
+    if calc == "sessions_held":
+        return _sessions_held(goal)
+    if calc == "fund_total":
+        return _fund_total(goal)
+    if calc == "net_giving":
+        return _net_giving(goal)
+    if calc == "named_checkins":
+        return _named_checkins(goal)
     return None
+
+
+def _window(goal, qs, field="date"):
+    start, end = period_bounds(goal.period_type)
+    if start:
+        qs = qs.filter(**{f"{field}__gte": start, f"{field}__lte": end})
+    if goal.calculation_location_id:
+        loc = "location_id" if field == "date" else field.replace("date", "location_id")
+        qs = qs.filter(**{loc: goal.calculation_location_id})
+    return qs
+
+
+def _sessions_held(goal):
+    """Item 11: sessions of a meeting with attendance recorded."""
+    from attendance.models import AttendanceSession
+    if not goal.calculation_meeting_type_id:
+        return None
+    return _window(goal, AttendanceSession.objects.filter(meeting_type_id=goal.calculation_meeting_type_id,
+                                                          status="filled")).count()
+
+
+def _fund_total(goal):
+    from django.db.models import Sum
+    from finance.models import Giving
+    if not goal.calculation_fund_id:
+        return None
+    return _window(goal, Giving.objects.filter(fund_id=goal.calculation_fund_id)).aggregate(t=Sum("amount"))["t"] or 0
+
+
+def _net_giving(goal):
+    from django.db.models import Sum
+    from finance.models import Expense, Giving
+    income = _window(goal, Giving.objects.all()).aggregate(t=Sum("amount"))["t"] or 0
+    spent = _window(goal, Expense.objects.all()).aggregate(t=Sum("amount"))["t"] or 0
+    return income - spent
+
+
+def _named_checkins(goal):
+    """Different people checked in by name at a meeting in the period."""
+    from attendance.models import AttendanceSessionMember
+    if not goal.calculation_meeting_type_id:
+        return None
+    qs = AttendanceSessionMember.objects.filter(session__meeting_type_id=goal.calculation_meeting_type_id)
+    start, end = period_bounds(goal.period_type)
+    if start:
+        qs = qs.filter(session__date__gte=start, session__date__lte=end)
+    if goal.calculation_location_id:
+        qs = qs.filter(session__location_id=goal.calculation_location_id)
+    return qs.values("member_id", "newcomer_id").distinct().count()
 
 
 def _latest_session_total(goal):
@@ -58,6 +115,8 @@ def _latest_session_total(goal):
     filled = AttendanceSession.objects.filter(
         meeting_type_id=goal.calculation_meeting_type_id, status="filled",
     ).order_by("-date")
+    if goal.calculation_location_id:
+        filled = filled.filter(location_id=goal.calculation_location_id)
     if not filled.exists():
         return 0
     latest_date = filled.first().date
@@ -83,9 +142,11 @@ def _monthly_average(goal):
 
     def average(start, end):
         per_date = {}
-        for s in AttendanceSession.objects.filter(
-                meeting_type_id=goal.calculation_meeting_type_id, status="filled",
-                date__gte=start, date__lte=end):
+        qs = AttendanceSession.objects.filter(
+            meeting_type_id=goal.calculation_meeting_type_id, status="filled", date__gte=start, date__lte=end)
+        if goal.calculation_location_id:
+            qs = qs.filter(location_id=goal.calculation_location_id)
+        for s in qs:
             per_date[s.date] = per_date.get(s.date, 0) + s.total
         return round(sum(per_date.values()) / len(per_date)) if per_date else None
 

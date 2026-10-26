@@ -1,4 +1,4 @@
-import { LocationPicker, NotificationBell, UserBadge } from './TopbarControls';
+import { LocationPicker, NotificationBell, PageHelpButton, UserBadge } from './TopbarControls';
 import { ServiceTopBadge } from '../service/ServiceBadge';
 
 interface TopbarProps {
@@ -27,6 +27,7 @@ export function Topbar({ pageTitle, onMenuClick, onLogout }: TopbarProps) {
       <div className="right">
         <LocationPicker />
         <ServiceTopBadge />
+        <PageHelpButton />
         <NotificationBell />
         <UserBadge onLogout={onLogout} />
       </div>

@@ -3,7 +3,9 @@ import { DATE_RANGES, rangeBounds, type DateRangeKey } from '../../lib/dateRange
 import { useFellowships, useCreateFellowship, useDeleteFellowship } from '../../api/attendance';
 import { AUDIENCES } from '../../types/attendance';
 import { useNavigate } from 'react-router-dom';
-import { useMeetingTypes, useAttendanceStats, useSessions, useRecentFilledSessions, useDeleteSession } from '../../api/attendance';
+import { useMeetingTypes, useAttendanceStats, useSessions, useRecentFilledSessions, useDeleteSession, useDidNotHold } from '../../api/attendance';
+import { HelpMark } from '../../components/ui/HelpMark';
+import { refusal } from '../../api/accountability';
 import { useDashboardSummary } from '../../api/dashboard';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { StatRow, type StatItem } from '../../components/ui/StatRow';
@@ -13,6 +15,10 @@ import { Badge } from '../../components/ui/Badge';
 import { Icon } from '../../components/ui/Icon';
 import { useAuth } from '../../context/AuthContext';
 import { useLocationName } from '../../api/locations';
+
+const STATE_COLOR: Record<string, 'gray' | 'blue' | 'red' | 'green' | 'amber'> = {
+  upcoming: 'gray', 'waiting-names': 'blue', waiting: 'blue', 'names-not-taken': 'red', 'not-filled': 'red', done: 'green', 'did-not-hold': 'gray',
+};
 
 export function AttendanceListPage() {
   const navigate = useNavigate();
@@ -25,6 +31,10 @@ export function AttendanceListPage() {
   const todayIso = new Date().toLocaleDateString('en-CA');
   const [meetingFilter, setMeetingFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const didNotHold = useDidNotHold();
+  const [notHeld, setNotHeld] = useState<number | null>(null);
+  const [notHeldReason, setNotHeldReason] = useState('');
+  const [notHeldErr, setNotHeldErr] = useState('');
   const [ordering, setOrdering] = useState('-date');
   const [audienceFilter, setAudienceFilter] = useState('all');
   const [rangeFilter, setRangeFilter] = useState<DateRangeKey>('all');
@@ -210,6 +220,7 @@ export function AttendanceListPage() {
                 <option value="all">All statuses</option>
                 <option value="filled">Filled</option>
                 <option value="pending">Pending</option>
+                <option value="did-not-hold">Did not hold</option>
               </select>
               <label className="sr-only" htmlFor="att-sort">Sort</label>
               <select id="att-sort" className="selectbox" value={ordering}
@@ -230,7 +241,7 @@ export function AttendanceListPage() {
         <div style={{ overflowX: 'auto' }}>
           <table className="cardtable">
             <thead>
-              <tr><th>Date</th><th>Meeting</th><th>Location</th><th>Mode</th><th>Total</th><th>Status</th><th></th></tr>
+              <tr><th>Date</th><th>Meeting</th><th>Location</th><th>Mode</th><th>Total</th><th>Status<HelpMark topic="faStatus" /></th><th></th></tr>
             </thead>
             <tbody>
               {(sessions?.results ?? []).map((s) => (
@@ -242,9 +253,12 @@ export function AttendanceListPage() {
                   <td data-label="Mode">{({ 'in-person': 'In person', online: 'Online', 'in-person-and-online': 'In person and online' } as Record<string, string>)[s.mode] ?? s.mode}</td>
                   <td data-label="Total">{s.status === 'filled' ? s.total : '–'}</td>
                   <td data-label="Status">
-                    {s.status === 'filled' ? <Badge color="green">Filled</Badge> : <Badge color="amber">Pending</Badge>}
+                    {s.state ? <Badge color={STATE_COLOR[s.state] ?? 'gray'}>{s.state_label}</Badge>
+                      : s.status === 'filled' ? <Badge color="green">Filled</Badge> : <Badge color="amber">Pending</Badge>}
+                    {s.status === 'did-not-hold' && s.not_held_reason && <div className="muted" style={{ fontSize: '.76rem' }}>{s.not_held_reason}</div>}
                   </td>
                   <td className="td-actions" onClick={(e) => e.stopPropagation()}>
+                    <div className="att-acts">
                     {/* Not before the service: the server refuses it. */}
                     {canEdit && s.status === 'pending' && s.date <= todayIso && (
                       <button className="btn sm" onClick={() => navigate(`/attendance/${s.id}/check-in`)}>
@@ -258,17 +272,48 @@ export function AttendanceListPage() {
                         Check in
                       </button>
                     )}
+                    {canEdit && s.status === 'pending' && s.date <= todayIso && (
+                      <button className="btn sm ghost" title="The service did not take place" onClick={() => { setNotHeld(s.id); setNotHeldReason(''); setNotHeldErr(''); }}>
+                        Did not hold
+                      </button>
+                    )}
+                    {canEdit && s.status === 'did-not-hold' && (
+                      <button className="btn sm ghost" title="It did take place after all" onClick={() => didNotHold.mutate({ id: s.id, undo: true })}>
+                        Undo Did not hold
+                      </button>
+                    )}
                     {canDelete && (
                       <button className="icon-btn" title="Delete session" onClick={(e) => handleDelete(e, s.id)}>
                         <Icon name="trash" size={15} />
                       </button>
                     )}
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
           {isLoading && <Skeleton shape="rows" rows={6} />}
+          {notHeld && (
+            <div className="fu-modal" role="dialog" aria-modal="true" aria-label="Did not hold" onMouseDown={(e) => { if (e.target === e.currentTarget) setNotHeld(null); }}>
+              <div className="fu-box">
+                <h3 style={{ margin: '0 0 4px' }}>This service did not hold<HelpMark topic="faDidNotHold" /></h3>
+                <p className="muted" style={{ fontSize: '.84rem', margin: '0 0 10px' }}>Nobody is followed up for it, and it is left out of averages and the bell.</p>
+                <div className="field"><label htmlFor="dnh-r">Why not?</label>
+                  <input id="dnh-r" value={notHeldReason} onChange={(e) => setNotHeldReason(e.target.value)} placeholder="For example: public holiday" /></div>
+                {notHeldErr && <p className="form-error" role="alert">{notHeldErr}</p>}
+                <div className="form-actions-row">
+                  <button className="btn sm" disabled={didNotHold.isPending} onClick={async () => {
+                    setNotHeldErr('');
+                    if (!notHeldReason.trim()) { setNotHeldErr('Say why it did not hold.'); return; }
+                    try { await didNotHold.mutateAsync({ id: notHeld, reason: notHeldReason.trim() }); setNotHeld(null); }
+                    catch (e) { setNotHeldErr(refusal(e, 'That could not be saved.')); }
+                  }}>Save</button>
+                  <button className="btn sm ghost" onClick={() => setNotHeld(null)}>Cancel</button>
+                </div>
+              </div>
+            </div>
+          )}
           {!isLoading && sessions?.results.length === 0 && <div className="empty">No sessions match these filters.</div>}
         </div>
 

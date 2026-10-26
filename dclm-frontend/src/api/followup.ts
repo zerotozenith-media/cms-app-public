@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from './client';
-import type { PaginatedResponse } from '../types/members';
+import { apiClient, getAllPages } from './client';
 import type {
   MemberFollowUpTask, CompleteFollowUpPayload, FollowUpStats,
   AssignmentPreview, AssignmentApplyResult, ShepherdProblems,
@@ -25,11 +24,7 @@ export function useMemberFollowUpTasks(filters: FollowUpFilters = {}) {
       if (filters.assigned_to !== undefined) params.assigned_to = String(filters.assigned_to);
       if (filters.done !== undefined) params.done = String(filters.done);
       params.ordering = filters.ordering ?? 'due_date';
-      params.page_size = '100';
-      const resp = await apiClient.get<PaginatedResponse<MemberFollowUpTask>>(
-        '/member-followup-tasks/', { params },
-      );
-      return resp.data.results;
+      return getAllPages<MemberFollowUpTask>('/member-followup-tasks/', params);
     },
   });
 }

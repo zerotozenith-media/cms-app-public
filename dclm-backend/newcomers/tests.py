@@ -331,14 +331,18 @@ class NewcomerIntakeSlipTestCase(APITestCase):
         self.assertIn("Share more about the church", tasks)
         self.assertIn("Have a salvation conversation", tasks)
 
-    def test_salvation_task_is_due_sooner_than_the_others(self):
+    def test_every_first_visit_task_is_due_within_24_hours(self):
+        """Kay, 26 October 2026: first-visit tasks are due 24 hours from
+        6:00 pm on the day the newcomer first came, like absence tasks.
+        Before, a salvation conversation had 2 days and a visit 5."""
         self.auth(self.admin)
         resp = self.client.post("/api/newcomers/", self.base_payload(
             wants_visit=True, wants_salvation_info=True,
         ))
-        tasks = {t.text: t.due_date for t in NewcomerTask.objects.filter(newcomer_id=resp.data["id"])}
-        self.assertLess(tasks["Have a salvation conversation"], tasks["Schedule a home visit"],
-            "The salvation-interest task should be due sooner, reflecting real pastoral urgency.")
+        tasks = list(NewcomerTask.objects.filter(newcomer_id=resp.data["id"]))
+        self.assertEqual({t.kind for t in tasks}, {"first-visit"})
+        self.assertEqual(len({t.due_at for t in tasks}), 1)
+        self.assertEqual(tasks[0].due_at - tasks[0].clock_start, datetime.timedelta(hours=24))
 
     def test_no_checkboxes_creates_no_tasks(self):
         self.auth(self.admin)

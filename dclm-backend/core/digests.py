@@ -33,7 +33,16 @@ def build_shepherd_digest(shepherd_name, tasks, today=None):
         return None
 
     today = today or timezone.localdate()
-    overdue = [t for t in tasks if t.due_date < today]
+    now = timezone.now()
+
+    def _late(t):
+        return (t.due_at < now) if t.due_at else (t.due_date < today)
+
+    def _due(t):
+        # The exact due time where there is one (Kay, 26 October 2026).
+        return f"due {timezone.localtime(t.due_at):%a %-d %b, %-I:%M %p}" if t.due_at else f"due {t.due_date}"
+
+    overdue = [t for t in tasks if _late(t)]
     count = len(tasks)
 
     if overdue:
@@ -48,7 +57,7 @@ def build_shepherd_digest(shepherd_name, tasks, today=None):
         "",
     ]
     for t in sorted(tasks, key=lambda x: x.due_date):
-        marker = "OVERDUE" if t.due_date < today else f"due {t.due_date}"
+        marker = "OVERDUE" if _late(t) else _due(t)
         what = f"missed {t.missed_meeting_name} on {t.missed_date}" if t.missed_meeting_name else t.text
         lines.append(f"  {t.member.full_name}, {what} ({marker})")
 
@@ -58,7 +67,7 @@ def build_shepherd_digest(shepherd_name, tasks, today=None):
         "really keeping them away, and agree a next step before you finish.",
         "",
     ]
-    url = _app_url("/members/follow-up")
+    url = _app_url("/follow-up")
     if url:
         lines += [f"Open your list: {url}", ""]
 
@@ -71,7 +80,7 @@ def build_shepherd_digest(shepherd_name, tasks, today=None):
 
     rows = "".join(
         f"<li><strong>{escape(t.member.full_name)}</strong>, {_what(t)} "
-        f"({'<span style=\"color:#D6202C\">overdue</span>' if t.due_date < today else f'due {t.due_date}'})</li>"
+        f"({'<span style=\"color:#D6202C\">overdue</span>' if _late(t) else _due(t)})</li>"
         for t in sorted(tasks, key=lambda x: x.due_date)
     )
     button = (
@@ -114,7 +123,7 @@ def build_leadership_summary(stats, today=None):
             "Those members have no shepherd, so nobody is responsible for them.",
             "",
         ]
-    url = _app_url("/members/follow-up")
+    url = _app_url("/follow-up")
     if url:
         lines += [f"Open the follow-up list: {url}", ""]
 

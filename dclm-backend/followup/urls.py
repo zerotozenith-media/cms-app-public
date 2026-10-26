@@ -9,6 +9,7 @@ urlpatterns = [
     path("followup/enrolments/<int:pk>/record/", views.RecordView.as_view(), name="followup-record"),
     path("followup/enrolments/<int:pk>/send/", views.SendExtraView.as_view(), name="followup-send"),
     path("followup/start-many/", views.StartManyView.as_view(), name="followup-start-many"),
+    path("followup/missed/", views.MissedView.as_view(), name="followup-missed"),
     path("followup/enrolments/<int:pk>/<str:action>/", views.EnrolmentActionView.as_view(), name="followup-action"),
     path("followup/bank/", views.BankView.as_view(), name="followup-bank"),
     path("followup/bank/<int:pk>/", views.BankItemView.as_view(), name="followup-bank-item"),

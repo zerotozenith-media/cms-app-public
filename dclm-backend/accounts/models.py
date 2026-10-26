@@ -95,6 +95,14 @@ class User(AbstractUser):
     # a member record. Blank means not set.
     gender = models.CharField(max_length=10, choices=[("Male", "Male"), ("Female", "Female")],
                               blank=True, default="")
+    # Follow-up Coordinator (Kay, 26 October 2026): reviews late tasks and
+    # their reasons, gets alerts on repeated absences, and sees every
+    # shepherd's record. A tick so any account can be one, an administrator
+    # included; coordinates_location blank means All locations.
+    is_followup_coordinator = models.BooleanField(default=False)
+    coordinates_location = models.ForeignKey(
+        "core.Location", on_delete=models.PROTECT, null=True, blank=True, related_name="followup_coordinators",
+        help_text="The location this account coordinates follow-up for. Blank = All locations.")
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []

@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { Icon } from '../ui/Icon';
 import { NAV_ITEMS } from '../../lib/nav';
 import { useAuth } from '../../context/AuthContext';
+import { useFollowUpAccess } from '../../api/accountability';
 import logoBadge from '../../assets/logo-badge.png';
 
 interface SidebarProps {
@@ -11,10 +12,15 @@ interface SidebarProps {
 
 export function Sidebar({ open, onClose }: SidebarProps) {
   const { hasPermission } = useAuth();
+  const { data: access } = useFollowUpAccess();
   // Real role-based filtering, replacing the demo's role.nav array ,
   // an item shows only if the user's role has can_view on its module,
   // or it has no module at all (Dashboard, visible to any authenticated user).
-  const visibleItems = NAV_ITEMS.filter((item) => item.module === null || hasPermission(item.module, 'view'));
+  const visibleItems = NAV_ITEMS.filter((item) => {
+    if (item.followup === 'mine') return !!access && (access.can_shepherd || access.has_tasks || access.can_review);
+    if (item.followup === 'review') return !!access?.can_review;
+    return item.module === null || hasPermission(item.module, 'view');
+  });
 
   return (
     <>

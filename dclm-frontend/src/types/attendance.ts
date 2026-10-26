@@ -45,6 +45,13 @@ export interface MeetingType {
    *  check knows when the service actually began. Null means this meeting
    *  is never auto-checked, whatever counts_for_absence says. */
   start_time: string | null;
+  /** Days before the meeting its session is created; 0 is the day itself. */
+  create_days_ahead?: number;
+  /** Locations it is held at; none means every location. */
+  held_at?: string[];
+  held_at_names?: string[];
+  /** What stops this meeting working as its ticks suggest. */
+  setup_warnings?: string[];
 }
 
 export type CheckInMode = 'in-person' | 'online';
@@ -93,7 +100,14 @@ export interface AttendanceSession {
   date: string;
   location: string;
   mode: 'in-person' | 'online';
-  status: 'pending' | 'filled';
+  status: 'pending' | 'filled' | 'did-not-hold';
+  /** Kay, 26 October 2026: Upcoming, Waiting for names, Names not taken,
+   *  Done, Did not hold, worked out on the server. */
+  state?: 'upcoming' | 'waiting-names' | 'waiting' | 'names-not-taken' | 'not-filled' | 'done' | 'did-not-hold';
+  state_label?: string;
+  not_held_reason?: string;
+  /** Names ticked after the absence check ran (Kay, 26 October 2026). */
+  late_entry?: { check_ran: string; due_hours: number } | null;
   track_named: boolean;
   men: number;
   women: number;
@@ -109,6 +123,7 @@ export interface AttendanceStats {
   sessions_this_month: number;
   filled: number;
   pending: number;
+  did_not_hold?: number;
 }
 
 export interface RecordAttendancePayload {

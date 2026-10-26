@@ -219,6 +219,39 @@ class RolePermissionViewSet(viewsets.ModelViewSet):
     queryset = RolePermission.objects.select_related("role")
     serializer_class = RolePermissionSerializer
 
+    # Review item A2: unticking Admin on the Administrator role locked
+    # everyone out of roles for good. A change that leaves no full
+    # administrator is refused.
+    def _guarded(self, fn):
+        from rest_framework.exceptions import ValidationError
+        with transaction.atomic():
+            result = fn()
+            if not any_full_administrator():
+                raise ValidationError({"detail": "This would leave no active account that covers All locations "
+                                                 "with full Admin rights, and nobody could undo it. Keep Admin "
+                                                 "fully ticked for at least one such account's role."})
+        return result
+
+    def perform_update(self, serializer):
+        self._guarded(serializer.save)
+        log_audit(self.request.user, "Changed permissions", "Role", serializer.instance.role.name,
+                  serializer.instance.module)
+
+    def perform_create(self, serializer):
+        self._guarded(serializer.save)
+
+    def perform_destroy(self, instance):
+        self._guarded(instance.delete)
+
+
+def any_full_administrator():
+    """Whether at least one active account covers All locations with every
+    Admin permission."""
+    for u in User.objects.filter(is_active=True, location__isnull=True).select_related("role"):
+        if u.is_superuser or is_full_administrator(u):
+            return True
+    return False
+
 
 PERMISSION_FLAGS = ("can_view", "can_create", "can_edit", "can_delete")
 
@@ -288,13 +321,91 @@ class UserViewSet(viewsets.ModelViewSet):
         instance = serializer.save()
         log_audit(self.request.user, "Created", "User", instance.email, instance=instance)
 
+    WATCHED = {"first_name": "first name", "last_name": "last name", "email": "email", "role": "role",
+               "location": "location", "is_active": "switched on", "can_shepherd": "shepherd",
+               "gender": "gender", "is_followup_coordinator": "Follow-up Coordinator",
+               "coordinates_location": "coordinates follow-up for"}
+
     def perform_update(self, serializer):
+        from rest_framework.exceptions import ValidationError
         self._check_within_reach(serializer.validated_data, serializer.instance)
-        before = serializer.instance.member_id
-        instance = serializer.save()
-        if "member" in serializer.validated_data and instance.member_id != before:
+        inst = serializer.instance
+        before = {f: getattr(inst, f) for f in self.WATCHED}
+        before_member = inst.member_id
+        if inst.pk == self.request.user.pk and serializer.validated_data.get("is_active") is False:
+            raise ValidationError({"is_active": "You cannot switch off your own account while signed in to it."})
+        with transaction.atomic():
+            instance = serializer.save()
+            # Review item A2: nobody may leave the church without an account
+            # that can manage everything; there is no other way back in.
+            if not any_full_administrator():
+                raise ValidationError({"detail": "This would leave no active account that covers All locations "
+                                                 "with full Admin rights, and nobody could then manage roles or "
+                                                 "accounts. Give another account those rights first."})
+        if "member" in serializer.validated_data and instance.member_id != before_member:
             log_audit(self.request.user, "Linked member record", "User", instance.email,
                       instance.member.full_name if instance.member_id else "Not a member")
+        changes = []
+        for f, label in self.WATCHED.items():
+            a, b = before[f], getattr(instance, f)
+            if a != b:
+                show = lambda v: ("All locations" if f in ("location", "coordinates_location") and v is None
+                                  else ("yes" if v is True else "no" if v is False else str(v)))
+                changes.append(f"{label}: {show(a)} to {show(b)}")
+        if changes:
+            log_audit(self.request.user, "Changed account", "User", instance.email, "; ".join(changes),
+                      instance=instance)
+        # Someone switched off or no longer shepherding hands their open
+        # tasks on, never leaving them with nobody (Kay, 26 October 2026).
+        if (before["is_active"] and not instance.is_active) or (before["can_shepherd"] and not instance.can_shepherd):
+            from core.task_actions import release_tasks
+            release_tasks(instance)
+
+    @action(detail=True, methods=["post"], url_path="send-reset")
+    def send_reset(self, request, pk=None):
+        """Send this person a link to choose a new password (item 12)."""
+        from rest_framework.exceptions import ValidationError
+        from .password_reset import _send
+        from .permissions import require
+        require(request.user, ("admin", "can_edit"))
+        user = self.get_object()
+        self._check_within_reach({}, user)
+        if not user.is_active:
+            raise ValidationError({"detail": "This account is switched off. Switch it on first, then send the link."})
+        _send(user)
+        log_audit(request.user, "Sent password reset link", "User", user.email)
+        return Response({"detail": f"A link to choose a new password was sent to {user.email}. It works once, "
+                                   f"for one hour."})
+
+    @action(detail=True, methods=["post"], url_path="add-to-roll")
+    def add_to_roll(self, request, pk=None):
+        """
+        Item 12: an account that is not on the member roll is added to it,
+        using the account's name, gender and location, and linked.
+        """
+        from rest_framework.exceptions import ValidationError
+        from core.models import Location
+        from members.models import Member
+        from .permissions import require
+        require(request.user, ("admin", "can_edit"), ("members", "can_create"))
+        user = self.get_object()
+        self._check_within_reach({}, user)
+        if user.member_id:
+            raise ValidationError({"detail": f"{display_name(user)} is already linked to a member record."})
+        if not (user.first_name and user.last_name):
+            raise ValidationError({"detail": "Give the account a first and last name first, so the member record "
+                                             "has a name."})
+        loc = user.location or Location.objects.filter(is_core=True).first()
+        category = request.data.get("category") or Member.Category.GENERAL
+        if category not in Member.Category.values:
+            raise ValidationError({"category": "Choose a member category."})
+        from django.utils import timezone
+        m = Member.objects.create(first_name=user.first_name, surname=user.last_name, gender=user.gender or "",
+                                  email=user.email, location=loc, joined_date=timezone.localdate(), category=category)
+        user.member = m
+        user.save(update_fields=["member"])
+        log_audit(request.user, "Added to member roll", "User", user.email, f"{m.full_name}, {loc.name}", instance=m)
+        return Response({"member": m.id, "member_name": m.full_name})
 
     @action(detail=False, methods=["get"], url_path="member-choices")
     def member_choices(self, request):
@@ -325,6 +436,7 @@ class UserViewSet(viewsets.ModelViewSet):
         # a dangling foreign key). But logging first, on its own, risks
         # leaving a false "Deleted" entry if delete() then fails validation.
         # The transaction makes both succeed or both roll back together.
+        from django.db.models import ProtectedError
         instance = self.get_object()
         email = instance.email
         try:
@@ -333,6 +445,14 @@ class UserViewSet(viewsets.ModelViewSet):
                 instance.delete()
         except DjangoValidationError as exc:
             return Response({"detail": "; ".join(exc.messages)}, status=400)
+        except ProtectedError as exc:
+            # Review item A4: say what holds it and what to do instead.
+            n = len(exc.protected_objects)
+            kinds = sorted({o._meta.verbose_name_plural for o in exc.protected_objects})
+            return Response({"detail": f"{display_name(instance)} produced {n} record(s) that keep their name "
+                                       f"({', '.join(kinds)}), so the account cannot be deleted. Switch it off "
+                                       f"instead: they can no longer sign in, and the records stay correct."},
+                            status=400)
         return Response(status=204)
 
 

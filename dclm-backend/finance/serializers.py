@@ -59,13 +59,22 @@ class GivingSerializer(serializers.ModelSerializer):
     method_name = serializers.CharField(source="method.name", read_only=True)
     project_name = serializers.CharField(source="project.name", read_only=True, default=None)
     member_name = serializers.CharField(source="member.full_name", read_only=True, default=None)
+    # O2: an offering recorded on a service says so, and is changed there.
+    session_label = serializers.SerializerMethodField()
+
+    def get_session_label(self, obj):
+        if not obj.session_id:
+            return ""
+        s = obj.session
+        return f"{s.meeting_type.name}, {s.date.day} {s.date:%b}"
 
     class Meta:
         model = Giving
         fields = [
             "id", "date", "fund", "fund_name", "method", "method_name", "amount",
-            "location", "project", "project_name", "member", "member_name",
+            "location", "project", "project_name", "member", "member_name", "session", "session_label",
         ]
+        read_only_fields = ["session"]
 
 
 class ExpenseSerializer(serializers.ModelSerializer):

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from './client';
+import { apiClient, getAllPages } from './client';
 import type { PaginatedResponse } from '../types/members';
 import type { Role, RolePermission, AdminUser, AuditLogEntry, LoginAttempt } from '../types/admin';
 
@@ -7,7 +7,7 @@ import type { Role, RolePermission, AdminUser, AuditLogEntry, LoginAttempt } fro
 export function useAdminUsers() {
   return useQuery({
     queryKey: ['admin-users'],
-    queryFn: async () => (await apiClient.get<PaginatedResponse<AdminUser>>('/users/', { params: { page_size: 100 } })).data.results,
+    queryFn: async () => getAllPages<AdminUser>('/users/'),
   });
 }
 export function useCreateUser() {
@@ -29,7 +29,7 @@ export function useDeleteUser() {
 export function useUpdateUser() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...data }: { id: number; can_shepherd?: boolean; gender?: string; member?: number | null }) => {
+    mutationFn: async ({ id, ...data }: { id: number } & Record<string, unknown>) => {
       const r = await apiClient.patch(`/users/${id}/`, data);
       return r.data;
     },
@@ -42,6 +42,27 @@ export function useUpdateUser() {
       // Linking a member record can show or clear "Shepherds himself".
       qc.invalidateQueries({ queryKey: ['members'] });
       qc.invalidateQueries({ queryKey: ['member-choices'] });
+    },
+  });
+}
+
+/** Item 12: email the person a link to choose a new password. */
+export function useSendReset() {
+  return useMutation({
+    mutationFn: async (id: number) => (await apiClient.post<{ detail: string }>(`/users/${id}/send-reset/`)).data,
+  });
+}
+
+/** Item 12: put an account on the member roll and link it. */
+export function useAddToRoll() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, category }: { id: number; category?: string }) =>
+      (await apiClient.post<{ member: number; member_name: string }>(`/users/${id}/add-to-roll/`, { category })).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-users'] });
+      qc.invalidateQueries({ queryKey: ['member-choices'] });
+      qc.invalidateQueries({ queryKey: ['members'] });
     },
   });
 }

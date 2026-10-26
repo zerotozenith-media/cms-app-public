@@ -42,6 +42,12 @@ class Base(APITestCase):
             name=name, source=self.source, location=self.bahrain, stage=stage,
             created_at=self.today, stage_since=self.today)
 
+    def tick(self, session, member):
+        """Names were taken: since review item O3 a service with nobody
+        ticked is never treated as everyone absent."""
+        from attendance.models import AttendanceSessionMember
+        AttendanceSessionMember.objects.create(session=session, member=member)
+
     def friday(self, offset_days):
         mt, _ = MeetingType.objects.get_or_create(
             id="fri-worship", defaults=dict(
@@ -73,9 +79,10 @@ class AudienceTestCase(Base):
         self.member("InTraining", Member.Category.IN_TRAINING)
 
         mt = self._workers_meeting()
-        AttendanceSession.objects.create(
+        s = AttendanceSession.objects.create(
             meeting_type=mt, date=self.today - datetime.timedelta(days=1),
             location=self.bahrain, mode="in-person", status="pending")
+        self.tick(s, self.member("PresentWorker", Member.Category.WORKER))
         call_command("check_absences", verbosity=0)
 
         chased = {t.member.first_name for t in MemberFollowUpTask.objects.all()}
@@ -99,9 +106,10 @@ class AudienceTestCase(Base):
             frequency="weekly", detail_level="simple",
             counts_for_absence=True, start_time=datetime.time(19, 0),
             audience=MeetingType.Audience.LEADERSHIP)
-        AttendanceSession.objects.create(
+        s = AttendanceSession.objects.create(
             meeting_type=mt, date=self.today - datetime.timedelta(days=1),
             location=self.bahrain, mode="in-person", status="pending")
+        self.tick(s, self.member("PresentLeader", Member.Category.WORKER, leader=True))
         call_command("check_absences", verbosity=0)
         chased = {t.member.first_name for t in MemberFollowUpTask.objects.all()}
         self.assertEqual(chased, {"Leader"})
@@ -109,7 +117,7 @@ class AudienceTestCase(Base):
     def test_everyone_still_means_everyone(self):
         self.member("A")
         self.member("B", Member.Category.WORKER)
-        self.friday(1)
+        self.tick(self.friday(1), self.member("Present"))
         call_command("check_absences", verbosity=0)
         self.assertEqual(MemberFollowUpTask.objects.count(), 2)
 

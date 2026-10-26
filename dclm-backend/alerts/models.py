@@ -26,7 +26,7 @@ class PushSubscription(models.Model):
 
 class AlertSettings(models.Model):
     """Which kinds of alert a person wants. Every kind starts switched on."""
-    KINDS = ("morning", "assigned", "arrivals", "weekly", "announcements")
+    KINDS = ("morning", "assigned", "arrivals", "weekly", "announcements", "followup")
 
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="alert_settings")
     morning = models.BooleanField(default=True)
@@ -34,6 +34,9 @@ class AlertSettings(models.Model):
     arrivals = models.BooleanField(default=True)
     weekly = models.BooleanField(default=True)
     announcements = models.BooleanField(default=True)
+    # Follow-up accountability: late tasks, reasons, the Review list,
+    # repeated absences and reminders to tick names.
+    followup = models.BooleanField(default=True)
     # So the morning and weekly alerts go once, however often the hourly
     # job runs.
     last_morning = models.DateField(null=True, blank=True)
@@ -72,3 +75,21 @@ class PushKeys(models.Model):
     public_key = models.CharField(max_length=120)
     private_key = models.CharField(max_length=120)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class Notice(models.Model):
+    """
+    An alert kept in the app as well as sent to the phone (Kay, 26 October
+    2026), so somebody without phone alerts still sees it, and nothing
+    depends on a phone being on.
+    """
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notices")
+    kind = models.CharField(max_length=20, default="followup")
+    title = models.CharField(max_length=120)
+    body = models.CharField(max_length=400, blank=True, default="")
+    url = models.CharField(max_length=200, blank=True, default="/")
+    created_at = models.DateTimeField(auto_now_add=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]

@@ -32,6 +32,11 @@ class Goal(models.Model):
         TESTIMONY_COUNT = "testimony_count", "Testimony count"
         MEMBER_CATEGORY_MOVES = "member_category_moves", "Members moved to a category"
         MILESTONE_COUNT = "milestone_count", "Milestone count"
+        # Item 11 (Kay, 26 October 2026): goals that update themselves.
+        SESSIONS_HELD = "sessions_held", "Sessions held"
+        FUND_TOTAL = "fund_total", "Fund total"
+        NET_GIVING = "net_giving", "Monthly giving less expenses"
+        NAMED_CHECKINS = "named_checkins", "People checked in by name"
 
     horizon = models.CharField(max_length=30, choices=Horizon.choices)
     name = models.CharField(max_length=200)
@@ -67,6 +72,12 @@ class Goal(models.Model):
         "newcomers.MilestoneType", on_delete=models.SET_NULL, null=True, blank=True,
         help_text="Used by MILESTONE_COUNT.",
     )
+    # Item 11: one location, or blank for all locations; and the fund a
+    # Fund total goal counts.
+    calculation_location = models.ForeignKey(
+        "core.Location", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    calculation_fund = models.ForeignKey(
+        "finance.Fund", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
 
     class Meta:
         ordering = ["horizon", "name"]

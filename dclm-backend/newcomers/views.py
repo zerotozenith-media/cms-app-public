@@ -6,7 +6,8 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.views import APIView
 from rest_framework.response import Response
 
 from accounts.audit import log_audit
@@ -85,6 +86,9 @@ class NewcomerViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
         before = serializer.instance.location_id
         before_shepherd = serializer.instance.assigned_to_id
         newcomer = serializer.save()
+        if newcomer.assigned_to_id != before_shepherd:
+            from core.task_actions import move_open_tasks
+            move_open_tasks(newcomer, newcomer.assigned_to_id)
         if newcomer.assigned_to_id and newcomer.assigned_to_id != before_shepherd:
             from alerts.events import given
             given([("newcomer", newcomer.pk, newcomer.name, newcomer.assigned_to_id)], by=self.request.user)
@@ -146,6 +150,17 @@ class NewcomerViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
                   f"{method}, no reply", instance=newcomer)
         return Response({"id": attempt.id, "date": attempt.date, "method": attempt.method}, status=201)
 
+    def get_permissions(self):
+        if getattr(self, "action", None) == "away":
+            from rest_framework.permissions import IsAuthenticated
+            return [IsAuthenticated()]
+        return super().get_permissions()
+
+    @action(detail=True, methods=["post", "delete"])
+    def away(self, request, pk=None):
+        """Mark the newcomer away for a known absence, or clear it."""
+        return away_action(self, request, self.get_object(), "newcomers")
+
     @action(detail=True, methods=["post"], url_path="make-member")
     def make_member(self, request, pk=None):
         """
@@ -188,6 +203,11 @@ class NewcomerViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
 
         if to_stage == from_stage:
             return Response({"detail": f"Newcomer is already {to_stage}."}, status=400)
+        # Not Interested stops follow-up (Kay, 26 October 2026), so the
+        # reason is kept with it.
+        if to_stage == Newcomer.Stage.NOT_INTERESTED and not note.strip():
+            return Response({"note": "Say why, for example \"Moved back home\". Not Interested stops "
+                                     "follow-up, so the reason is kept with it."}, status=400)
 
         # Becoming a member is a conversion, not just a new label. Moving
         # the stage alone left the person shown as a member on the board
@@ -220,6 +240,10 @@ class NewcomerViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
             elif note:
                 newcomer.not_interested_note = note
             newcomer.save(update_fields=["stage", "stage_since", "not_interested_note"])
+            if to_stage == Newcomer.Stage.NOT_INTERESTED:
+                from core.accountable import TaskResult
+                from core.task_actions import close_open_for
+                close_open_for(newcomer, request.user, TaskResult.KNOWN_REASON, f"Marked Not Interested: {note}")
 
         return Response(NewcomerSerializer(newcomer).data)
 
@@ -251,11 +275,14 @@ class NewcomerViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
         return Response(NewcomerSerializer(fresh).data)
 
 
-class NewcomerTaskViewSet(LocationScopedMixin, viewsets.ModelViewSet):
+from core.task_views import TaskActionsMixin, away_action
+
+
+class NewcomerTaskViewSet(TaskActionsMixin, LocationScopedMixin, viewsets.ModelViewSet):
     location_lookup = "newcomer__location_id"
     module = "newcomers"
     permission_classes = [ModulePermission]
-    queryset = NewcomerTask.objects.select_related("newcomer", "newcomer__assigned_to", "newcomer__assigned_to__member", "assigned_to", "assigned_to__member")
+    queryset = NewcomerTask.objects.select_related("newcomer", "newcomer__assigned_to", "newcomer__assigned_to__member", "assigned_to", "assigned_to__member").prefetch_related("attempts", "attempts__by", "reviews")
     serializer_class = NewcomerTaskSerializer
 
     filter_backends = [filters.OrderingFilter]
@@ -283,25 +310,18 @@ class NewcomerTaskViewSet(LocationScopedMixin, viewsets.ModelViewSet):
         task with no record of what was discussed wasn't useful to a
         leader reviewing history later.
         """
-        require(request.user, ("newcomers", "can_edit"))
+        from core import task_actions as acts
+        from core.task_views import block_until_reasons
         task = self.get_object()
+        self._may_record(request, task)
+        block_until_reasons(request.user, task)
         serializer = CompleteNewcomerTaskSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-
-        task.done = True
-        task.contact_date = data.get("contact_date") or timezone.localdate()
-        task.contact_method = data["contact_method"]
-        task.contact_goal = data["contact_goal"]
-        task.contact_scripture = data["contact_scripture"]
-        task.contact_root_cause = data["contact_root_cause"]
-        task.contact_next_step = data["contact_next_step"]
-        task.save()
-        log_audit(
-            request.user, "Recorded follow-up outcome", "Newcomer", task.newcomer.name,
-            f"{task.contact_method}: {task.contact_goal[:60]}", instance=task,
-        )
-        return Response(NewcomerTaskSerializer(task).data)
+        extra = acts.reached(task, request.user, serializer.validated_data)
+        task.refresh_from_db()
+        data = dict(NewcomerTaskSerializer(task).data)
+        data.update(extra)
+        return Response(data)
 
 
 class NewcomerStatusHistoryViewSet(LocationScopedMixin, viewsets.ModelViewSet):
@@ -316,7 +336,12 @@ class NewcomerStatusHistoryViewSet(LocationScopedMixin, viewsets.ModelViewSet):
 
 REGISTRATION_MIN_SUBMIT_SECONDS = 2.0
 REGISTRATION_RATE_LIMIT_WINDOW_HOURS = 24
-REGISTRATION_MAX_PER_IP = 5  # generous enough for one family submitting multiple members from a shared phone
+# P10 (review, 25 October 2026): counted per phone, since visitors on the
+# church Wi-Fi share one internet address. 5 a day from one phone covers a
+# family filling it in for each other. The address limit only stops a flood.
+REGISTRATION_MAX_PER_DEVICE = 5
+REGISTRATION_MAX_PER_IP = 60
+REGISTRATION_MAX_PER_IP_BURST = 15   # in 10 minutes
 
 GENERIC_REGISTRATION_ERROR = {"detail": "We couldn't process your submission. Please see a leader at the welcome desk."}
 
@@ -326,6 +351,51 @@ def _get_client_ip(request):
     if forwarded:
         return forwarded.split(",")[0].strip()
     return request.META.get("REMOTE_ADDR", "0.0.0.0")
+
+
+def _blocked(ip, device, now=None):
+    """Whether this phone, or this internet address, has sent too many."""
+    now = now or timezone.now()
+    ok = PublicRegistrationAttempt.objects.filter(successful=True, counted=True,
+                                                  timestamp__gte=now - timedelta(hours=REGISTRATION_RATE_LIMIT_WINDOW_HOURS))
+    if device and ok.filter(device_id=device).count() >= REGISTRATION_MAX_PER_DEVICE:
+        return True
+    if not device and ok.filter(ip_address=ip, device_id="").count() >= REGISTRATION_MAX_PER_DEVICE:
+        return True   # an old form with no phone id: counted as before
+    if ok.filter(ip_address=ip).count() >= REGISTRATION_MAX_PER_IP:
+        return True
+    return ok.filter(ip_address=ip, timestamp__gte=now - timedelta(minutes=10)).count() >= REGISTRATION_MAX_PER_IP_BURST
+
+
+@api_view(["GET", "POST"])
+def registration_blocks(request):
+    """
+    P10: phones and addresses the QR form is refusing now, for an
+    administrator. POST {"ip": ..., "device_id": ...} lifts a block; the
+    attempts stay in the log.
+    """
+    from accounts.permissions import require
+    require(request.user, ("newcomers", "can_edit"), ("admin", "can_view"))
+    window = timezone.now() - timedelta(hours=REGISTRATION_RATE_LIMIT_WINDOW_HOURS)
+    if request.method == "POST":
+        qs = PublicRegistrationAttempt.objects.filter(successful=True, counted=True, timestamp__gte=window)
+        if request.data.get("device_id"):
+            qs = qs.filter(device_id=request.data["device_id"])
+        elif request.data.get("ip"):
+            qs = qs.filter(ip_address=request.data["ip"])
+        else:
+            return Response({"detail": "Say which phone or address to unblock."}, status=400)
+        n = qs.update(counted=False)
+        log_audit(request.user, "Lifted QR form block", "Public registration",
+                  request.data.get("device_id") or request.data.get("ip"), f"{n} submission(s) no longer counted")
+        return Response({"lifted": n})
+    from django.db.models import Count, Max
+    refused = (PublicRegistrationAttempt.objects.filter(reason=PublicRegistrationAttempt.Reason.RATE_LIMITED,
+                                                        timestamp__gte=window)
+               .values("ip_address", "device_id").annotate(n=Count("id"), last=Max("timestamp")).order_by("-last"))
+    rows = [{"ip": r["ip_address"], "device_id": r["device_id"], "refused": r["n"], "last": r["last"],
+             "still_blocked": _blocked(r["ip_address"], r["device_id"])} for r in refused]
+    return Response({"results": rows, "per_phone": REGISTRATION_MAX_PER_DEVICE, "per_address": REGISTRATION_MAX_PER_IP})
 
 
 @api_view(["POST"])
@@ -344,9 +414,10 @@ def public_newcomer_registration(request):
     import datetime as dt
 
     ip = _get_client_ip(request)
+    device = str(request.data.get("device_id") or "")[:64]
 
     def reject(reason, response_status=status.HTTP_400_BAD_REQUEST):
-        PublicRegistrationAttempt.objects.create(ip_address=ip, successful=False, reason=reason)
+        PublicRegistrationAttempt.objects.create(ip_address=ip, device_id=device, successful=False, reason=reason)
         return Response(GENERIC_REGISTRATION_ERROR, status=response_status)
 
     website = request.data.get("website") or ""
@@ -363,11 +434,7 @@ def public_newcomer_registration(request):
         except (ValueError, AttributeError):
             pass  # malformed timestamp , don't hard-fail a real submission over it
 
-    window_start = timezone.now() - timedelta(hours=REGISTRATION_RATE_LIMIT_WINDOW_HOURS)
-    recent_count = PublicRegistrationAttempt.objects.filter(
-        ip_address=ip, successful=True, timestamp__gte=window_start,
-    ).count()
-    if recent_count >= REGISTRATION_MAX_PER_IP:
+    if _blocked(ip, device):
         return reject(PublicRegistrationAttempt.Reason.RATE_LIMITED, status.HTTP_429_TOO_MANY_REQUESTS)
 
     serializer = PublicRegistrationSerializer(data=request.data)
@@ -407,7 +474,8 @@ def public_newcomer_registration(request):
         from alerts.events import arrival
         newcomer.refresh_from_db()
         arrival("newcomer", newcomer)
-        PublicRegistrationAttempt.objects.create(ip_address=ip, successful=True, reason=PublicRegistrationAttempt.Reason.SUCCESS)
+        PublicRegistrationAttempt.objects.create(ip_address=ip, device_id=device, successful=True,
+                                                 reason=PublicRegistrationAttempt.Reason.SUCCESS)
 
     return Response({"detail": "Thank you! Someone from our team will be in touch soon."}, status=status.HTTP_201_CREATED)
 
@@ -488,3 +556,49 @@ def convert_to_member(newcomer, user):
               "Added to the member roll", instance=newcomer)
     return member
 
+
+
+class BulkAssignNewcomersView(APIView):
+    """Item 13 (Kay, 26 October 2026): give several newcomers one shepherd.
+    Same rules as one at a time: someone who may shepherd, of the same
+    gender, at the newcomer's location; their open tasks move too."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from accounts.gender import WORD, can_pair
+        from accounts.models import User
+        from accounts.names import display_name
+        from accounts.permissions import require
+        from alerts.events import given
+        from core.task_actions import move_open_tasks
+        require(request.user, ("newcomers", "can_edit"))
+        ids = request.data.get("newcomer_ids") or []
+        shepherd = User.objects.filter(id=request.data.get("shepherd_id"), is_active=True).first()
+        if not shepherd:
+            return Response({"shepherd_id": "Choose a shepherd."}, status=400)
+        if not shepherd.can_shepherd:
+            return Response({"shepherd_id": "That person is not set up to shepherd others. An administrator can tick "
+                                            "Can shepherd others on their account."}, status=400)
+        qs = Newcomer.objects.filter(id__in=ids)
+        if not request.user.is_superuser and request.user.location_id:
+            qs = qs.filter(location_id=request.user.location_id)
+        people = list(qs)
+        if not people:
+            return Response({"detail": "Tick at least one newcomer."}, status=400)
+        clash = [n for n in people if not can_pair(n.gender, shepherd)]
+        if clash:
+            names = ", ".join(f"{n.name} ({WORD.get(n.gender, 'gender not known')})" for n in clash[:5])
+            return Response({"detail": f"Men follow up men and women follow up women. Not saved, because of {names}. "
+                                       f"Untick them or choose someone of the same gender."}, status=400)
+        elsewhere = [n for n in people if shepherd.location_id and n.location_id != shepherd.location_id]
+        if elsewhere:
+            return Response({"detail": f"{display_name(shepherd)} serves {shepherd.location.name} only. Not saved, "
+                                       f"because {elsewhere[0].name} is at another location."}, status=400)
+        newly = [("newcomer", n.id, n.name, shepherd.id) for n in people if n.assigned_to_id != shepherd.id]
+        Newcomer.objects.filter(id__in=[n.id for n in people]).update(assigned_to=shepherd)
+        for n in people:
+            move_open_tasks(n, shepherd.id)
+        given(newly, by=request.user)
+        log_audit(request.user, "Bulk assigned shepherd", "Newcomer", f"{len(people)} newcomer(s)",
+                  f"Assigned to {display_name(shepherd)}")
+        return Response({"updated": len(people), "shepherd": display_name(shepherd)})

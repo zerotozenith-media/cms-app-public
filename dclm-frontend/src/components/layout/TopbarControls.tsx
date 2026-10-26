@@ -5,6 +5,10 @@ import { useLocations } from '../../api/locations';
 import { useViewingLocation } from '../../api/viewing';
 import { useAuth } from '../../context/AuthContext';
 import { useOutstanding } from '../../api/notifications';
+import { useMarkNoticesRead, useNotices, whenText } from '../../api/accountability';
+import { openManual } from '../../api/help';
+import type { HelpMsg } from '../../api/help';
+import { helpForPath, slug } from '../../help/content';
 
 /** Closes a popover when the person taps elsewhere or presses Escape. */
 function usePopover() {
@@ -63,13 +67,25 @@ export function NotificationBell() {
   const route = useRoute();
   const { open, setOpen, ref } = usePopover();
   const { data } = useOutstanding();
+  const { data: notices } = useNotices();
+  const markRead = useMarkNoticesRead();
   useEffect(() => setOpen(false), [route.pathname, setOpen]);
-  const total = data?.total ?? 0;
+  const unread = notices?.unread ?? 0;
+  const total = (data?.total ?? 0) + unread;
+  // Opening the bell marks the alerts read; they stay shaded until it closes.
+  const [shaded, setShaded] = useState<number[]>([]);
+  function toggle() {
+    if (!open && unread) {
+      setShaded((notices?.results ?? []).filter((n) => !n.read).map((n) => n.id));
+      markRead.mutate(undefined);
+    }
+    setOpen(!open);
+  }
   return (
     <div className="tb-pop" ref={ref}>
-      <button className="tb-bell" aria-label={total ? `${total} things need attention` : 'Nothing needs attention'} aria-expanded={open} onClick={() => setOpen(!open)}>
+      <button className="tb-bell" aria-label={total ? `${total} things need attention` : 'Nothing needs attention'} aria-expanded={open} onClick={toggle}>
         <svg viewBox="0 0 24 24" width="21" height="21" fill="none" aria-hidden="true"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15L6 16Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><path d="M10 20.5a2 2 0 0 0 4 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
-        {total > 0 && <span key={total} className={`tb-count ${data?.level}`}>{total > 99 ? '99+' : total}</span>}
+        {total > 0 && <span key={total} className={`tb-count ${data?.level ?? 'waiting'}`}>{total > 99 ? '99+' : total}</span>}
       </button>
       {open && (
         <div className="tb-menu tb-bell-menu" role="dialog" aria-label="Needs your attention">
@@ -82,6 +98,19 @@ export function NotificationBell() {
               <span aria-hidden="true">›</span>
             </Link>
           ))}
+          {(notices?.results ?? []).length > 0 && <>
+            <div className="tb-menu-head" style={{ marginTop: 6 }}>Alerts</div>
+            {notices!.results.slice(0, 12).map((n) => (
+              <Link key={n.id} to={n.url || '/follow-up'} className={`fa-notice${shaded.includes(n.id) ? ' unread' : ''}`} onClick={() => setOpen(false)}>
+                <div>
+                  <div className="fa-notice-title">{n.title}</div>
+                  {n.body && <div className="fa-notice-body">{n.body}</div>}
+                  <div className="fa-notice-when">{whenText(n.created_at)}</div>
+                </div>
+              </Link>
+            ))}
+            <div className="tb-menu-note">The same alerts reach your phone when phone alerts are on.</div>
+          </>}
         </div>
       )}
     </div>
@@ -115,6 +144,44 @@ export function UserBadge({ onLogout }: { onLogout: () => void }) {
           </div>
           <Link to="/profile" className="tb-menu-item" onClick={() => setOpen(false)}>My profile</Link>
           <button className="tb-menu-item" onClick={onLogout}>Sign out</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Help for this page (Kay, 26 October 2026): the steps for the page you
+ *  are on, the answers to what it may refuse, and its manual page. */
+export function PageHelpButton() {
+  const route = useRoute();
+  const { open, setOpen, ref } = usePopover();
+  const [err, setErr] = useState<HelpMsg>(null);
+  useEffect(() => { setOpen(false); setErr(null); }, [route.pathname, setOpen]);
+  const help = helpForPath(route.pathname);
+  return (
+    <div className="tb-pop" ref={ref}>
+      <button className="tb-help" aria-label="Help for this page" aria-expanded={open} title="Help for this page" onClick={() => setOpen(!open)}>
+        <svg viewBox="0 0 24 24" width="21" height="21" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="12" cy="16.8" r="1.1" fill="currentColor"/></svg>
+      </button>
+      {open && (
+        <div className="tb-menu tb-help-menu" role="dialog" aria-label="Help for this page">
+          <div className="tb-menu-head">Help for this page{help ? `: ${help.title}` : ''}</div>
+          {help ? (
+            <>
+              <ol className="tb-help-steps">{help.steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
+              {help.links.map((l) => (
+                <Link key={l.t} className="tb-menu-item tb-help-link" onClick={() => setOpen(false)}
+                  to={`/help?s=${l.s}${l.h ? `&h=${slug(l.h)}` : ''}`}>{l.t} <span aria-hidden="true">›</span></Link>
+              ))}
+              {help.manual && (
+                <button type="button" className="tb-menu-item tb-help-link" onClick={async () => setErr(await openManual(help.manual))}>
+                  Full details: manual, page {help.manual} <span aria-hidden="true">›</span>
+                </button>
+              )}
+            </>
+          ) : <div className="tb-empty">Search the full Help for what you are doing.</div>}
+          {err && <div className={err.error ? 'form-error' : 'help-ok'} role={err.error ? 'alert' : 'status'}>{err.text}</div>}
+          <Link to="/help" className="tb-menu-item tb-help-link tb-help-all" onClick={() => setOpen(false)}>Open the full Help <span aria-hidden="true">›</span></Link>
         </div>
       )}
     </div>

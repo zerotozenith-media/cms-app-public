@@ -107,6 +107,22 @@ export function useCreateSession() {
   });
 }
 
+/** Review item O3: a service that did not take place, with a reason. */
+export function useDidNotHold() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, reason, undo }: { id: number; reason?: string; undo?: boolean }) =>
+      undo ? (await apiClient.delete(`/attendance-sessions/${id}/did-not-hold/`)).data
+        : (await apiClient.post(`/attendance-sessions/${id}/did-not-hold/`, { reason })).data,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['session'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+}
+
 export function useDeleteSession() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -156,7 +172,7 @@ export function useCheckIn(sessionId: number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ mode, ...who }: CheckInWho & { mode?: CheckInMode }) =>
-      (await apiClient.post<{ attendees: AttendanceSessionMember[] }>(
+      (await apiClient.post<{ attendees: AttendanceSessionMember[]; was_present?: string[] }>(
         `/attendance-sessions/${sessionId}/check_in/`,
         { ...whoBody(who as CheckInWho), mode: mode ?? 'in-person' },
       )).data,

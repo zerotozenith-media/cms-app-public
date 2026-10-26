@@ -1,7 +1,51 @@
 import { useEffect, useState } from 'react';
 import { Card } from '../ui/Card';
 import { useAlertSettings, useSaveAlertKind, useTestAlert } from '../../api/alerts';
-import { currentSubscription, isIOS, pushState, turnOff, turnOn, type PushState } from '../../lib/push';
+import { currentSubscription, deviceKind, isIOS, isStandalone, pushState, turnOff, turnOn, type PushState } from '../../lib/push';
+
+/**
+ * Item 16 (Kay, 26 October 2026): when alerts are blocked, the steps to
+ * allow them on this kind of device, rather than "check your settings".
+ */
+function BlockedSteps({ onTry, busy }: { onTry: () => void; busy: boolean }) {
+  const kind = deviceKind();
+  const app = isStandalone();
+  const ua = navigator.userAgent || '';
+  const [browser, setBrowser] = useState(!app);
+  const firefox = /Firefox/.test(ua);
+  const safariMac = kind === 'computer' && /Safari/.test(ua) && !/Chrome|Edg/.test(ua);
+  let where = '';
+  let steps: React.ReactNode[] = [];
+  if (kind === 'iPhone' || kind === 'iPad') {
+    where = `On your ${kind}`;
+    steps = [<>Open the <b>Settings</b> app.</>, <>Tap <b>Notifications</b>, then <b>DCLM Bahrain</b>.</>, <>Turn on <b>Allow Notifications</b>.</>, <>Come back here and press <b>Turn on</b>.</>];
+  } else if (kind === 'phone' && !browser) {
+    where = 'On your Android phone, with the DCLM Bahrain app installed';
+    steps = [<>Go to your Home Screen and press and hold the <b>DCLM Bahrain</b> icon.</>, <>Tap <b>App info</b> (or the small <b>i</b>).</>, <>Tap <b>Notifications</b> and turn them on.</>, <>Come back here and press <b>Turn on</b>.</>];
+  } else if (kind === 'phone') {
+    where = 'On your Android phone, in Chrome';
+    steps = [<>Tap the icon to the left of the web address at the top.</>, <>Tap <b>Permissions</b> (or <b>Site settings</b>), then <b>Notifications</b>.</>, <>Choose <b>Allow</b>.</>, <>Come back here and press <b>Turn on</b>.</>];
+  } else if (safariMac) {
+    where = 'In Safari on your Mac';
+    steps = [<>Open the <b>Safari</b> menu, then <b>Settings</b>.</>, <>Choose <b>Websites</b>, then <b>Notifications</b> on the left.</>, <>Find this site and set it to <b>Allow</b>.</>, <>Reload this page and press <b>Turn on</b>.</>];
+  } else if (firefox) {
+    where = 'In Firefox';
+    steps = [<>Click the padlock to the left of the web address.</>, <>Next to <b>Send notifications</b>, clear <b>Blocked</b>.</>, <>Reload this page and press <b>Turn on</b>.</>];
+  } else {
+    where = 'In Chrome or Edge on this computer';
+    steps = [<>Click the icon to the left of the web address.</>, <>Find <b>Notifications</b> and choose <b>Allow</b>.</>, <>Reload this page and press <b>Turn on</b>.</>];
+  }
+  return (
+    <div className="gender-notice">
+      <b>Alerts are blocked on this {kind === 'device' ? 'device' : kind}.</b> {where}:
+      <ol style={{ margin: '6px 0', paddingLeft: 20 }}>{steps.map((st, i) => <li key={i}>{st}</li>)}</ol>
+      <div className="form-actions-row" style={{ margin: 0 }}>
+        <button className="btn sm" onClick={onTry} disabled={busy}>Turn on</button>
+        {kind === 'phone' && <button className="btn sm outline" onClick={() => setBrowser(!browser)}>{browser ? 'I use the app, not Chrome' : 'I use Chrome, not the app'}</button>}
+      </div>
+    </div>
+  );
+}
 
 /**
  * Alerts on this device (Kay, October 2026). Turned on once per phone or
@@ -35,7 +79,7 @@ export function AlertsCard() {
       const s = await turnOn();
       await refresh(); await refetch();
       if (s === 'on') setMsg('Alerts are on for this device.');
-      else if (s === 'denied') setErr('Alerts are blocked for this site. Allow notifications for it in your browser settings, then press Turn on again.');
+      else if (s === 'denied') setErr('Alerts are still blocked. Follow the steps above, then press Turn on again.');
     } catch {
       setErr('Alerts could not be turned on. Check you are online and try again.');
     } finally { setBusy(false); }
@@ -59,7 +103,7 @@ export function AlertsCard() {
           On an iPhone or iPad, alerts work once the system is on your Home Screen. In Safari, press <b>Share</b>, then <b>Add to Home Screen</b>. Open DCLM Bahrain from there and come back to this page.
         </div>
       ) : state === 'denied' ? (
-        <div className="gender-notice">Alerts are blocked for this site. Allow notifications for it in your browser or phone settings, then reload this page.</div>
+        <BlockedSteps onTry={enable} busy={busy} />
       ) : (
         <div className="form-actions-row alerts-actions">
           {on ? (

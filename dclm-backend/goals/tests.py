@@ -203,3 +203,55 @@ class SeedGoalsCommandTestCase(TestCase):
         call_command("seed_default_goals")
         self.assertEqual(Goal.objects.filter(tracking="auto").count(), 9)
         self.assertEqual(Goal.objects.filter(tracking="manual").count(), 5)
+
+
+class AutomaticGoalsTestCase(APITestCase):
+    """Item 11 (Kay, 26 October 2026): goals that update themselves from the records."""
+
+    def setUp(self):
+        import datetime
+        from django.utils import timezone
+        from accounts.models import Role, RolePermission, User
+        from attendance.models import AttendanceSession, MeetingType
+        from core.models import Location
+        from finance.models import Expense, ExpenseCategory, Fund, Giving, PaymentMethod
+        self.bh = Location.objects.get_or_create(id="bahrain", defaults={"name": "Bahrain HQ", "is_core": True})[0]
+        self.qa = Location.objects.get_or_create(id="others", defaults={"name": "Qatar"})[0]
+        self.asia = MeetingType.objects.create(id="asia", name="Asia Fellowship", day="Saturday", frequency="weekly",
+                                              detail_level="simple")
+        today = timezone.localdate()
+        for loc, total in ((self.bh, 8), (self.bh, 12), (self.qa, 30)):
+            s = AttendanceSession.objects.create(meeting_type=self.asia, date=today - datetime.timedelta(days=len(
+                AttendanceSession.objects.all())), location=loc, mode="in-person", status="filled")
+            AttendanceSession.objects.filter(pk=s.pk).update(men=total)
+        self.tithe = Fund.objects.get_or_create(name="Tithe")[0]
+        cash = PaymentMethod.objects.get_or_create(name="Cash")[0]
+        Giving.objects.create(date=today, fund=self.tithe, method=cash, amount=100, location=self.bh)
+        Giving.objects.create(date=today, fund=self.tithe, method=cash, amount=50, location=self.qa)
+        cat = ExpenseCategory.objects.get_or_create(name="Rent")[0]
+        Expense.objects.create(date=today, category=cat, amount=30, location=self.bh)
+        role = Role.objects.get_or_create(name="Administrator")[0]
+        RolePermission.objects.update_or_create(role=role, module="goals", defaults=dict(can_view=True, can_create=True, can_edit=True))
+        self.client.force_authenticate(User.objects.create_user(email="a@t.com", password="x", role=role))
+
+    def make(self, **kw):
+        body = dict(name="Goal", horizon="Short-term", target=10, tracking="auto", source="Auto")
+        body.setdefault("period_type", "month")
+        body.update(kw)
+        return self.client.post("/api/goals/", body, format="json")
+
+    def test_measures_and_location(self):
+        r = self.make(calculation_type="sessions_held", calculation_meeting_type="asia", calculation_location="bahrain",
+                      period_type="none")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(r.data["current_value"], 2)
+        self.assertEqual(r.data["measure_note"], "Asia Fellowship sessions held at Bahrain HQ")
+        r = self.make(calculation_type="fund_total", calculation_fund=self.tithe.id)
+        self.assertEqual(float(r.data["current_value"]), 150)
+        r = self.make(calculation_type="net_giving", calculation_location="bahrain")
+        self.assertEqual(float(r.data["current_value"]), 70)
+
+    def test_a_measure_needs_its_meeting(self):
+        r = self.make(calculation_type="sessions_held")
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.data["calculation_meeting_type"], ["Choose the meeting."])

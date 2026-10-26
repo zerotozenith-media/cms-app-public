@@ -38,7 +38,10 @@ class NewcomerStatusHistorySerializer(serializers.ModelSerializer):
         # rule already established for MemberCategoryHistory (Batch 0.1).
 
 
-class NewcomerTaskSerializer(serializers.ModelSerializer):
+from core.task_views import AccountableFieldsMixin
+
+
+class NewcomerTaskSerializer(AccountableFieldsMixin, serializers.ModelSerializer):
     # The person's name and shepherd on each row (F10). The list showed only
     # the task, with a fixed letter N, until the task was opened.
     newcomer_name = serializers.CharField(source="newcomer.name", read_only=True)
@@ -55,11 +58,12 @@ class NewcomerTaskSerializer(serializers.ModelSerializer):
             "id", "newcomer", "newcomer_name", "shepherd_name", "text", "due_date", "done", "assigned_to",
             "contact_date", "contact_method", "contact_notes",
             "contact_goal", "contact_scripture", "contact_root_cause", "contact_next_step",
-        ]
+            "missed_session", "missed_meeting_name", "missed_date",
+        ] + AccountableFieldsMixin.ACCOUNTABLE
         read_only_fields = [
             "id", "done", "contact_date", "contact_method", "contact_notes",
             "contact_goal", "contact_scripture", "contact_root_cause", "contact_next_step",
-        ]
+        ] + AccountableFieldsMixin.ACCOUNTABLE
         # done (and the log fields alongside it) are deliberately read-only
         # here , same principle as Member.category and Newcomer.stage
         # elsewhere in this codebase. A checked box with no record of what
@@ -72,6 +76,13 @@ class NewcomerTaskSerializer(serializers.ModelSerializer):
         # if not explicitly set on the task itself.
         if not validated_data.get("assigned_to"):
             validated_data["assigned_to"] = validated_data["newcomer"].assigned_to
+        # Made by hand: due at the clock start on its due date.
+        from django.utils import timezone
+        from core.followup_rules import at, rules
+        validated_data.setdefault("created_at", timezone.now())
+        if validated_data.get("due_date") and not validated_data.get("due_at"):
+            validated_data["due_at"] = at(validated_data["due_date"], rules().clock_start)
+        validated_data["kind"] = "absence" if validated_data.get("missed_meeting_name") else "manual"
         return super().create(validated_data)
 
 
@@ -125,6 +136,7 @@ class NewcomerSerializer(serializers.ModelSerializer):
             "is_first_timer", "is_new_resident",
             "wants_visit", "wants_to_know_more", "wants_salvation_info", "keep_in_touch",
             "invited_by_member", "invited_by_member_name", "invited_by_name",
+            "away_from", "away_to", "away_reason", "away_note",
         ]
         read_only_fields = ["id", "stage", "stage_since", "created_at", "not_interested_note", "invited_by_member"]
         # stage is read-only for the same reason category/status are elsewhere:
@@ -145,6 +157,12 @@ class NewcomerSerializer(serializers.ModelSerializer):
             gender = attrs.get("gender", self.instance.gender if self.instance else "") or ""
             if not can_pair(gender, attrs["assigned_to"]):
                 raise serializers.ValidationError({"assigned_to": mismatch_message(gender, "newcomer")})
+        get = lambda f: attrs.get(f, getattr(self.instance, f, None))
+        a, b = get("away_from"), get("away_to")
+        if bool(a) != bool(b):
+            raise serializers.ValidationError({"away_to": "Give both the first and the last day away, or neither."})
+        if a and b and b < a:
+            raise serializers.ValidationError({"away_to": "The last day away must be on or after the first."})
         return attrs
 
     def get_days_in_stage(self, obj):

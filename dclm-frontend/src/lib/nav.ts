@@ -6,6 +6,9 @@ export interface NavItem {
   icon: IconName;
   path: string;
   module: string | null; // null = always visible to any authenticated user (Dashboard has no ViewSet/module of its own)
+  /** Shown by follow-up role rather than module: 'mine' for anyone who
+   *  shepherds or holds tasks, 'review' for coordinators and administrators. */
+  followup?: 'mine' | 'review';
 }
 
 // Ported exactly from the demo's NAV_ITEMS, now with each item mapped to
@@ -13,6 +16,8 @@ export interface NavItem {
 // role-based filtering in Batch 3.2, replacing the demo's role.nav array.
 export const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', icon: 'grid', path: '/', module: null },
+  { key: 'my-followup', label: 'My follow-up', icon: 'user', path: '/follow-up', module: null, followup: 'mine' },
+  { key: 'followup-review', label: 'Follow-up Review', icon: 'target', path: '/followup-review', module: null, followup: 'review' },
   { key: 'attendance', label: 'Attendance', icon: 'check', path: '/attendance', module: 'attendance' },
   { key: 'members', label: 'Members', icon: 'users', path: '/members', module: 'members' },
   { key: 'newcomers', label: 'Newcomers & Follow-up', icon: 'userplus', path: '/newcomers', module: 'newcomers' },

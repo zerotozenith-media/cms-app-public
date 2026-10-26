@@ -38,6 +38,27 @@ class UserSerializer(serializers.ModelSerializer):
     role_name = serializers.CharField(source="role.name", read_only=True, default=None)
     location_name = serializers.CharField(source="location.name", read_only=True, default=None)
     full_name = serializers.SerializerMethodField()
+    coordinates_location_name = serializers.SerializerMethodField()
+
+    def get_coordinates_location_name(self, obj):
+        if not obj.is_followup_coordinator:
+            return ""
+        return obj.coordinates_location.name if obj.coordinates_location_id else "All locations"
+
+    def validate(self, attrs):
+        """A Follow-up Coordinator covers All locations or one location, and
+        never more than the account itself can see (Kay, 26 October 2026)."""
+        get = lambda f: attrs.get(f, getattr(self.instance, f, None))
+        if get("is_followup_coordinator"):
+            loc = get("location")
+            cov = get("coordinates_location")
+            if loc is not None and cov is None:
+                attrs["coordinates_location"] = loc
+            elif loc is not None and cov is not None and cov.pk != loc.pk:
+                raise serializers.ValidationError({"coordinates_location":
+                    f"This account covers {loc.name} only, so it can coordinate follow-up for {loc.name} only. "
+                    f"Set its location to All locations first to coordinate elsewhere."})
+        return attrs
 
     class Meta:
         model = User
@@ -45,6 +66,7 @@ class UserSerializer(serializers.ModelSerializer):
             "id", "email", "first_name", "last_name", "full_name", "password",
             "role", "role_name", "location", "location_name", "member",
             "is_active", "last_login", "can_shepherd", "gender",
+            "is_followup_coordinator", "coordinates_location", "coordinates_location_name",
         ]
         read_only_fields = ["id", "last_login"]
 

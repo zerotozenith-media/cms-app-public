@@ -29,6 +29,11 @@ export interface AdminUser {
   can_shepherd?: boolean;
   gender?: '' | 'Male' | 'Female';
   last_login: string | null;
+  /** Follow-up Coordinator tick (Kay, 26 October 2026), any role. */
+  is_followup_coordinator?: boolean;
+  /** Blank with the tick on means All locations. */
+  coordinates_location?: string | null;
+  coordinates_location_name?: string;
 }
 
 export interface AuditLogEntry {
@@ -55,4 +60,7 @@ export interface LoginAttempt {
 // from 'admin': whoever runs the church's adverts should be able to see
 // what a campaign cost per person reached without also being able to
 // create accounts and change church settings.
-export const MODULES = ['members', 'attendance', 'newcomers', 'finance', 'goals', 'reports', 'outreach', 'admin'] as const;
+export const MODULES = ['members', 'attendance', 'newcomers', 'finance', 'goals', 'reports', 'outreach', 'admin', 'followup-review'] as const;
+
+/** How each module is named on screen. */
+export const MODULE_LABELS: Record<string, string> = { 'followup-review': 'Follow-up review' };

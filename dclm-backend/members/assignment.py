@@ -197,8 +197,13 @@ def apply_assignment_changes(changes, by=None):
         # Sent only once everything here is saved.
         given(newly, by=by)
         applied_members = 0
+        from core.task_actions import move_open_tasks
         for mid, sid in member_ids.items():
             applied_members += Member.objects.filter(id=mid).update(assigned_to_id=sid)
+            # Their open tasks move with them (Kay, 26 October 2026).
+            m = Member.objects.filter(id=mid).first()
+            if m:
+                move_open_tasks(m, sid)
 
         applied_newcomers = 0
         for nid, sid in newcomer_ids.items():
@@ -208,6 +213,7 @@ def apply_assignment_changes(changes, by=None):
             n = NewcomerModel.objects.filter(id=nid).first()
             if n:
                 carry_tasks_to_shepherd(n)
+                move_open_tasks(n, sid)
 
     return applied_members, applied_newcomers
 

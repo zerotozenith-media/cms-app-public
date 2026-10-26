@@ -65,6 +65,27 @@ class MeetingType(models.Model):
         help_text="Whether the session form asks for an offering. Set here rather "
                   "than fixed in code, so the church can change it.",
     )
+    # Item 20 (Kay, 26 October 2026): sessions were made up to 6 days
+    # ahead and showed Pending, so next Friday looked like work not done.
+    # 0 makes each session at 2:07 am on its day.
+    create_days_ahead = models.PositiveSmallIntegerField(
+        default=0,
+        help_text="How many days before the meeting its session is created. 0 is the day itself.",
+    )
+    # Sessions were made at every location, including those that do not
+    # hold the meeting. Only the locations ticked here get one. None ticked
+    # means every location, so existing meetings and new locations carry
+    # on as before until an administrator narrows them.
+    held_at = models.ManyToManyField(
+        "core.Location", blank=True, related_name="meetings_held",
+        help_text="The locations that hold this meeting. None means every location.",
+    )
+
+    def held_locations(self):
+        """Where this meeting is held: the locations ticked, or every location."""
+        from core.models import Location
+        ticked = list(self.held_at.all())
+        return ticked or list(Location.objects.all())
 
     class Meta:
         ordering = ["name"]
@@ -72,6 +93,8 @@ class MeetingType(models.Model):
     def clean(self):
         """Refuse a day the generator cannot match."""
         from django.core.exceptions import ValidationError
+        if self.create_days_ahead is not None and self.create_days_ahead > 14:
+            raise ValidationError({"create_days_ahead": "Sessions can be created at most 14 days ahead."})
         if self.frequency == "weekly":
             if not self.day:
                 raise ValidationError({"day": "A weekly meeting needs a day."})
@@ -170,12 +193,24 @@ class AttendanceSession(models.Model):
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
         FILLED = "filled", "Filled"
+        # Review item O3: a Friday that did not take place, for example a
+        # public holiday, stayed Pending for ever and could make a task for
+        # everyone expected. Did not hold is left out of absence checks,
+        # pending counts and averages.
+        DID_NOT_HOLD = "did-not-hold", "Did not hold"
 
     meeting_type = models.ForeignKey("attendance.MeetingType", on_delete=models.PROTECT, related_name="sessions")
     date = models.DateField()
     location = models.ForeignKey("core.Location", on_delete=models.PROTECT, related_name="attendance_sessions")
     mode = models.CharField(max_length=24, choices=Mode.choices)
-    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    not_held_reason = models.CharField(
+        max_length=200, blank=True, default="",
+        help_text="Why the service did not take place, when marked Did not hold.")
+    # So the reminder to tick names, and the alert when names are still
+    # not taken the next evening, each go once.
+    reminder_sent_at = models.DateTimeField(null=True, blank=True)
+    names_alert_sent_at = models.DateTimeField(null=True, blank=True)
     track_named = models.BooleanField(default=False)
 
     # Headcount is always the source of truth (Batch 0.2). One column per

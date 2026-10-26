@@ -5,6 +5,7 @@ import { RolePermissionMatrix } from '../../components/admin/RolePermissionMatri
 import { Skeleton } from '../../components/ui/Skeleton';
 import { Badge } from '../../components/ui/Badge';
 import { Icon } from '../../components/ui/Icon';
+import { EditUserModal } from '../../components/admin/EditUserModal';
 
 import { useAuth } from '../../context/AuthContext';
 export function UsersRolesTab() {
@@ -52,7 +53,12 @@ export function UsersRolesTab() {
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
   const [newRoleName, setNewRoleName] = useState('');
 
-  if (roles && !role && roles.length) setRole(String(roles[0].id));
+  // A1: default to the first role this person may give (Follow-up when
+  // offered), never one the server will refuse.
+  const givable = (roles ?? []).filter((r: any) => r.assignable !== false);
+  if (roles && !role && givable.length) setRole(String((givable.find((r) => r.name === 'Follow-up') ?? givable[0]).id));
+  const [editing, setEditing] = useState<number | null>(null);
+  const [showOff, setShowOff] = useState(false);
 
   async function handleAddUser(e: React.FormEvent) {
     e.preventDefault();
@@ -70,11 +76,15 @@ export function UsersRolesTab() {
       const data = err?.response?.data;
       if (data?.password) setUserError(`Password: ${data.password[0]}`);
       else if (data?.email) setUserError(`Email: ${data.email[0]}`);
+      else if (data?.detail) setUserError(String(data.detail));
+      else if (data && Object.values(data)[0]) setUserError(String(([] as unknown[]).concat(Object.values(data)[0] as any)[0]));
       else setUserError('Could not create the user. Please check the form.');
     }
   }
+  // A4: Switch off is the normal way to end someone's access. Delete is
+  // only for an account made by mistake, and a refusal says why.
   async function handleDeleteUser(id: number) {
-    if (!confirm('Delete this user?')) return;
+    if (!confirm('Delete this account for good? To stop someone signing in, Switch off is usually better: it keeps their history. Open Edit to switch an account off.')) return;
     try {
       await deleteUser.mutateAsync(id);
     } catch (err: any) {
@@ -180,9 +190,12 @@ export function UsersRolesTab() {
           <table className="cardtable">
             <thead><tr><th>Name</th><th>Role</th><th>Gender</th><th>Member record</th><th>Location</th><th></th></tr></thead>
             <tbody>
-              {(users ?? []).map((u) => (
-                <tr key={u.id}>
-                  <td data-label="Name">{u.full_name}<div className="muted" style={{ fontSize: '.78rem' }}>{u.email}</div></td>
+              {(users ?? []).filter((u) => showOff || u.is_active).map((u) => (
+                <tr key={u.id} className={u.is_active ? '' : 'user-off'}>
+                  <td data-label="Name">{u.full_name}<div className="muted" style={{ fontSize: '.78rem' }}>{u.email}</div>
+                    {!u.is_active && <Badge color="gray">Switched off</Badge>}
+                    {u.is_followup_coordinator && <div><Badge color="blue">Follow-up Coordinator, {u.coordinates_location_name}</Badge></div>}
+                  </td>
                   <td data-label="Role">
                     {u.role_name ? <Badge color="blue">{u.role_name}</Badge> : <span className="muted">–</span>}
                     <label className="shepherd-tick" title="Can shepherd others: people can be assigned to them to follow up">
@@ -215,6 +228,7 @@ export function UsersRolesTab() {
                   </td>
                   <td data-label="Location">{u.location_name ?? 'All locations'}</td>
                   <td className="td-actions">
+                    {canEditUser && <button className="btn sm outline" style={{ marginRight: 6 }} onClick={() => setEditing(u.id)}>Edit</button>}
                     {canDeleteUser && <button className="icon-btn" title="Delete user" aria-label="Delete user" onClick={() => handleDeleteUser(u.id)}><Icon name="trash" size={14} /></button>}
                   </td>
                 </tr>
@@ -222,6 +236,15 @@ export function UsersRolesTab() {
             </tbody>
           </table>
           {!users && <Skeleton shape="rows" rows={4} />}
+          {(users ?? []).some((u) => !u.is_active) && (
+            <label className="fr-tick" style={{ marginTop: 8 }}>
+              <input type="checkbox" checked={showOff} onChange={(e) => setShowOff(e.target.checked)} />
+              Show switched-off accounts ({(users ?? []).filter((u) => !u.is_active).length})
+            </label>
+          )}
+          {editing && users?.find((u) => u.id === editing) && (
+            <EditUserModal user={users.find((u) => u.id === editing)!} onClose={() => setEditing(null)} />
+          )}
         </div>
       </div>
 

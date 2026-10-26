@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient, API_BASE_URL } from './client';
+import { apiClient, API_BASE_URL, getAllPages } from './client';
 import axios from 'axios';
 import type { PaginatedResponse } from '../types/members';
 import type { Newcomer, NewcomerTask, NewcomerSource, MilestoneType } from '../types/newcomers';
@@ -24,7 +24,7 @@ export function useNewcomers(params: NewcomerListParams = {}) {
 export function useAllNewcomers() {
   return useQuery({
     queryKey: ['newcomers-all'],
-    queryFn: async () => (await apiClient.get<PaginatedResponse<Newcomer>>('/newcomers/', { params: { page_size: 100 } })).data.results,
+    queryFn: async () => getAllPages<Newcomer>('/newcomers/'),
   });
 }
 
@@ -201,11 +201,10 @@ export function useAllNewcomerTasks(params: { done?: boolean; ordering?: string 
   return useQuery({
     queryKey: ['all-newcomer-tasks', params],
     queryFn: async () => {
-      const query: Record<string, string> = { page_size: '200' };
+      const query: Record<string, string> = {};
       if (params.done !== undefined) query.done = String(params.done);
       query.ordering = params.ordering ?? 'due_date';
-      const resp = await apiClient.get<PaginatedResponse<NewcomerTask>>('/newcomer-tasks/', { params: query });
-      return resp.data.results;
+      return getAllPages<NewcomerTask>('/newcomer-tasks/', query);
     },
   });
 }

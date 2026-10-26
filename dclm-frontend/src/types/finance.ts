@@ -28,6 +28,9 @@ export interface Giving {
   project_name: string | null;
   member: number | null;
   member_name: string | null;
+  /** O2: set when recorded on a service; changed there, not here. */
+  session?: number | null;
+  session_label?: string;
 }
 
 export interface Expense {

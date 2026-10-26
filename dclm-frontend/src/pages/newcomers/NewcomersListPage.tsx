@@ -9,6 +9,11 @@ import { Badge } from '../../components/ui/Badge';
 import type { Newcomer, NewcomerStage } from '../../types/newcomers';
 import { useLocationName } from '../../api/locations';
 import { useAuth } from '../../context/AuthContext';
+import { useEligibleShepherds } from '../../api/followup';
+import { canPair } from '../../lib/gender';
+import { apiClient } from '../../api/client';
+import { refusal } from '../../api/accountability';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 function stageBadgeColor(stage: NewcomerStage): 'blue' | 'green' | 'gray' {
   if (stage === 'member') return 'green';
@@ -36,6 +41,22 @@ export function NewcomersListPage() {
   const [view, setView] = useState<'board' | 'table'>('board');
   const [page, setPage] = useState(1);
   const pageSize = 12;
+  // Item 13 (Kay): tick several and give them one shepherd.
+  const qc = useQueryClient();
+  const [picked, setPicked] = useState<Set<number>>(new Set());
+  const [bulkTo, setBulkTo] = useState('');
+  const [bulkMsg, setBulkMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const { data: eligible } = useEligibleShepherds();
+  const bulk = useMutation({
+    mutationFn: async () => (await apiClient.post('/newcomers-bulk-assign/', { newcomer_ids: [...picked], shepherd_id: Number(bulkTo) })).data,
+    onSuccess: (d: any) => {
+      setBulkMsg({ ok: true, text: `${d.updated} given to ${d.shepherd}. Their open tasks moved too.` });
+      setPicked(new Set()); setBulkTo('');
+      qc.invalidateQueries({ queryKey: ['newcomers-all'] });
+    },
+    onError: (e) => setBulkMsg({ ok: false, text: refusal(e, 'Not saved. Try again.') }),
+  });
+  const toggle = (id: number) => { const s2 = new Set(picked); if (s2.has(id)) s2.delete(id); else s2.add(id); setPicked(s2); setBulkMsg(null); };
 
   const everyone = allNewcomers ?? [];
   const shepherds = [...new Set(everyone.map((n) => n.assigned_to_name).filter(Boolean))].sort() as string[];
@@ -170,14 +191,35 @@ export function NewcomersListPage() {
           />
         ) : (
           <>
+            {canMove && picked.size > 0 && (() => {
+              const chosen = everyone.filter((n) => picked.has(n.id));
+              const fits = (eligible ?? []).filter((s: any) => chosen.every((n) => canPair((n as any).gender ?? '', s.gender)));
+              return (
+                <div className="bulk-bar">
+                  <span><b>{picked.size}</b> selected</span>
+                  <select className="selectbox" aria-label="Shepherd for the selected newcomers" value={bulkTo} onChange={(e) => setBulkTo(e.target.value)}>
+                    <option value="">Choose shepherd</option>
+                    {fits.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                  <button className="btn sm" disabled={!bulkTo || bulk.isPending} onClick={() => bulk.mutate()}>Assign</button>
+                  <button className="btn sm ghost" onClick={() => { setPicked(new Set()); setBulkMsg(null); }}>Clear</button>
+                  <span className="muted" style={{ fontSize: '.8rem' }}>Only shepherds who may take all {picked.size} are offered: men for men, women for women.</span>
+                </div>
+              );
+            })()}
+            {bulkMsg && <p className={bulkMsg.ok ? 'fr-done' : 'form-error'} role={bulkMsg.ok ? 'status' : 'alert'}>{bulkMsg.text}</p>}
             <div style={{ overflowX: 'auto' }}>
               <table className="cardtable">
                 <thead><tr>
+                  {canMove && <th style={{ width: 34 }}><input type="checkbox" aria-label="Select all on this page"
+                    checked={pageRows.length > 0 && pageRows.every((n: Newcomer) => picked.has(n.id))}
+                    onChange={(e) => { const s2 = new Set(picked); pageRows.forEach((n: Newcomer) => e.target.checked ? s2.add(n.id) : s2.delete(n.id)); setPicked(s2); }} /></th>}
                   <th>Name</th><th>Stage</th><th>Shepherd</th><th>Waiting</th><th>Source</th><th>Location</th>
                 </tr></thead>
                 <tbody>
                   {pageRows.map((n: Newcomer) => (
-                    <tr key={n.id} className="clickable" onClick={() => navigate(`/newcomers/${n.id}`)}>
+                    <tr key={n.id} className="clickable" onClick={() => navigate(`/newcomers/${n.id}`)} style={picked.has(n.id) ? { background: '#F3F7FC' } : undefined}>
+                      {canMove && <td data-label="Select" onClick={(e) => e.stopPropagation()}><input type="checkbox" aria-label={`Select ${n.name}`} checked={picked.has(n.id)} onChange={() => toggle(n.id)} /></td>}
                       <td data-label="Name"><b>{n.name}</b></td>
                       <td data-label="Stage"><Badge color={stageBadgeColor(n.stage)}>{stageLabel(n.stage)}</Badge></td>
                       <td data-label="Shepherd">

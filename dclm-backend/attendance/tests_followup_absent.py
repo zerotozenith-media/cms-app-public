@@ -63,21 +63,27 @@ class FollowUpThoseNotTicked(Base):
         MemberFollowUpTask.objects.create(member=self.a, text="x", due_date=self.today, missed_meeting_name="Earlier", missed_date=self.today)
         r = self.client.get(self.url(s))
         self.assertEqual(r.status_code, 200, r.data)
+        # Tasks pile (Kay, 26 October 2026): Henry's open task elsewhere no
+        # longer stops a task for this service.
         self.assertEqual((r.data["to_follow_up"], r.data["ticked"], r.data["open_elsewhere"], r.data["already"]),
-                         (2, ["Joshua Afari"], 1, 0))
-        self.assertEqual(sorted(r.data["names"]), ["Chinedu Uguru", "Ifeanyi Eze"])
+                         (3, ["Joshua Afari"], 1, 0))
+        self.assertEqual(sorted(r.data["names"]), ["Chinedu Uguru", "Henry Ashu", "Ifeanyi Eze"])
         r = self.client.post(self.url(s))
-        self.assertEqual((r.status_code, r.data["created"]), (201, 2))
+        self.assertEqual((r.status_code, r.data["created"]), (201, 3))
         made = MemberFollowUpTask.objects.filter(missed_session=s)
-        self.assertEqual(sorted(t.member.first_name for t in made), ["Chinedu", "Ifeanyi"])
-        t = made.first()
-        self.assertEqual((t.assigned_to, t.missed_meeting_name, t.missed_date, t.due_date),
-                         (self.shepherd, "Friday Worship Service", s.date, self.today + datetime.timedelta(days=2)))
+        self.assertEqual(sorted(t.member.first_name for t in made), ["Chinedu", "Henry", "Ifeanyi"])
+        t = made.get(member__first_name="Chinedu")
+        # An old service followed up on request: the clock starts when the
+        # task is made, and it is due 24 hours later.
+        self.assertEqual((t.assigned_to, t.missed_meeting_name, t.missed_date, t.kind),
+                         (self.shepherd, "Friday Worship Service", s.date, "absence"))
+        self.assertEqual(t.due_at - t.clock_start, datetime.timedelta(hours=24))
+        self.assertEqual(t.clock_start, t.created_at)
         self.assertTrue(AuditLog.objects.filter(action="Followed up absentees").exists())
         # Pressing it again makes nothing new.
         self.assertEqual(self.client.get(self.url(s)).data["to_follow_up"], 0)
         self.assertEqual(self.client.post(self.url(s)).data["created"], 0)
-        self.assertEqual(self.client.get(self.url(s)).data["already"], 2)
+        self.assertEqual(self.client.get(self.url(s)).data["already"], 3)
 
     def test_a_meeting_not_followed_up_automatically_can_be_done_any_day(self):
         s = self.session(mt=self.mon, days_ago=3)

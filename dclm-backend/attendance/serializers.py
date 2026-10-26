@@ -5,12 +5,39 @@ from .models import Fellowship, MeetingType, AttendanceSession, AttendanceSessio
 
 
 class MeetingTypeSerializer(serializers.ModelSerializer):
+    held_at_names = serializers.SerializerMethodField()
+    setup_warnings = serializers.SerializerMethodField()
+
     class Meta:
         model = MeetingType
         fields = ["id", "name", "day", "frequency", "detail_level", "monthly_target",
                   "counts_for_absence", "start_time", "audience", "collects_offering",
-                  "generates_sessions", "effective_target", "usual_mode"]
+                  "generates_sessions", "effective_target", "usual_mode",
+                  "create_days_ahead", "held_at", "held_at_names", "setup_warnings"]
         read_only_fields = ["generates_sessions", "effective_target"]
+        extra_kwargs = {"held_at": {"required": False}}
+
+    def get_held_at_names(self, obj):
+        # None ticked means every location.
+        return [l.name for l in obj.held_locations()]
+
+    def get_setup_warnings(self, obj):
+        """What stops this meeting working as its ticks suggest, said on its
+        row (review item A3). Ticking Follows up absence did nothing without
+        a start time, and no screen said so."""
+        out = []
+        if obj.counts_for_absence and not obj.start_time:
+            out.append("Follows up absence but has no start time, so nobody missing it is "
+                       "followed up. Set a start time.")
+        return out
+
+    def validate_create_days_ahead(self, value):
+        if value is not None and value > 14:
+            raise serializers.ValidationError(
+                "Sessions can be created at most 14 days ahead, so they never fill the list "
+                "with services weeks away.")
+        return value
+
 
     # Short forms people naturally type, written out in full so the weekly
     # generator can read them.
@@ -72,6 +99,22 @@ class AttendanceSessionSerializer(serializers.ModelSerializer):
     # So the check-in screen can say when ticking names late will make
     # absence follow-up tasks for those not ticked.
     counts_for_absence = serializers.BooleanField(source="meeting_type.counts_for_absence", read_only=True)
+    # Item 20: the status word shown in Attendance, so a session made early
+    # reads Upcoming rather than Pending.
+    state = serializers.SerializerMethodField()
+    state_label = serializers.SerializerMethodField()
+    # Names ticked after the absence check ran: shown on the check-in
+    # screen with when the tasks will be due (Kay, 26 October 2026).
+    late_entry = serializers.SerializerMethodField()
+    # O1: the offering as saved, so reopening the form shows it.
+    offering = serializers.SerializerMethodField()
+
+    def get_offering(self, obj):
+        from decimal import Decimal
+        out = {}
+        for g in obj.giving.select_related("fund").all():
+            out[g.fund.name] = out.get(g.fund.name, Decimal("0")) + g.amount
+        return {k: f"{v:.3f}" for k, v in out.items()}
 
     class Meta:
         model = AttendanceSession
@@ -84,13 +127,55 @@ class AttendanceSessionSerializer(serializers.ModelSerializer):
         "in_person_total", "new_comers", "new_converts",
         "fellowship", "fellowship_name", "led_by", "led_by_name", "lesson",
         "edition_name", "edition_place", "counts_for_absence",
+        "state", "state_label", "not_held_reason", "late_entry", "offering",
         ]
-        read_only_fields = ["id", "status"]
+        read_only_fields = ["id", "status", "not_held_reason"]
         # status is deliberately read-only here too , the only correct way
         # to fill a session is AttendanceSessionViewSet.record(), which sets
         # status='filled' together with the headcounts, atomically.
 
+    def _rules(self):
+        if not hasattr(self, "_rules_cache"):
+            from core.followup_rules import rules
+            self._rules_cache = rules()
+        return self._rules_cache
+
+    def get_state(self, obj):
+        from core.followup_rules import session_state
+        return session_state(obj, r=self._rules())
+
+    def get_late_entry(self, obj):
+        """None, or the hours shepherds get from when the tasks are made."""
+        from django.utils import timezone
+        from core.followup_rules import check_time
+        mt = obj.meeting_type
+        if not (mt.counts_for_absence and mt.start_time) or obj.status == "did-not-hold":
+            return None
+        r = self._rules()
+        ran = check_time(mt, obj.date, r)
+        if timezone.now() < ran or (timezone.localdate() - obj.date).days > 7:
+            return None
+        return {"check_ran": ran, "due_hours": r.due_hours}
+
+    def get_state_label(self, obj):
+        from core.followup_rules import STATE_LABELS
+        return STATE_LABELS[self.get_state(obj)]
+
     def validate(self, attrs):
+        # Review item O4: a second session for the same meeting, date,
+        # location and fellowship was accepted, doubled the dashboard
+        # totals, and its untouched twin stayed Pending.
+        if self.instance is None:
+            mt = attrs.get("meeting_type")
+            twin = AttendanceSession.objects.filter(
+                meeting_type=mt, date=attrs.get("date"), location=attrs.get("location"),
+                fellowship=attrs.get("fellowship")).first() if mt else None
+            if twin:
+                raise serializers.ValidationError({
+                    "detail": f"{twin.meeting_type.name} at {twin.location.name} on "
+                              f"{twin.date:%A %-d %B} already exists. Open it to record attendance "
+                              f"instead of adding a second one, which would count the service twice.",
+                    "existing_id": twin.id})
         # F22: only occasional meetings have editions.
         mt = attrs.get("meeting_type") or getattr(self.instance, "meeting_type", None)
         for f in ("edition_name", "edition_place"):
@@ -232,8 +317,15 @@ def _schedule_first_session(fellowship):
     weekday = WEEKDAY_MAP.get((mt.day or "").strip().lower())
     if weekday is None:
         return
-    date = Command._next_occurrence(timezone.localdate(), weekday)
-    places = [fellowship.location] if fellowship.location_id else list(Location.objects.all())
+    today = timezone.localdate()
+    date = Command._next_occurrence(today, weekday)
+    # The same rule as the nightly run: only once the meeting is within its
+    # "Create each session" days, and only where it is held.
+    if (date - today).days > (mt.create_days_ahead or 0):
+        return
+    held = mt.held_locations()
+    places = [fellowship.location] if fellowship.location_id else held
+    places = [p for p in places if p in held]
     for loc in places:
         AttendanceSession.objects.get_or_create(
             meeting_type=mt, location=loc, date=date, fellowship=fellowship,

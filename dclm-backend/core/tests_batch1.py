@@ -108,7 +108,8 @@ class FellowshipSessionTestCase(Base):
         super().setUp()
         self.house = MeetingType.objects.create(
             id="fri-house", name="Friday House Caring Fellowship", day="Friday",
-            frequency="weekly", detail_level="detailed", collects_offering=True)
+            frequency="weekly", detail_level="detailed", collects_offering=True,
+            create_days_ahead=6)  # made up to 6 days ahead, as before item 20
         self.women = Fellowship.objects.create(name="HCF Women", meeting_type=self.house)
         self.men = Fellowship.objects.create(name="HCF Men", meeting_type=self.house)
 
@@ -141,7 +142,8 @@ class FellowshipSessionTestCase(Base):
     def test_an_ordinary_meeting_still_gets_one_session(self):
         MeetingType.objects.create(
             id="fri-worship", name="Friday Worship", day="Friday",
-            frequency="weekly", detail_level="detailed")
+            frequency="weekly", detail_level="detailed",
+            create_days_ahead=6)  # made up to 6 days ahead, as before item 20
         call_command("generate_recurring_sessions", verbosity=0)
         self.assertEqual(
             AttendanceSession.objects.filter(meeting_type_id="fri-worship").count(), 1)

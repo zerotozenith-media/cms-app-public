@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Navigate, useParams, useNavigate } from 'react-router-dom';
 import {
   useNewcomer, useUpdateNewcomer, useDeleteNewcomer, useChangeStage, useSetMilestone,
-  useCreateTask, useDeleteTask, useCompleteNewcomerTask, useNewcomerSources, useNewcomerTasks,
+  useCreateTask, useNewcomerSources,
   useNewcomerReadiness, useNewcomerJourney, useMakeMember, useLogAttempt, ATTEMPT_METHODS,
 } from '../../api/newcomers';
 import { ReadinessCards } from '../../components/journey/ReadinessCards';
@@ -11,14 +11,18 @@ import { JourneyTimeline } from '../../components/journey/JourneyTimeline';
 import { usePerson } from '../../api/person';
 import { PersonMessages } from '../../components/person/PersonMessages';
 import { AttendanceList, PersonStats, PersonTabs, initialsOf } from '../../components/person/PersonParts';
+import { PersonTasks } from '../../components/accountability/PersonTasks';
+import { AwayModal } from '../../components/accountability/TaskModals';
+import { dayText, refusal } from '../../api/accountability';
+import { useEligibleShepherds } from '../../api/followup';
+import { canPair } from '../../lib/gender';
+import { HelpMark } from '../../components/ui/HelpMark';
 
 const longDate = (d?: string | null) =>
   d ? new Date(`${d}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '–';
 
 import { Badge } from '../../components/ui/Badge';
 import { Icon } from '../../components/ui/Icon';
-import { FollowUpCompletionForm } from '../../components/followup/FollowUpCompletionForm';
-import { CompletedFollowUpLog } from '../../components/followup/CompletedFollowUpLog';
 import { useLocationName, useMyLocations } from '../../api/locations';
 import { useAuth } from '../../context/AuthContext';
 
@@ -48,6 +52,7 @@ export function NewcomerProfilePage() {
   const newcomerId = Number(id);
   const navigate = useNavigate();
   const { data: n, isLoading, isError } = useNewcomer(newcomerId);
+  const { data: shepherds } = useEligibleShepherds(n?.location);
   const { data: sources } = useNewcomerSources();
   const updateNewcomer = useUpdateNewcomer(newcomerId);
   const deleteNewcomer = useDeleteNewcomer();
@@ -61,7 +66,6 @@ export function NewcomerProfilePage() {
   const canDelete = hasPermission('newcomers', 'delete');
   const canMakeMember = canEdit && hasPermission('members', 'create');
   const createTask = useCreateTask(newcomerId);
-  const deleteTask = useDeleteTask(newcomerId);
   const { data: readiness } = useNewcomerReadiness(newcomerId);
   const { data: journey } = useNewcomerJourney(newcomerId);
   const makeMember = useMakeMember(newcomerId);
@@ -86,6 +90,9 @@ export function NewcomerProfilePage() {
   const [editName, setEditName] = useState('');
   const [editSource, setEditSource] = useState<number>(0);
   const [showNotInterested, setShowNotInterested] = useState(false);
+  const [stageError, setStageError] = useState('');
+  const [awayOpen, setAwayOpen] = useState(false);
+  const [shepherdError, setShepherdError] = useState('');
   const [niNote, setNiNote] = useState('');
   const [reactivateTarget, setReactivateTarget] = useState('new');
   const [taskText, setTaskText] = useState('');
@@ -134,13 +141,25 @@ export function NewcomerProfilePage() {
     await deleteNewcomer.mutateAsync(newcomerId);
     navigate('/newcomers');
   }
+  // Kay, 26 October 2026: Not Interested needs a note, and a refusal says why.
   async function confirmNotInterested() {
-    await changeStage.mutateAsync({ to_stage: 'not-interested', note: niNote.trim() });
-    setShowNotInterested(false);
-    setNiNote('');
+    setStageError('');
+    if (!niNote.trim()) { setStageError('Add a note saying why, so whoever reads the record later knows.'); return; }
+    try {
+      await changeStage.mutateAsync({ to_stage: 'not-interested', note: niNote.trim() });
+      setShowNotInterested(false);
+      setNiNote('');
+    } catch (e) { setStageError(refusal(e, 'The stage could not be changed.')); }
   }
   async function reactivate() {
-    await changeStage.mutateAsync({ to_stage: reactivateTarget });
+    setStageError('');
+    try { await changeStage.mutateAsync({ to_stage: reactivateTarget }); }
+    catch (e) { setStageError(refusal(e, 'They could not be reactivated.')); }
+  }
+  async function changeShepherd(value: string) {
+    setShepherdError('');
+    try { await updateNewcomer.mutateAsync({ assigned_to: value ? Number(value) : null } as any); }
+    catch (e) { setShepherdError(refusal(e, 'That shepherd could not be saved.')); }
   }
   async function handleAddTask(e: React.FormEvent) {
     e.preventDefault();
@@ -195,14 +214,15 @@ export function NewcomerProfilePage() {
               {showNotInterested && (
                 <div className="form-card section-gap">
                   <p className="muted" style={{ fontSize: '.84rem', marginBottom: 10 }}>
-                    This moves them out of active follow-up. Their record and history are kept, and they can be reactivated at any time.
+                    This stops follow-up: their open tasks close and no more are made. Their record and history are kept, and they can be reactivated at any time.
                   </p>
                   <div className="field">
-                    <label htmlFor="nc-ni-note">Note (optional)</label>
+                    <label htmlFor="nc-ni-note">Note <span className="req">*</span><HelpMark topic="faStage" /></label>
                     <textarea id="nc-ni-note" value={niNote} onChange={(e) => setNiNote(e.target.value)} placeholder="Why are they being marked not interested?" />
                   </div>
                   <div className="form-actions-row">
                     <button className="btn sm red" onClick={confirmNotInterested} disabled={changeStage.isPending}>Confirm</button>
+                    {stageError && <p className="form-error" role="alert">{stageError}</p>}
                     <button className="btn sm ghost" onClick={() => setShowNotInterested(false)}>Cancel</button>
                   </div>
                 </div>
@@ -210,6 +230,7 @@ export function NewcomerProfilePage() {
             </>
           )) : (
             <div className="form-card section-gap" style={{ borderColor: 'var(--line)', background: 'var(--sky-2)' }}>
+              {stageError && <p className="form-error" role="alert">{stageError}</p>}
               <div style={{ fontWeight: 700, color: 'var(--blue-deep)', marginBottom: 4 }}>Marked Not Interested</div>
               <div className="muted" style={{ fontSize: '.84rem' }}>
                 On {n.stage_since}{n.not_interested_note ? ` · ${n.not_interested_note}` : ''}
@@ -284,7 +305,7 @@ export function NewcomerProfilePage() {
     ) },
     { key: 'followups', label: 'Follow-ups', body: (
       <>
-          <TaskList newcomerId={newcomerId} onDelete={(taskId) => deleteTask.mutate(taskId)} />
+          <PersonTasks type="newcomer" personId={newcomerId} person={n.name} />
           <div className="form-card section-gap">
             {canCreate && <form onSubmit={handleAddTask}>
               <div className="form-row">
@@ -365,7 +386,24 @@ export function NewcomerProfilePage() {
             <div className="pf"><span>Phone</span><span>{n.phone || '–'}</span></div>
             <div className="pf"><span>Email</span><span style={{ wordBreak: 'break-all' }}>{n.email || '–'}</span></div>
             <div className="pf"><span>Address</span><span>{[n.address, n.city_governorate].filter(Boolean).join(', ') || '–'}</span></div>
-            <div className="pf"><span>Shepherd</span>{n.assigned_to_name ? <span>{n.assigned_to_name}</span> : <Badge color="amber">Unassigned</Badge>}</div>
+            <div className="pf">
+              <label htmlFor="nc-shepherd" style={{ color: 'var(--muted)', fontWeight: 400 }}>Shepherd</label>
+              {canEdit ? (
+                <select id="nc-shepherd" className="selectbox" style={{ maxWidth: 170 }} value={n.assigned_to ?? ''} onChange={(e) => changeShepherd(e.target.value)}>
+                  <option value="">No shepherd</option>
+                  {n.assigned_to && !(shepherds ?? []).some((s: any) => s.id === n.assigned_to) && <option value={n.assigned_to}>{n.assigned_to_name}</option>}
+                  {(shepherds ?? []).filter((s: any) => canPair((n as any).gender ?? '', s.gender)).map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              ) : n.assigned_to_name ? <span>{n.assigned_to_name}</span> : <Badge color="amber">Unassigned</Badge>}
+            </div>
+            {shepherdError && <p className="form-error" role="alert">{shepherdError}</p>}
+            <div className="pf">
+              <span>Away<HelpMark topic="faAway" /></span>
+              <span>
+                {n.away_to && n.away_to >= new Date().toLocaleDateString('en-CA') ? `${dayText(n.away_from)} to ${dayText(n.away_to)}` : 'No'}
+                {canEdit && <button className="linkish" style={{ marginLeft: 8 }} onClick={() => setAwayOpen(true)}>{n.away_to ? 'Change' : 'Mark away'}</button>}
+              </span>
+            </div>
             <div className="pf"><span>How they came</span><span>{n.source_name || '–'}</span></div>
             {person?.first_came && <div className="pf"><span>First came</span><span>{longDate(person.first_came)}</span></div>}
             <div className="pf"><span>First meeting</span><span>{n.meeting_attended_name || '–'}</span></div>
@@ -378,56 +416,7 @@ export function NewcomerProfilePage() {
         </div>
         <PersonTabs tabs={tabs} />
       </div>
-    </>
-  );
-}
-
-function TaskList({ newcomerId, onDelete }: { newcomerId: number; onDelete: (id: number) => void }) {
-  const { hasPermission } = useAuth();
-  const canEdit = hasPermission('newcomers', 'edit');
-  const canDelete = hasPermission('newcomers', 'delete');
-  const { data: tasks } = useNewcomerTasks(newcomerId);
-  const complete = useCompleteNewcomerTask(newcomerId);
-  const [completingId, setCompletingId] = useState<number | null>(null);
-
-  if (!tasks || !tasks.length) return <div className="empty">No follow-up tasks yet.</div>;
-  return (
-    <>
-      {tasks.map((t) => {
-        const isCompleting = completingId === t.id;
-        return (
-          <div key={t.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--line)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <div style={{ minWidth: 0 }}>
-                <b style={t.done ? { textDecoration: 'line-through', color: 'var(--muted)' } : undefined}>{t.text}</b>
-                <div className="muted" style={{ fontSize: '.78rem' }}>Due {t.due_date}</div>
-                {t.done && <CompletedFollowUpLog log={t} />}
-              </div>
-              <div className="row-actions">
-                {t.done && <Badge color="green">Done</Badge>}
-                {canEdit && (
-                  <button className="btn sm outline" onClick={() => setCompletingId(isCompleting ? null : t.id)}>
-                    {t.done ? 'Edit' : 'Mark done'}
-                  </button>
-                )}
-                {canDelete && <button className="icon-btn" title="Delete task" onClick={() => onDelete(t.id)}><Icon name="trash" size={14} /></button>}
-              </div>
-            </div>
-            {isCompleting && (
-              <FollowUpCompletionForm
-                idPrefix={`nctask-${t.id}`}
-                existing={t.done ? t : null}
-                saving={complete.isPending}
-                onCancel={() => setCompletingId(null)}
-                onSave={async (payload) => {
-                  await complete.mutateAsync({ id: t.id, payload });
-                  setCompletingId(null);
-                }}
-              />
-            )}
-          </div>
-        );
-      })}
+      {awayOpen && <AwayModal type="newcomer" id={newcomerId} name={n.name} current={n} onClose={() => setAwayOpen(false)} />}
     </>
   );
 }

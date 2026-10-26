@@ -30,6 +30,7 @@ export function LiveCheckInPage() {
   const [query, setQuery] = useState('');
   // A tap that fails says so, rather than leaving the row silently unchanged.
   const [tapError, setTapError] = useState('');
+  const [presentNote, setPresentNote] = useState<string[]>([]);
   const failed = (e: any) => setTapError(e?.response?.data?.detail || 'That tap was not saved. Check your connection and tap again.');
 
   // Who is already checked in, by member id, so a row can render its
@@ -79,12 +80,16 @@ export function LiveCheckInPage() {
     // could overwrite someone else's taps on submit.
     setTapError('');
     if (attendeeByMember.has(member.id)) checkOut.mutate({ memberId: member.id }, { onError: failed });
-    else checkIn.mutate({ memberId: member.id }, { onError: failed });
+    else checkIn.mutate({ memberId: member.id }, { onError: failed, onSuccess: present });
+  }
+  // Ticked after their task was made: the task closes as Was present.
+  function present(r: { was_present?: string[] }) {
+    if (r?.was_present?.length) setPresentNote(r.was_present);
   }
   function toggleNewcomer(n: RosterNewcomer) {
     setTapError('');
     if (attendeeByNewcomer.has(n.id)) checkOut.mutate({ newcomerId: n.id }, { onError: failed });
-    else checkIn.mutate({ newcomerId: n.id }, { onError: failed });
+    else checkIn.mutate({ newcomerId: n.id }, { onError: failed, onSuccess: present });
   }
   // Fridays so far, counting today once they are checked in.
   function fridays(n: RosterNewcomer, checked: boolean) {
@@ -99,6 +104,19 @@ export function LiveCheckInPage() {
   return (
     <>
       {tapError && <p className="form-error" role="alert">{tapError}</p>}
+      {presentNote.length > 0 && (
+        <div className="fr-done" role="status" style={{ marginBottom: 10 }}>
+          <b>{presentNote.join(', ')} {presentNote.length === 1 ? 'was' : 'were'} ticked present.</b><HelpMark topic="faWasPresent" />{' '}
+          {presentNote.length === 1 ? 'The follow-up task for this service is' : 'Their follow-up tasks for this service are'} closed as Was present, and the shepherd has been told.
+        </div>
+      )}
+      {session.late_entry && session.attendees.some((a) => a.member != null) && (
+        <div className="gender-notice" role="note">
+          <b>Names ticked late</b><HelpMark topic="faNamesLate" /><br />
+          The absence check already ran at {new Date(session.late_entry.check_ran).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Bahrain' }).toLowerCase()} on {longDay(session.date)}.
+          Tasks for anyone not ticked are made at the next check, within 30 minutes, and are due {session.late_entry.due_hours} hours from then, so shepherds are not late because of a late entry.
+        </div>
+      )}
       <a className="backlink" onClick={() => navigate(`/attendance/${sessionId}`)}>
         ← Back to session details
       </a>

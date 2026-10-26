@@ -8,6 +8,7 @@ import { AuthProvider } from './context/AuthContext';
 import './styles/design-system.css';
 import './styles/app.css';
 import { registerServiceWorker } from './lib/push';
+import { RefusalToast, reportRefusal } from './components/ui/RefusalToast';
 
 /**
  * F11. Lists keep showing while a filter or page changes, with a thin bar
@@ -24,7 +25,8 @@ const LISTS = new Set([
 const queryClient: QueryClient = new QueryClient({
   // After any change is saved, everything remembered is marked out of date,
   // so no page can show old figures for the minute it is remembered.
-  mutationCache: new MutationCache({ onSuccess: () => { queryClient.invalidateQueries(); } }),
+  // A refused save always says why (P12, P13, O8).
+  mutationCache: new MutationCache({ onSuccess: () => { queryClient.invalidateQueries(); }, onError: (e) => reportRefusal(e) }),
   defaultOptions: {
     queries: {
       retry: 1,
@@ -46,6 +48,7 @@ createRoot(document.getElementById('root')!).render(
       <BrowserRouter>
         <AuthProvider>
           <App />
+          <RefusalToast />
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>

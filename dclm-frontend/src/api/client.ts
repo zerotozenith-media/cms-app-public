@@ -82,3 +82,21 @@ export function mediaUrl(url?: string | null): string | null {
   if (/^https?:\/\//.test(url)) return url;
   try { return new URL(url, API_BASE_URL).toString(); } catch { return url; }
 }
+
+/**
+ * P2 and P3 (review, 25 October 2026): boards and pipelines need every
+ * record, but the server sends at most 100 a page. This follows the pages
+ * to the end, so nobody silently drops off a list.
+ */
+export async function getAllPages<T>(url: string, params: Record<string, unknown> = {}): Promise<T[]> {
+  const out: T[] = [];
+  let page = 1;
+  for (;;) {
+    const resp = await apiClient.get<{ results: T[]; next: string | null } | T[]>(url, { params: { ...params, page, page_size: 100 } });
+    const d = resp.data;
+    if (Array.isArray(d)) return d;
+    out.push(...d.results);
+    if (!d.next || page >= 50) return out;
+    page += 1;
+  }
+}

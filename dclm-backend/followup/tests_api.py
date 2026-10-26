@@ -255,3 +255,36 @@ class StartManyTestCase(Base):
         self.as_(u)
         self.assertEqual(self.client.get("/api/followup/start-many/").status_code, 403)
         self.assertEqual(self.client.post("/api/followup/start-many/", {"newcomers": [self.mine.id]}, format="json").status_code, 403)
+
+
+class MissedMessagesTestCase(Base):
+    """Item 10 (Kay, 26 October 2026): planned messages not sent, or skipped."""
+
+    def setUp(self):
+        super().setUp()
+        _setup_people(self)
+        self.client.force_authenticate(user=self.shep)
+        self.e = Enrolment.objects.get(newcomer=self.mine)
+        self.day1 = datetime.date.today() - datetime.timedelta(days=3)
+        Enrolment.objects.filter(pk=self.e.pk).update(started=self.day1)
+
+    def missed(self):
+        return [(r["date"], r["template"]["theme"]) for r in self.client.get("/api/followup/missed/").data["results"]]
+
+    def test_listed_then_sent_on_that_days_plan(self):
+        self.assertIn((self.day1.isoformat(), "Welcome"), [(str(d), t) for d, t in self.missed()])
+        r = self.client.post("/api/followup/missed/", {"enrolment": self.e.id, "date": str(self.day1), "action": "sent",
+                                                       "text": "*Welcome*"}, format="json")
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertNotIn(self.day1.isoformat(), [str(d) for d, _ in self.missed()])
+        log = self.e.log.get(on_date=self.day1)
+        self.assertEqual((log.kind, log.day), ("planned", 1))
+
+    def test_dismissed_and_others_people_not_shown(self):
+        self.client.post("/api/followup/missed/", {"enrolment": self.e.id, "date": str(self.day1), "action": "dismiss"},
+                         format="json")
+        self.assertNotIn(self.day1.isoformat(), [str(d) for d, _ in self.missed()])
+        self.client.force_authenticate(user=self.other)
+        theirs = self.client.post("/api/followup/missed/", {"enrolment": self.e.id, "date": str(self.day1),
+                                                            "action": "dismiss"}, format="json")
+        self.assertEqual(theirs.status_code, 403)

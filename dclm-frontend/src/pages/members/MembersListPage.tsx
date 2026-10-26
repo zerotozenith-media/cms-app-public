@@ -71,6 +71,7 @@ export function MembersListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const fromPipeline = searchParams.get('from') === 'pipeline';
   const [ordering, setOrdering] = useState('surname,first_name');
+  const [statusFilter, setStatusFilter] = useState('active');
   const [page, setPage] = useState(1);
 
   const { data, isLoading } = useMembers({
@@ -79,6 +80,7 @@ export function MembersListPage() {
     shepherd: shepherdFilter !== 'all' ? shepherdFilter : undefined,
     household: householdFilter !== 'all' ? householdFilter : undefined,
     is_leader: leaderFilter === 'yes' ? 'true' : undefined,
+    status: statusFilter !== 'active' ? statusFilter : undefined,
     from_pipeline: fromPipeline ? 'true' : undefined,
     ordering,
     page,
@@ -162,6 +164,13 @@ export function MembersListPage() {
               onChange={(e) => { setLeaderFilter(e.target.value); setPage(1); }}>
               <option value="all">Leaders and members</option>
               <option value="yes">Leaders only</option>
+            </select>
+            <label className="sr-only" htmlFor="mem-status">Status</label>
+            <select id="mem-status" className="selectbox" value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
+              <option value="active">Active members</option>
+              <option value="inactive">Moved away or left</option>
+              <option value="all">Everyone</option>
             </select>
             <select className="selectbox" value={ordering} onChange={(e) => setOrdering(e.target.value)}>
               <option value="surname,first_name">Sort: Name A-Z</option>

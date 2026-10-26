@@ -65,6 +65,15 @@ class MemberViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
         from django.db.models.functions import Coalesce
 
         qs = super().get_queryset()
+        # Review item P4: people who moved away or left keep their history
+        # but leave the list, unless asked for.
+        status = self.request.query_params.get("status")
+        if status in ("moved-away", "left", "active"):
+            qs = qs.filter(status=status)
+        elif status == "inactive":
+            qs = qs.exclude(status="active")
+        elif status != "all" and getattr(self, "action", None) in ("list", "stats"):
+            qs = qs.filter(status="active")
         category = self.request.query_params.get("category")
         if category:
             qs = qs.filter(category=category)
@@ -121,9 +130,49 @@ class MemberViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
             from alerts.events import given
             given([("member", instance.pk, instance.full_name, instance.assigned_to_id)], by=self.request.user)
 
+    @action(detail=True, methods=["get"], url_path="delete-preview")
+    def delete_preview(self, request, pk=None):
+        """P4 (review, 25 October 2026): what deleting this member would
+        remove for good, so the person can set a status instead."""
+        m = self.get_object()
+        n = {
+            "check_ins": m.attendance_records.count(),
+            "follow_ups": m.followup_tasks.count(),
+            "message_plans": m.enrolments.count(),
+            "category_changes": m.category_history.count(),
+            "giving_kept": m.giving_entries.count(),
+        }
+        return Response(n)
+
+    @action(detail=True, methods=["post", "delete"])
+    def away(self, request, pk=None):
+        """Mark the member away for a known absence, or clear it."""
+        return away_action(self, request, self.get_object(), "members")
+
+    def get_permissions(self):
+        if getattr(self, "action", None) == "away":
+            from rest_framework.permissions import IsAuthenticated
+            return [IsAuthenticated()]
+        return super().get_permissions()
+
     def perform_update(self, serializer):
         before = serializer.instance.assigned_to_id
+        before_status = serializer.instance.status
         instance = serializer.save()
+        if instance.assigned_to_id != before:
+            # Their open tasks move with them (Kay, 26 October 2026).
+            from core.task_actions import move_open_tasks
+            move_open_tasks(instance, instance.assigned_to_id)
+        if instance.status != before_status:
+            log_audit(self.request.user, "Changed status", "Member", instance.full_name,
+                      f"{before_status} to {instance.status}" + (f". {instance.status_note}" if instance.status_note else ""),
+                      instance=instance)
+            if instance.status != "active":
+                # No more follow-up for someone who has left.
+                from core.accountable import TaskResult
+                from core.task_actions import close_open_for
+                close_open_for(instance, self.request.user, TaskResult.MOVED_AWAY,
+                               instance.get_status_display() + (f". {instance.status_note}" if instance.status_note else ""))
         if instance.assigned_to_id and instance.assigned_to_id != before:
             from alerts.events import given
             given([("member", instance.pk, instance.full_name, instance.assigned_to_id)], by=self.request.user)
@@ -143,8 +192,10 @@ class MemberViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
         # endpoint's whole purpose is UNFILTERED-by-category counts, so
         # re-derive the location-scoped-only base rather than reuse a
         # possibly category-filtered queryset.
-        base = LocationScopedQuerySetMixin.get_queryset(self)
+        everyone = LocationScopedQuerySetMixin.get_queryset(self)
+        base = everyone.filter(status="active")
         return Response({
+            "inactive": everyone.exclude(status="active").count(),
             "total": base.count(),
             "workers": base.filter(category="Worker").count(),
             "workers_in_training": base.filter(category="Worker in Training").count(),
@@ -160,7 +211,7 @@ class MemberViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
         """
         from .shepherd_rules import rule_breaks
         base = LocationScopedQuerySetMixin.get_queryset(self)
-        found = rule_breaks(base.order_by("surname", "first_name"))
+        found = rule_breaks(base.filter(status="active").order_by("surname", "first_name"))
         return Response({
             "count": len(found),
             "people": [{"id": m.id, "name": m.full_name, "tag": tag} for m, _, tag in found],
@@ -237,7 +288,10 @@ class MemberCategoryHistoryViewSet(LocationScopedMixin, viewsets.ModelViewSet):
         )
 
 
-class MemberFollowUpTaskViewSet(LocationScopedMixin, viewsets.ModelViewSet):
+from core.task_views import TaskActionsMixin, away_action
+
+
+class MemberFollowUpTaskViewSet(TaskActionsMixin, LocationScopedMixin, viewsets.ModelViewSet):
     location_lookup = "member__location_id"
     """
     Real member-absence follow-up (confirmed design, built after the
@@ -247,7 +301,8 @@ class MemberFollowUpTaskViewSet(LocationScopedMixin, viewsets.ModelViewSet):
     """
     module = "members"
     permission_classes = [ModulePermission]
-    queryset = MemberFollowUpTask.objects.select_related("member", "assigned_to")
+    queryset = MemberFollowUpTask.objects.select_related("member", "assigned_to").prefetch_related(
+        "attempts", "attempts__by", "reviews")
     serializer_class = MemberFollowUpTaskSerializer
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ["due_date"]
@@ -277,38 +332,34 @@ class MemberFollowUpTaskViewSet(LocationScopedMixin, viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def complete(self, request, pk=None):
-        """The only correct way to mark a follow-up done , requires the
-        real visitation outcome, mirroring NewcomerTaskViewSet.complete()."""
-        require(request.user, ("members", "can_edit"))
+        """Record that the member was reached. The four outcome boxes are
+        required; the visit closes every open absence task for the member
+        (Kay, 26 October 2026). The same as record-result with Reached."""
+        from core import task_actions as acts
+        from core.task_views import block_until_reasons
         task = self.get_object()
+        self._may_record(request, task)
+        block_until_reasons(request.user, task)
         serializer = CompleteMemberFollowUpTaskSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-
-        task.done = True
-        task.contact_date = data.get("contact_date") or timezone.localdate()
-        task.contact_method = data["contact_method"]
-        task.contact_goal = data["contact_goal"]
-        task.contact_scripture = data["contact_scripture"]
-        task.contact_root_cause = data["contact_root_cause"]
-        task.contact_next_step = data["contact_next_step"]
-        task.save()
-        log_audit(
-            request.user, "Recorded follow-up outcome", "Member", task.member.full_name,
-            f"{task.contact_method}: {task.contact_goal[:60]}", instance=task,
-        )
-        return Response(MemberFollowUpTaskSerializer(task).data)
+        extra = acts.reached(task, request.user, serializer.validated_data)
+        task.refresh_from_db()
+        data = dict(MemberFollowUpTaskSerializer(task).data)
+        data.update(extra)
+        return Response(data)
 
     @action(detail=False, methods=["get"])
     def stats(self, request):
         """Same reasoning as every other stats endpoint in this app ,
         follow-up tasks accumulate over years, so a real aggregate query
         is correct regardless of how much history exists."""
+        from django.db.models import Q
         base = self.get_queryset().filter(done=False)
         today = timezone.localdate()
+        late = Q(due_at__lt=timezone.now()) | Q(due_at__isnull=True, due_date__lt=today)
         return Response({
             "open_followups": base.count(),
-            "overdue": base.filter(due_date__lt=today).count(),
+            "overdue": base.filter(late).count(),
             "unassigned": base.filter(assigned_to__isnull=True).count(),
         })
 
@@ -445,7 +496,11 @@ class BulkAssignShepherdView(APIView):
 
         from alerts.events import given
         newly = [("member", m.id, m.full_name, shepherd.id) for m in qs if m.assigned_to_id != shepherd.id]
+        moving = list(qs)
         updated = qs.update(assigned_to=shepherd)
+        from core.task_actions import move_open_tasks
+        for m in moving:
+            move_open_tasks(m, shepherd.id)
         given(newly, by=request.user)
         log_audit(
             request.user, "Bulk assigned shepherd", "Member",

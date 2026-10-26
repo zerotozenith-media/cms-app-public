@@ -42,7 +42,8 @@ def outstanding(user):
     items = []
 
     if user_has(user, "newcomers", "can_view"):
-        qs = NewcomerTask.objects.filter(done=False, due_date__lt=today)
+        from core.followup_rules import late_q
+        qs = NewcomerTask.objects.filter(late_q(), done=False)
         if loc:
             qs = qs.filter(newcomer__location_id=loc)
         if not mine_all:
@@ -52,9 +53,10 @@ def outstanding(user):
             whose = "" if mine_all else "of your "
             items.append({"key": "newcomer-follow-ups", "count": n, "level": "overdue",
                           "label": f"{n} {whose}newcomer {_plural(n, 'follow-up', 'follow-ups')} overdue",
-                          "link": "/newcomers/follow-up"})
+                          "link": "/newcomers/follow-up" if mine_all else "/follow-up"})
     if user_has(user, "members", "can_view"):
-        qs = MemberFollowUpTask.objects.filter(done=False, due_date__lt=today)
+        from core.followup_rules import late_q
+        qs = MemberFollowUpTask.objects.filter(late_q(), done=False)
         if loc:
             qs = qs.filter(member__location_id=loc)
         if not mine_all:
@@ -64,7 +66,21 @@ def outstanding(user):
             whose = "" if mine_all else "of your "
             items.append({"key": "member-follow-ups", "count": n, "level": "overdue",
                           "label": f"{n} {whose}member {_plural(n, 'follow-up', 'follow-ups')} overdue",
-                          "link": "/members?tab=follow-up"})
+                          "link": "/members/follow-up" if mine_all else "/follow-up"})
+    # Kay, 26 October 2026: reasons owed come first, then the Review list.
+    from core import followup_review as rev
+    from core.followup_access import can_review, coverage
+    owed = rev.my_followup(user)["needs_reason"]
+    if owed:
+        items.insert(0, {"key": "reasons", "count": owed, "level": "overdue",
+                         "label": f"{owed} late {_plural(owed, 'task needs', 'tasks need')} a reason",
+                         "link": "/follow-up"})
+    if can_review(user, None):
+        n = len(rev.review_list(user, coverage(user)))
+        if n:
+            items.append({"key": "review", "count": n, "level": "waiting",
+                          "label": f"{n} {_plural(n, 'task', 'tasks')} on your Review list",
+                          "link": "/followup-review"})
     if user_has(user, "newcomers", "can_edit"):
         # Enquiries belong to no location until the person attends.
         n = Enquiry.objects.filter(stage="new").count()

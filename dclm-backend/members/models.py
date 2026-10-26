@@ -1,6 +1,9 @@
 import datetime
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
+
+from core.accountable import AccountableTask
 
 
 def validate_not_future(value):
@@ -75,6 +78,34 @@ class Member(models.Model):
         related_name="became_member",
     )
 
+    # Review item P4: a member who left could only be deleted, losing every
+    # attendance record, follow-up and message. Moved away and Left keep
+    # the history and stop follow-up tasks.
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Active"
+        MOVED_AWAY = "moved-away", "Moved away"
+        LEFT = "left", "Left the church"
+
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    status_date = models.DateField(null=True, blank=True)
+    status_note = models.CharField(max_length=300, blank=True, default="")
+
+    # A known absence, such as travel or illness (Kay, 26 October 2026). No
+    # absence tasks are made from away_from to away_to.
+    class AwayReason(models.TextChoices):
+        TRAVELLING = "travelling", "Travelling"
+        SICK = "sick", "Sick"
+        SHIFT = "shift-abroad", "Working a shift abroad"
+        OTHER = "other", "Other"
+
+    away_from = models.DateField(null=True, blank=True)
+    away_to = models.DateField(null=True, blank=True)
+    away_reason = models.CharField(max_length=20, choices=AwayReason.choices, blank=True, default="")
+    away_note = models.CharField(max_length=300, blank=True, default="")
+
+    def away_on(self, day):
+        return bool(self.away_from and self.away_to and self.away_from <= day <= self.away_to)
+
     class Meta:
         ordering = ["surname", "first_name"]
 
@@ -108,7 +139,7 @@ class MemberCategoryHistory(models.Model):
         return f"{self.member}: {self.from_category} -> {self.to_category}"
 
 
-class MemberFollowUpTask(models.Model):
+class MemberFollowUpTask(AccountableTask):
     """
     Real member-absence follow-up, confirmed design: a member who isn't
     checked into a meeting flagged as counts_for_absence gets exactly one
@@ -172,3 +203,34 @@ class MemberFollowUpTask(models.Model):
 
     def __str__(self):
         return f"{self.member}: {self.text}"
+
+
+class MemberContactAttempt(models.Model):
+    """
+    A call, message or visit that did not reach a member (review gap 5).
+    Before this a shepherd who called three times left no trace until they
+    got through. Mirrors NewcomerContactAttempt.
+    """
+    class Method(models.TextChoices):
+        PHONE_CALL = "Phone call", "Phone call"
+        WHATSAPP = "WhatsApp", "WhatsApp"
+        TEXT = "Text message", "Text message"
+        SOCIAL_MESSAGE = "Social media message", "Social media message"
+        EMAIL = "Email", "Email"
+        HOME_VISIT = "Home visit", "Home visit"
+
+    member = models.ForeignKey("members.Member", on_delete=models.CASCADE, related_name="contact_attempts")
+    task = models.ForeignKey("members.MemberFollowUpTask", on_delete=models.SET_NULL, null=True, blank=True,
+                             related_name="attempts")
+    date = models.DateField(default=timezone.localdate)
+    at = models.DateTimeField(default=timezone.now)
+    method = models.CharField(max_length=30, choices=Method.choices)
+    note = models.CharField(max_length=300, blank=True, default="")
+    by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
+                           related_name="member_contact_attempts")
+
+    class Meta:
+        ordering = ["-at", "-id"]
+
+    def __str__(self):
+        return f"{self.member}: {self.method} on {self.date}"

@@ -172,7 +172,8 @@ class FellowshipLocationTestCase(Base):
         super().setUp()
         self.house = MeetingType.objects.create(
             id="fri-house", name="Friday House Caring Fellowship", day="Friday",
-            frequency="weekly", detail_level="detailed", collects_offering=True)
+            frequency="weekly", detail_level="detailed", collects_offering=True,
+            create_days_ahead=6)  # made up to 6 days ahead, as before item 20
         Fellowship.objects.create(name="HCF Women", meeting_type=self.house, location=self.bahrain)
         Fellowship.objects.create(name="HCF Men", meeting_type=self.house, location=self.bahrain)
 
@@ -1102,7 +1103,8 @@ class NewFellowshipSessionTestCase(Base):
     def setUp(self):
         super().setUp()
         self.mt = MeetingType.objects.create(id="fri-house", name="House Fellowship", day="Friday",
-                                             frequency="weekly", detail_level="detailed")
+                                             frequency="weekly", detail_level="detailed",
+                                             create_days_ahead=6)  # made up to 6 days ahead, as before item 20
 
     def next_friday(self):
         import datetime
@@ -1694,8 +1696,10 @@ class UsualModeTestCase(Base):
     def setUp(self):
         super().setUp()
         self.fri = MeetingType.objects.create(id="fri-worship", name="Friday Worship", day="Friday", frequency="weekly",
-                                              detail_level="detailed", usual_mode="in-person-and-online")
-        self.mon = MeetingType.objects.create(id="mon-bs", name="Monday Bible Study", day="Monday", frequency="weekly", detail_level="detailed")
+                                              detail_level="detailed", usual_mode="in-person-and-online",
+                                              create_days_ahead=6)  # made up to 6 days ahead, as before item 20
+        self.mon = MeetingType.objects.create(id="mon-bs", name="Monday Bible Study", day="Monday", frequency="weekly",
+                                              detail_level="detailed", create_days_ahead=6)
 
     def test_weekly_sessions_follow_the_usual_mode(self):
         from django.core.management import call_command

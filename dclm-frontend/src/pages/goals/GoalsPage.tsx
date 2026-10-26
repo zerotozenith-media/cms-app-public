@@ -8,6 +8,20 @@ import { Icon } from '../../components/ui/Icon';
 import type { Goal, GoalHorizon } from '../../types/goals';
 
 import { useAuth } from '../../context/AuthContext';
+import { useMeetingTypes } from '../../api/attendance';
+import { useLocations } from '../../api/locations';
+import { useFunds } from '../../api/finance';
+import { HelpMark } from '../../components/ui/HelpMark';
+import { refusal } from '../../api/accountability';
+
+/** Item 11 (Kay, 26 October 2026): what an automatic goal can measure. */
+const MEASURES: { k: string; l: string; needs: 'meeting' | 'fund' | null; period: string }[] = [
+  { k: 'monthly_average_attendance', l: 'Average attendance a month', needs: 'meeting', period: 'month' },
+  { k: 'sessions_held', l: 'Sessions held', needs: 'meeting', period: 'month' },
+  { k: 'named_checkins', l: 'People checked in by name', needs: 'meeting', period: 'month' },
+  { k: 'fund_total', l: 'Fund total', needs: 'fund', period: 'month' },
+  { k: 'net_giving', l: 'Monthly giving less expenses', needs: null, period: 'month' },
+];
 const HORIZONS: GoalHorizon[] = ['Short-term', 'Medium-term', 'Long-term', 'Spiritual growth'];
 
 function progressColor(current: number, target: number): 'green' | 'red' | '' {
@@ -36,6 +50,17 @@ export function GoalsPage() {
   const [unit, setUnit] = useState('');
   const [targetDate, setTargetDate] = useState('');
   const [measuredBy, setMeasuredBy] = useState('');
+  const [auto, setAuto] = useState(false);
+  const [measure, setMeasure] = useState('monthly_average_attendance');
+  const [mMeeting, setMMeeting] = useState('');
+  const [mFund, setMFund] = useState('');
+  const [mLocation, setMLocation] = useState('');
+  const [period, setPeriod] = useState('month');
+  const [createErr, setCreateErr] = useState('');
+  const { data: meetings } = useMeetingTypes();
+  const { data: locs } = useLocations();
+  const { data: funds } = useFunds();
+  const chosenMeasure = MEASURES.find((m) => m.k === measure)!;
 
   const list = goals ?? [];
   let achieved = 0, behind = 0, onTrack = 0;
@@ -55,8 +80,17 @@ export function GoalsPage() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    await createGoal.mutateAsync({ name, horizon, target: Number(target), unit, target_date: targetDate.trim(), measured_by: measuredBy.trim() });
-    setName(''); setTarget(''); setUnit(''); setHorizon('Short-term'); setTargetDate(''); setMeasuredBy('');
+    setCreateErr('');
+    try {
+      await createGoal.mutateAsync({ name, horizon, target: Number(target), unit, target_date: targetDate.trim(), measured_by: measuredBy.trim(),
+        auto: auto ? {
+          calculation_type: measure, period_type: measure === 'monthly_average_attendance' ? 'month' : period,
+          calculation_meeting_type: chosenMeasure.needs === 'meeting' ? mMeeting || null : null,
+          calculation_fund: chosenMeasure.needs === 'fund' ? (mFund ? Number(mFund) : null) : null,
+          calculation_location: mLocation || null,
+        } : undefined });
+    } catch (err) { setCreateErr(refusal(err, 'The goal could not be added.')); return; }
+    setName(''); setTarget(''); setUnit(''); setHorizon('Short-term'); setTargetDate(''); setMeasuredBy(''); setAuto(false);
     setShowForm(false);
   }
   async function handleDelete(id: number) {
@@ -84,7 +118,7 @@ export function GoalsPage() {
         <div className="card form-card editing" style={{ maxWidth: 520, margin: '0 auto 20px' }}>
           <h3>New goal</h3>
           <p className="muted" style={{ fontSize: '.84rem', margin: '-4px 0 12px' }}>
-            New goals are manually tracked. Update the progress value on the Goals list as it changes.
+            Progress is typed by hand, or updates itself from the records in the app.
           </p>
           <form onSubmit={handleCreate}>
             <div className="field">
@@ -107,7 +141,46 @@ export function GoalsPage() {
                 <input id="goal-unit" value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="e.g. % or blank" />
               </div>
             </div>
+            <div className="fr-group coord">
+              <div className="field" style={{ marginBottom: 8 }}>
+                <label>How progress is measured<HelpMark topic="goalTracking" /></label>
+                <div className="viewtoggle" role="group" aria-label="How progress is measured">
+                  <button type="button" className={auto ? '' : 'on'} onClick={() => setAuto(false)}>Typed by hand</button>
+                  <button type="button" className={auto ? 'on' : ''} onClick={() => setAuto(true)}>Automatically</button>
+                </div>
+              </div>
+              {auto && <>
+                <div className="field"><label htmlFor="goal-calc">Measure</label>
+                  <select id="goal-calc" value={measure} onChange={(e) => setMeasure(e.target.value)}>
+                    {MEASURES.map((m) => <option key={m.k} value={m.k}>{m.l}</option>)}
+                  </select></div>
+                {chosenMeasure.needs === 'meeting' && <div className="field"><label htmlFor="goal-meeting">Meeting</label>
+                  <select id="goal-meeting" value={mMeeting} onChange={(e) => setMMeeting(e.target.value)}>
+                    <option value="">Choose a meeting</option>
+                    {(meetings ?? []).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select></div>}
+                {chosenMeasure.needs === 'fund' && <div className="field"><label htmlFor="goal-fund">Fund</label>
+                  <select id="goal-fund" value={mFund} onChange={(e) => setMFund(e.target.value)}>
+                    <option value="">Choose a fund</option>
+                    {(funds ?? []).map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                  </select></div>}
+                <div className="form-row">
+                  <div className="field"><label htmlFor="goal-loc">Location</label>
+                    <select id="goal-loc" value={mLocation} onChange={(e) => setMLocation(e.target.value)}>
+                      <option value="">All locations</option>
+                      {(locs ?? []).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    </select></div>
+                  {measure !== 'monthly_average_attendance' && <div className="field"><label htmlFor="goal-period">Counted over</label>
+                    <select id="goal-period" value={period} onChange={(e) => setPeriod(e.target.value)}>
+                      <option value="month">This month</option><option value="quarter">This quarter</option>
+                      <option value="year">This year</option><option value="none">All time</option>
+                    </select></div>}
+                </div>
+                <div className="muted" style={{ fontSize: '.82rem' }}>Updates itself from the records. It shows on Goals and in the Overseer report.</div>
+              </>}
+            </div>
             <ReportFields targetDate={targetDate} setTargetDate={setTargetDate} measuredBy={measuredBy} setMeasuredBy={setMeasuredBy} idPrefix="goal" />
+            {createErr && <p className="form-error" role="alert">{createErr}</p>}
             <div className="form-actions-row">
               <button className="btn sm" type="submit" disabled={createGoal.isPending}>Add goal</button>
               <button className="btn sm ghost" type="button" onClick={() => setShowForm(false)}>Cancel</button>
@@ -206,7 +279,7 @@ function GoalRow({
           {goal.calculation_error ? (
             <span style={{ color: 'var(--red)' }}>{goal.calculation_error}</span>
           ) : (
-            goal.source
+            goal.measure_note || goal.source
           )}
           {goal.link_route && (
             <a onClick={() => onNavigate(`/${goal.link_route}`)}>View data →</a>

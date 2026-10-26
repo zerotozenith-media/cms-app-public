@@ -1,6 +1,8 @@
 from django.db import models
 from django.utils import timezone
 
+from core.accountable import AccountableTask
+
 
 class NewcomerSource(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -80,6 +82,18 @@ class Newcomer(models.Model):
     )
     invited_by_name = models.CharField(max_length=150, blank=True, default="")
 
+    # A known absence, as for members (Kay, 26 October 2026).
+    away_from = models.DateField(null=True, blank=True)
+    away_to = models.DateField(null=True, blank=True)
+    away_reason = models.CharField(
+        max_length=20, blank=True, default="",
+        choices=[("travelling", "Travelling"), ("sick", "Sick"), ("shift-abroad", "Working a shift abroad"),
+                 ("other", "Other")])
+    away_note = models.CharField(max_length=300, blank=True, default="")
+
+    def away_on(self, day):
+        return bool(self.away_from and self.away_to and self.away_from <= day <= self.away_to)
+
     class Meta:
         ordering = ["-created_at"]
 
@@ -117,7 +131,7 @@ class NewcomerMilestone(models.Model):
         return f"{self.newcomer}: {self.milestone_type}"
 
 
-class NewcomerTask(models.Model):
+class NewcomerTask(AccountableTask):
     class Method(models.TextChoices):
         HOME_VISIT = "Home visit", "Home visit"
         PHONE_CALL = "Phone call", "Phone call"
@@ -135,6 +149,13 @@ class NewcomerTask(models.Model):
         help_text="Batch 0.3, Finding 3: independent of the newcomer's primary leader; "
                    "defaults to it if left blank at the application layer.",
     )
+    # A newcomer who misses a service gets a task like a member (Kay, 26
+    # October 2026), so the task says which service, as member tasks do.
+    missed_session = models.ForeignKey(
+        "attendance.AttendanceSession", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="newcomer_followups")
+    missed_meeting_name = models.CharField(max_length=150, blank=True, default="")
+    missed_date = models.DateField(null=True, blank=True)
     # A checked box with no record of what was discussed isn't useful to a
     # leader reviewing history later , confirmed real gap, fixed here and
     # on MemberFollowUpTask together, not just one of the two.
@@ -189,6 +210,11 @@ class PublicRegistrationAttempt(models.Model):
         INVALID_DATA = "invalid_data", "Failed normal field validation"
 
     ip_address = models.GenericIPAddressField()
+    # P10 (review, 25 October 2026): visitors on the church Wi-Fi share one
+    # address, so each phone is counted by itself, and an administrator
+    # can lift a block (counted off).
+    device_id = models.CharField(max_length=64, blank=True, default="")
+    counted = models.BooleanField(default=True)
     successful = models.BooleanField()
     reason = models.CharField(max_length=20, choices=Reason.choices)
     timestamp = models.DateTimeField(auto_now_add=True)
@@ -231,6 +257,9 @@ class NewcomerContactAttempt(models.Model):
         "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="newcomer_contact_attempts",
     )
+    task = models.ForeignKey(
+        "newcomers.NewcomerTask", on_delete=models.SET_NULL, null=True, blank=True, related_name="attempts")
+    at = models.DateTimeField(default=timezone.now)
 
     class Meta:
         ordering = ["-date", "-id"]

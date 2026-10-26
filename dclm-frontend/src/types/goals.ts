@@ -17,4 +17,7 @@ export interface Goal {
   link_tab: string;
   current_value: number;
   calculation_error: string | null;
+  /** Item 11: what an automatic goal counts, in words. */
+  measure_note?: string;
+  calculation_type?: string;
 }

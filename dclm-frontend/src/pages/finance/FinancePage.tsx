@@ -1,3 +1,4 @@
+import { refusal } from '../../api/accountability';
 import { useState } from 'react';
 import { RemittanceTab } from './RemittanceTab';
 import { DATE_RANGES, rangeBounds, type DateRangeKey } from '../../lib/dateRanges';
@@ -122,20 +123,29 @@ export function FinancePage() {
       date: gDate, fund: Number(gFund), method: Number(gMethod), amount: gAmount,
       location: gLocation, member: gMember ? Number(gMember) : null,
     };
-    if (givingEditId) {
-      await updateGiving.mutateAsync({ id: givingEditId, ...payload });
-      cancelGivingEdit();
-    } else {
-      await createGiving.mutateAsync(payload);
-      setGAmount('');
-      setGMember('');
-    }
+    // O8: a refusal is shown under the form, in the server's own words.
+    setGErr('');
+    try {
+      if (givingEditId) {
+        await updateGiving.mutateAsync({ id: givingEditId, ...payload });
+        cancelGivingEdit();
+      } else {
+        await createGiving.mutateAsync(payload);
+        setGAmount('');
+        setGMember('');
+      }
+    } catch (err) { setGErr(refusal(err, 'The giving entry could not be saved.')); }
   }
   async function handleDeleteGiving(id: number) {
     if (!confirm('Delete this giving entry?')) return;
-    await deleteGiving.mutateAsync(id);
+    setListErr('');
+    try { await deleteGiving.mutateAsync(id); }
+    catch (err) { setListErr(refusal(err, 'The giving entry could not be deleted.')); }
   }
 
+  const [gErr, setGErr] = useState('');
+  const [eErr, setEErr] = useState('');
+  const [listErr, setListErr] = useState('');
   // --- Expense form ---
   const [expenseEditId, setExpenseEditId] = useState<number | null>(null);
   const [eCategory, setECategory] = useState('');
@@ -176,19 +186,24 @@ export function FinancePage() {
     formData.append('description', eDescription);
     formData.append('date', eDate);
     if (eReceiptFile) formData.append('receipt_file', eReceiptFile);
-    if (expenseEditId) {
-      await updateExpense.mutateAsync({ id: expenseEditId, payload: formData });
-      cancelExpenseEdit();
-    } else {
-      await createExpense.mutateAsync(formData);
-      setEAmount('');
-      setEDescription('');
-      setEReceiptFile(null);
-    }
+    setEErr('');
+    try {
+      if (expenseEditId) {
+        await updateExpense.mutateAsync({ id: expenseEditId, payload: formData });
+        cancelExpenseEdit();
+      } else {
+        await createExpense.mutateAsync(formData);
+        setEAmount('');
+        setEDescription('');
+        setEReceiptFile(null);
+      }
+    } catch (err) { setEErr(refusal(err, 'The expense could not be saved.')); }
   }
   async function handleDeleteExpense(id: number) {
     if (!confirm('Delete this expense entry?')) return;
-    await deleteExpense.mutateAsync(id);
+    setListErr('');
+    try { await deleteExpense.mutateAsync(id); }
+    catch (err) { setListErr(refusal(err, 'The expense could not be deleted.')); }
   }
 
   const stats: StatItem[] = [
@@ -303,6 +318,7 @@ export function FinancePage() {
               {givingEditId ? 'Save changes' : 'Add entry'}
             </button>
             {givingEditId && <button className="btn ghost" type="button" onClick={cancelGivingEdit}>Cancel</button>}
+            {gErr && <p className="form-error" role="alert" style={{ marginTop: 10 }}>{gErr}</p>}
           </form>
         </div>
 
@@ -345,6 +361,7 @@ export function FinancePage() {
               {expenseEditId ? 'Save changes' : 'Add entry'}
             </button>
             {expenseEditId && <button className="btn ghost" type="button" onClick={cancelExpenseEdit}>Cancel</button>}
+            {eErr && <p className="form-error" role="alert" style={{ marginTop: 10 }}>{eErr}</p>}
           </form>
         </div>
       </div>}
@@ -375,6 +392,7 @@ export function FinancePage() {
           </div>
         </div>
         <div style={{ overflowX: 'auto' }}>
+          {listErr && <p className="form-error" role="alert">{listErr}</p>}
           <table className="cardtable">
             <thead><tr><th>Date</th><th>Fund</th><th>Method</th><th>Member</th><th>Amount</th><th></th></tr></thead>
             <tbody>
@@ -384,7 +402,7 @@ export function FinancePage() {
                   <td data-label="Fund">{g.fund_name}</td>
                   <td data-label="Method">{g.method_name}</td>
                   <td data-label="Member">
-                    {g.member ? (
+                    {g.session_label ? <span className="badge blue" title="Recorded on a service. Change it on the session.">From session: {g.session_label}</span> : g.member ? (
                       <a onClick={() => navigate(`/members/${g.member}`)} style={{ color: 'var(--blue)', cursor: 'pointer', fontWeight: 600 }}>
                         {g.member_name}
                       </a>
@@ -392,8 +410,12 @@ export function FinancePage() {
                   </td>
                   <td data-label="Amount"><b>{fmt(g.amount)}</b></td>
                   <td className="td-actions" style={{ border: 0 }}>
-                    {canEdit && <button className="icon-btn edit" title="Edit entry" aria-label="Edit entry" onClick={() => startGivingEdit(g)}><Icon name="edit" size={14} /></button>}
-                    {canDelete && <button className="icon-btn" title="Delete entry" aria-label="Delete entry" onClick={() => handleDeleteGiving(g.id)}><Icon name="trash" size={14} /></button>}
+                    {g.session ? (
+                      <a className="linkish" onClick={() => navigate(`/attendance/${g.session}`)} title="Recorded on a service, so it is changed there and the two never disagree">Change on the session</a>
+                    ) : <>
+                      {canEdit && <button className="icon-btn edit" title="Edit entry" aria-label="Edit entry" onClick={() => startGivingEdit(g)}><Icon name="edit" size={14} /></button>}
+                      {canDelete && <button className="icon-btn" title="Delete entry" aria-label="Delete entry" onClick={() => handleDeleteGiving(g.id)}><Icon name="trash" size={14} /></button>}
+                    </>}
                   </td>
                 </tr>
               ))}

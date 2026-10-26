@@ -3,8 +3,40 @@ import { QRCodeSVG } from 'qrcode.react';
 
 import { useState } from 'react';
 import { useMyLocations } from '../../api/locations';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '../../api/client';
+import { useAuth } from '../../context/AuthContext';
+
+/** P10: phones the form is refusing today, and a way to let them in. */
+function Blocks() {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ['registration-blocks'],
+    queryFn: async () => (await apiClient.get<{ results: { ip: string; device_id: string; refused: number; last: string; still_blocked: boolean }[]; per_phone: number }>('/newcomers-registration-blocks/')).data,
+  });
+  const lift = useMutation({
+    mutationFn: async (b: { ip: string; device_id: string }) => (await apiClient.post('/newcomers-registration-blocks/', b.device_id ? { device_id: b.device_id } : { ip: b.ip })).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['registration-blocks'] }),
+  });
+  const rows = (data?.results ?? []).filter((r) => r.still_blocked);
+  return (
+    <div className="card section-gap" style={{ maxWidth: 480, margin: '16px auto 0' }}>
+      <h3 style={{ margin: '0 0 4px' }}>Phones turned away today</h3>
+      <p className="muted" style={{ fontSize: '.82rem', margin: '0 0 8px' }}>
+        Each phone can send {data?.per_phone ?? 5} forms a day, enough for a family. Visitors on the church Wi-Fi are counted phone by phone, so they never block each other.
+      </p>
+      {rows.length === 0 ? <div className="muted" style={{ fontSize: '.86rem' }}>None.</div> : rows.map((r) => (
+        <div key={`${r.ip}-${r.device_id}`} className="person-row" style={{ fontSize: '.84rem' }}>
+          <span>{r.device_id ? `Phone ${r.device_id.slice(-6)}` : `Address ${r.ip}`} <span className="muted">· turned away {r.refused} time{r.refused === 1 ? '' : 's'}</span></span>
+          <button className="btn sm outline" onClick={() => lift.mutate(r)} disabled={lift.isPending}>Let them in</button>
+        </div>
+      ))}
+    </div>
+  );
+}
 export function QrRegistrationPage() {
   const navigate = useNavigate();
+  const { hasPermission } = useAuth();
   // One code per location, so a visitor lands in the pipeline of the
   // location they attended rather than always the main one.
   const { data: locations } = useMyLocations();
@@ -45,6 +77,7 @@ export function QrRegistrationPage() {
         </div>
         <div className="muted" style={{ fontSize: '.8rem', wordBreak: 'break-all' }}>{registrationUrl}</div>
       </div>
+      {hasPermission('newcomers', 'edit') && hasPermission('admin', 'view') && <Blocks />}
     </>
   );
 }

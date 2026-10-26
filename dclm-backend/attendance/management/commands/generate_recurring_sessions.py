@@ -1,14 +1,16 @@
 """
 Batch 0.2 approved decision: recurring session generation is fully
-automatic, with no staff action required. This command IS that automation
-, it creates the upcoming pending AttendanceSession for every weekly
-MeetingType, at every Location, if one doesn't already exist.
+automatic, with no staff action required. This command IS that automation.
 
-Scheduling this to actually run on its own (cron, Azure Function timer
-trigger, etc.) is Phase 5 deployment work , this command is the real,
-tested logic that scheduling will invoke. Idempotent: safe to run daily,
-multiple times a day, or after a missed run, without ever creating
-duplicate sessions.
+Item 20 (Kay, 26 October 2026): a session used to be made up to 6 days
+ahead, at every location, and showed Pending, so next Friday looked the
+same as a service whose names were never taken. Now each meeting makes its
+session only at the locations that hold it (Admin, Meeting Types, Held at),
+and only once the meeting is no more than its "Create each session" days
+away. 0, the default, makes it at 2:07 am on the day itself.
+
+Idempotent: safe to run daily, several times a day, or after a missed run,
+without ever creating duplicate sessions.
 """
 import datetime
 
@@ -26,13 +28,13 @@ WEEKDAY_MAP = {
 
 
 class Command(BaseCommand):
-    help = "Creates the upcoming pending session for every weekly meeting type, at every location."
+    help = "Creates each weekly meeting's session at the locations that hold it, on the day or the days ahead set for it."
 
     def handle(self, *args, **options):
         today = timezone.localdate()
         weekly_types = MeetingType.objects.filter(frequency=MeetingType.Frequency.WEEKLY)
-        locations = list(Location.objects.all())
         created_count = 0
+        locations = list(Location.objects.all())
         skipped_count = 0
 
         if not locations:
@@ -48,8 +50,10 @@ class Command(BaseCommand):
                 continue
 
             next_date = self._next_occurrence(today, weekday_num)
+            if (next_date - today).days > (mt.create_days_ahead or 0):
+                continue  # not yet: it appears nearer the day
 
-            for loc in locations:
+            for loc in mt.held_locations():
                 # A meeting type with fellowships needs one session per
                 # fellowship. Two fellowships meet the same evening, so a
                 # single session would leave the second one nowhere to be

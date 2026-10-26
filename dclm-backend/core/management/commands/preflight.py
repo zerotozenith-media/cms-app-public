@@ -50,6 +50,7 @@ class Command(BaseCommand):
         self.check_accounts()
         self.check_scheduled_jobs()
         self.check_meeting_setup()
+        self.check_followup_plan()
         self.check_version_11()
         self.check_email()
         self.check_alerts()
@@ -287,6 +288,40 @@ class Command(BaseCommand):
             )
         else:
             self.ok(f"{tracked.count()} meeting(s) tracked for absence, all with start times")
+
+    def check_followup_plan(self):
+        """The follow-up plan (Kay, 26 October 2026)."""
+        from django.utils import timezone
+        from accounts.models import User
+        from core.followup_clock import attendance_falling
+        from core.followup_rules import rules
+        coords = User.objects.filter(is_active=True, is_followup_coordinator=True)
+        if coords.exists():
+            from accounts.names import display_name
+            names = ", ".join(f"{display_name(u)} ({u.coordinates_location.name if u.coordinates_location_id else 'All locations'})"
+                              for u in coords.select_related("coordinates_location")[:5])
+            self.ok(f"Follow-up Coordinator: {names}")
+        else:
+            self.warn("no Follow-up Coordinator yet",
+                      "Late tasks, reasons and repeated-absence alerts go to the administrators until one is "
+                      "chosen. Tick Follow-up Coordinator on an account in Admin, Users.")
+        from newcomers.models import Newcomer
+        r = rules()
+        waiting = Newcomer.objects.filter(stage__in=r.stages).count()
+        if waiting:
+            self.warn(f"{waiting} newcomer(s) are New, Contacted or Attending",
+                      "Each tracked service with names ticked gives every one of them who is not ticked a task, "
+                      "until they are marked Not Interested or become members. Tick newcomers at check-in, and "
+                      "mark those who have stopped coming Not Interested, so shepherds are not given tasks that "
+                      "are not needed.")
+        n = attendance_falling(timezone.now(), r, dry_run=True)
+        if n:
+            self.warn(f"the first morning run will make {n} attendance falling task(s)",
+                      "These are people who came to fewer than half of the last 8 services with names ticked. "
+                      "If names were not ticked every week, some will be wrong; close them as Was present, or "
+                      "change the share in Admin, Follow-up Rules, before 7:00 am.")
+        else:
+            self.ok("attendance falling: no tasks would be made today")
 
     def check_version_11(self):
         """

@@ -203,6 +203,7 @@ class RecurringSessionGenerationTestCase(TestCase):
         self.weekly_mt = MeetingType.objects.create(
             id="fri-worship", name="Friday Worship Service", day="Friday",
             frequency="weekly", detail_level="detailed", monthly_target=150,
+            create_days_ahead=6,  # made up to 6 days ahead, as before item 20
         )
         self.occasional_mt = MeetingType.objects.create(
             id="gck", name="Global Crusade with Kumuyi", day=",",

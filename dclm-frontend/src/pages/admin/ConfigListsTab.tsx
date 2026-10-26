@@ -42,7 +42,7 @@ function LocationsCard() {
     setId(''); setName(''); setNote('');
   }
   async function handleDelete(locId: string) {
-    if (!confirm('Delete this location?')) return;
+    if (!confirm('Remove this location? It can only be removed once no account, house fellowship or record belongs to it. You will be told what is still there.')) return;
     setError(null);
     try {
       await deleteLocation.mutateAsync(locId);

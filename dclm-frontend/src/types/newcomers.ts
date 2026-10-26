@@ -7,6 +7,11 @@ export interface MilestoneStatus {
 }
 
 export interface Newcomer {
+  /** Away dates: no absence tasks are made between them. */
+  away_from?: string | null;
+  away_to?: string | null;
+  away_reason?: string;
+  away_note?: string;
   id: number;
   name: string;
   source: number;

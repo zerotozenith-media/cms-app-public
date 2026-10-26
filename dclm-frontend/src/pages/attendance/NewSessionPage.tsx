@@ -25,6 +25,7 @@ export function NewSessionPage() {
   const [editionName, setEditionName] = useState('');
   const [editionPlace, setEditionPlace] = useState('');
   const [error, setError] = useState('');
+  const [existing, setExisting] = useState<number | null>(null);
 
   if (meetingTypes && !meetingType && meetingTypes.length) { setMeetingType(meetingTypes[0].id); setMode(meetingTypes[0].usual_mode ?? 'online'); }
   if (locations && !location && locations.length) setLocation(locations[0].id);
@@ -41,7 +42,9 @@ export function NewSessionPage() {
       navigate(`/attendance/${created.id}`);
     } catch (err: any) {
       const d = err?.response?.data ?? {};
-      const first = Object.values(d)[0];
+      // O4: a session that already exists is named, with a way to open it.
+      setExisting(d.existing_id ? Number(([] as any[]).concat(d.existing_id)[0]) : null);
+      const first = d.detail ?? Object.values(d)[0];
       setError(first ? String(([] as any[]).concat(first)[0]) : 'The session could not be created. Try again.');
     }
   }
@@ -111,7 +114,7 @@ export function NewSessionPage() {
               <option value="in-person">In person</option>
             </select>
           </div>
-          {error && <p className="form-error" role="alert">{error}</p>}
+          {error && <p className="form-error" role="alert">{error}{existing && <> <a className="linkish" onClick={() => navigate(`/attendance/${existing}`)}>Open it</a></>}</p>}
           <Button type="submit" disabled={createSession.isPending}>
             {createSession.isPending ? 'Creating…' : 'Create session'}
           </Button>

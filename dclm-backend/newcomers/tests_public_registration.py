@@ -158,3 +158,65 @@ class PublicRegistrationTestCase(APITestCase):
         attempt = PublicRegistrationAttempt.objects.latest("id")
         self.assertTrue(attempt.successful)
         self.assertEqual(attempt.reason, "success")
+
+
+class RegistrationPerPhoneTests(APITestCase):
+    """P10 (review, 25 October 2026): visitors on the church Wi-Fi share one
+    address, so each phone is counted by itself."""
+
+    def setUp(self):
+        from core.models import Location
+        self.bh = Location.objects.get_or_create(id="bahrain", defaults={"name": "Bahrain HQ", "is_core": True})[0]
+        from newcomers.models import NewcomerSource
+        self.src = NewcomerSource.objects.get_or_create(name="QR code")[0]
+
+    def post(self, name, device):
+        import datetime as dt
+        loaded = (timezone.now() - dt.timedelta(seconds=30)).isoformat()
+        return self.client.post("/api/public/newcomer-registration/", {
+            "name": name, "phone": "", "email": "", "source": self.src.id, "form_loaded_at": loaded,
+            "device_id": device, "website": ""}, format="json", REMOTE_ADDR="10.0.0.1")
+
+    def test_many_phones_on_one_wifi_all_get_in(self):
+        for i in range(12):
+            r = self.post(f"Visitor {i}", f"phone-{i}")
+            self.assertEqual(r.status_code, 201, (i, r.data))
+
+    def test_one_phone_is_limited_and_an_administrator_can_lift_it(self):
+        from accounts.models import Role, RolePermission, User
+        for i in range(5):
+            self.assertEqual(self.post(f"Family {i}", "phone-a").status_code, 201)
+        self.assertEqual(self.post("Family 6", "phone-a").status_code, 429)
+        role = Role.objects.get_or_create(name="Administrator")[0]
+        for m in ("newcomers", "admin"):
+            RolePermission.objects.update_or_create(role=role, module=m, defaults=dict(can_view=True, can_edit=True))
+        admin = User.objects.create_user(email="adm@t.com", password="x", role=role)
+        self.client.force_authenticate(admin)
+        rows = self.client.get("/api/newcomers-registration-blocks/").data["results"]
+        self.assertEqual((rows[0]["device_id"], rows[0]["still_blocked"]), ("phone-a", True))
+        self.client.post("/api/newcomers-registration-blocks/", {"device_id": "phone-a"}, format="json")
+        self.client.force_authenticate(None)
+        self.assertEqual(self.post("Family 6", "phone-a").status_code, 201)
+
+
+class BulkAssignNewcomersTests(APITestCase):
+    """Item 13: several newcomers given one shepherd, same rules as one at a time."""
+
+    def test_assign_and_gender_rule(self):
+        from accounts.models import Role, RolePermission, User
+        bh = Location.objects.get_or_create(id="bahrain", defaults={"name": "Bahrain HQ", "is_core": True})[0]
+        src = NewcomerSource.objects.get_or_create(name="Walk-in")[0]
+        role = Role.objects.get_or_create(name="Follow-up")[0]
+        RolePermission.objects.update_or_create(role=role, module="newcomers", defaults=dict(can_view=True, can_edit=True))
+        me = User.objects.create_user(email="me@t.com", password="x", role=role)
+        henry = User.objects.create_user(email="h@t.com", password="x", can_shepherd=True, gender="Male", location=bh)
+        a = Newcomer.objects.create(name="Kofi A", source=src, location=bh, gender="Male", created_at=timezone.now(), stage_since=timezone.localdate())
+        b = Newcomer.objects.create(name="Ama B", source=src, location=bh, gender="Female", created_at=timezone.now(), stage_since=timezone.localdate())
+        self.client.force_authenticate(me)
+        r = self.client.post("/api/newcomers-bulk-assign/", {"newcomer_ids": [a.id, b.id], "shepherd_id": henry.id}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("Ama B (a woman)", r.data["detail"])
+        r = self.client.post("/api/newcomers-bulk-assign/", {"newcomer_ids": [a.id], "shepherd_id": henry.id}, format="json")
+        self.assertEqual(r.status_code, 200, r.data)
+        a.refresh_from_db()
+        self.assertEqual(a.assigned_to, henry)

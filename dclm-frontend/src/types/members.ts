@@ -39,6 +39,15 @@ export interface Member {
   /** What is wrong with their shepherd, such as "A man shepherds her",
    *  or empty when the pairing keeps the rules. */
   shepherd_problem?: string;
+  /** P4: Active, Moved away or Left, with the date and a note. */
+  status?: 'active' | 'moved-away' | 'left';
+  status_date?: string | null;
+  status_note?: string;
+  /** Away dates: no absence tasks are made between them. */
+  away_from?: string | null;
+  away_to?: string | null;
+  away_reason?: string;
+  away_note?: string;
 }
 
 /** Members whose shepherd breaks a rule, for the box at the top of Members. */
@@ -71,6 +80,8 @@ export interface MemberListParams {
   /** A household id, or "none" for members not linked to one. */
   household?: string;
   is_leader?: string;
+  /** P4: active by default; "all", "inactive", or one status. */
+  status?: string;
   ordering?: string;
   page?: number;
 }

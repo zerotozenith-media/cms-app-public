@@ -61,11 +61,17 @@ class CheckAbsencesCommandTestCase(TestCase):
         self.member_absent = Member.objects.create(surname="Noor", first_name="Fatima",
             location=self.bahrain, joined_date=datetime.date(2024, 1, 1), assigned_to=self.shepherd)
 
-    def _session(self, meeting_type, date=None):
-        return AttendanceSession.objects.create(
+    def _session(self, meeting_type, date=None, tick=False):
+        s = AttendanceSession.objects.create(
             meeting_type=meeting_type, date=date or self.service_date,
             location=self.bahrain, mode="in-person", status="pending",
         )
+        if tick:
+            # Names were taken: somebody is ticked present. Since review item
+            # O3 a service with nobody ticked is never treated as everyone
+            # absent.
+            AttendanceSessionMember.objects.create(session=s, member=self.member_present)
+        return s
 
     # --- Core behavior ---
 
@@ -85,10 +91,23 @@ class CheckAbsencesCommandTestCase(TestCase):
     def test_task_assigned_to_none_when_member_has_no_shepherd(self):
         unshepherded = Member.objects.create(surname="Karim", first_name="Ali", location=self.bahrain,
             joined_date=datetime.date(2023, 1, 1))  # no assigned_to
-        self._session(self.tracked_mt)
+        self._session(self.tracked_mt, tick=True)
         call_command("check_absences")
         task = MemberFollowUpTask.objects.get(member=unshepherded)
         self.assertIsNone(task.assigned_to)
+
+    def test_a_service_with_nobody_ticked_chases_nobody(self):
+        """Review item O3: a Pending service with no names used to count
+        everyone expected as absent. It now shows Names not taken."""
+        self._session(self.tracked_mt)
+        call_command("check_absences")
+        self.assertEqual(MemberFollowUpTask.objects.count(), 0)
+
+    def test_did_not_hold_is_never_checked(self):
+        s = self._session(self.tracked_mt, tick=True)
+        AttendanceSession.objects.filter(pk=s.pk).update(status="did-not-hold")
+        call_command("check_absences")
+        self.assertEqual(MemberFollowUpTask.objects.count(), 0)
 
     # --- The timing threshold is real, not decorative ---
 
@@ -121,7 +140,7 @@ class CheckAbsencesCommandTestCase(TestCase):
     # --- Idempotency: safe to re-run without duplicating ---
 
     def test_rerunning_on_the_same_session_does_not_duplicate(self):
-        self._session(self.tracked_mt)
+        self._session(self.tracked_mt, tick=True)
         call_command("check_absences")
         call_command("check_absences")
         call_command("check_absences")
@@ -130,25 +149,24 @@ class CheckAbsencesCommandTestCase(TestCase):
             "Running the command multiple times must not create duplicate tasks for the same session.",
         )
 
-    # --- The confirmed "don't stack tasks" rule, and its correct limit ---
+    # --- Tasks pile (Kay, 26 October 2026) ---
 
-    def test_second_different_session_absence_does_not_stack_while_first_is_open(self):
-        session1 = self._session(self.tracked_mt, date=self.service_date - datetime.timedelta(days=7))
+    def test_a_second_missed_service_gets_its_own_task_while_the_first_is_open(self):
+        session1 = self._session(self.tracked_mt, date=self.service_date - datetime.timedelta(days=7), tick=True)
         call_command("check_absences")
         self.assertEqual(MemberFollowUpTask.objects.filter(member=self.member_absent).count(), 1)
 
-        session2 = self._session(self.tracked_mt, date=self.service_date)
+        session2 = self._session(self.tracked_mt, date=self.service_date, tick=True)
         call_command("check_absences")
-        self.assertEqual(
-            MemberFollowUpTask.objects.filter(member=self.member_absent).count(), 1,
-            "A second, still-open task must not stack on top of an unresolved first one.",
-        )
+        tasks = MemberFollowUpTask.objects.filter(member=self.member_absent, done=False)
+        self.assertEqual(tasks.count(), 2, "Every missed service gets its own task, even with one still open.")
+        self.assertEqual(tasks.get(missed_session=session2).missed_in_row, 2)
 
     def test_new_absence_after_prior_task_resolved_creates_a_genuinely_new_task(self):
         """The distinction that actually matters: 'don't stack' should
         block piling up open tasks, not block real, separate follow-ups
         once the earlier one is actually resolved."""
-        session1 = self._session(self.tracked_mt, date=self.service_date - datetime.timedelta(days=7))
+        session1 = self._session(self.tracked_mt, date=self.service_date - datetime.timedelta(days=7), tick=True)
         call_command("check_absences")
         first_task = MemberFollowUpTask.objects.get(member=self.member_absent)
         first_task.done = True
@@ -156,7 +174,7 @@ class CheckAbsencesCommandTestCase(TestCase):
         first_task.contact_date = timezone.localdate()
         first_task.save()
 
-        session2 = self._session(self.tracked_mt, date=self.service_date)
+        session2 = self._session(self.tracked_mt, date=self.service_date, tick=True)
         call_command("check_absences")
         tasks = MemberFollowUpTask.objects.filter(member=self.member_absent)
         self.assertEqual(tasks.count(), 2, "A resolved prior task must not block a genuinely new absence.")
@@ -168,7 +186,7 @@ class CheckAbsencesCommandTestCase(TestCase):
         others = Location.objects.create(id="others", name="Others", note="Qatar")
         qatar_member = Member.objects.create(surname="Yusuf", first_name="Amina", location=others,
             joined_date=datetime.date(2023, 1, 1))
-        self._session(self.tracked_mt)  # Bahrain session
+        self._session(self.tracked_mt, tick=True)  # Bahrain session
         call_command("check_absences")
         self.assertFalse(MemberFollowUpTask.objects.filter(member=qatar_member).exists(),
             "A Bahrain session's roster must not include members from a different location.")

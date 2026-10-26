@@ -21,6 +21,10 @@ import { useLocationName } from '../../api/locations';
 
 import { useEligibleShepherds, useAddMemberTask } from '../../api/followup';
 import { canPair } from '../../lib/gender';
+import { HelpMark } from '../../components/ui/HelpMark';
+import { PersonTasks } from '../../components/accountability/PersonTasks';
+import { AwayModal } from '../../components/accountability/TaskModals';
+import { dayText } from '../../api/accountability';
 const CATEGORIES = ['General Member', 'Worker in Training', 'Worker'];
 
 function categoryBadgeColor(cat: string): 'green' | 'amber' | 'gray' {
@@ -65,6 +69,28 @@ export function MemberProfilePage() {
   const [formValues, setFormValues] = useState<MemberFormValues | null>(null);
   const [moveTarget, setMoveTarget] = useState('');
   const [editError, setEditError] = useState('');
+  const [awayOpen, setAwayOpen] = useState(false);
+  const [losses, setLosses] = useState<Record<string, number> | null>(null);
+  const [deleteErr, setDeleteErr] = useState('');
+  const [statusEdit, setStatusEdit] = useState<{ status: string; note: string } | null>(null);
+  const [statusError, setStatusError] = useState('');
+  async function saveStatus() {
+    if (!statusEdit) return;
+    setStatusError('');
+    if (statusEdit.status !== 'active' && !statusEdit.note.trim()) { setStatusError('Add a short note, for example where they moved to.'); return; }
+    try {
+      await updateMember.mutateAsync({ status: statusEdit.status, status_note: statusEdit.note } as any);
+      setStatusEdit(null);
+    } catch (err: any) {
+      const d = err?.response?.data ?? {};
+      setStatusError(String(([] as unknown[]).concat(d.status ?? d.status_note ?? d.detail ?? 'The status could not be saved.')[0]));
+    }
+  }
+  async function toggleLeader(on: boolean) {
+    setStatusError('');
+    try { await updateMember.mutateAsync({ is_leader: on } as any); }
+    catch { setStatusError('The leader tick could not be saved. Try again.'); }
+  }
 
   const { data: household } = useQuery({
     queryKey: ['household', member?.household],
@@ -126,10 +152,21 @@ export function MemberProfilePage() {
     }
   }
 
+  // P4: deleting removes their history, so the box says what goes and
+  // offers a status instead.
   async function handleDelete() {
-    if (!confirm('Delete this member?')) return;
-    await deleteMember.mutateAsync(memberId);
-    navigate('/members');
+    setDeleteErr('');
+    try { setLosses((await apiClient.get(`/members/${memberId}/delete-preview/`)).data); }
+    catch { setLosses({ check_ins: 0, follow_ups: 0, message_plans: 0, category_changes: 0, giving_kept: 0 }); }
+  }
+  async function deleteAnyway() {
+    setDeleteErr('');
+    try {
+      await deleteMember.mutateAsync(memberId);
+      navigate('/members');
+    } catch (err: any) {
+      setDeleteErr(err?.response?.data?.detail ?? 'This member could not be deleted.');
+    }
   }
 
   async function handleMove() {
@@ -180,9 +217,10 @@ export function MemberProfilePage() {
       </>
     ) },
     { key: 'journey', label: 'Journey', body: person ? (<><MilestoneChips p={person} /><JourneyTimeline p={person} /></>) : null },
-    { key: 'followups', label: 'Follow-ups', body: person ? (
+    { key: 'followups', label: 'Tasks', body: person ? (
       <>
-        <OpenFollowUps p={person} onOpen={(t) => navigate(t.kind === 'newcomer' ? `/newcomers/${person.newcomer_id}` : '/members/follow-up')} />
+        <PersonTasks type="member" personId={memberId} person={member.full_name} />
+        {person.newcomer_id && <OpenFollowUps p={{ ...person, open_follow_ups: (person.open_follow_ups ?? []).filter((t: any) => t.kind === 'newcomer') } as any} onOpen={() => navigate(`/newcomers/${person.newcomer_id}`)} />}
         {hasPermission('members', 'create') && (
           <AddMemberTask memberId={memberId} shepherdId={member.assigned_to ?? null}
             shepherds={(shepherds ?? []).filter((s: any) => canPair(member.gender, s.gender))}
@@ -221,6 +259,9 @@ export function MemberProfilePage() {
             <Badge color="green">Member</Badge>
             <Badge color={categoryBadgeColor(member.category)}>{member.category}</Badge>
             <Badge color="blue">{locationName(member.location)}</Badge>
+            {member.status && member.status !== 'active' && <Badge color="gray">{member.status === 'left' ? 'Left the church' : 'Moved away'}</Badge>}
+            {member.away_to && member.away_to >= new Date().toLocaleDateString('en-CA') && <Badge color="blue">Away until {dayText(member.away_to)}</Badge>}
+            {member.is_leader && <Badge color="green">Leader</Badge>}
           </div>
 
           {editing && formValues && locations && (
@@ -269,6 +310,41 @@ export function MemberProfilePage() {
               </span>
             )}
             {shepherdError && <p className="form-error" role="alert">{shepherdError}</p>}
+            <div className="pf">
+              <span>Status<HelpMark topic="faStatusMember" /></span>
+              {canEdit && !statusEdit ? (
+                <button className="linkish" onClick={() => setStatusEdit({ status: member.status ?? 'active', note: member.status_note ?? '' })}>
+                  {member.status === 'left' ? 'Left the church' : member.status === 'moved-away' ? 'Moved away' : 'Active'}
+                </button>
+              ) : !statusEdit && <b>{member.status === 'left' ? 'Left the church' : member.status === 'moved-away' ? 'Moved away' : 'Active'}</b>}
+            </div>
+            {statusEdit && (
+              <div className="fa-inline">
+                <div className="field"><label htmlFor="m-status">Status</label>
+                  <select id="m-status" value={statusEdit.status} onChange={(e) => setStatusEdit({ ...statusEdit, status: e.target.value })}>
+                    <option value="active">Active</option><option value="moved-away">Moved away</option><option value="left">Left the church</option>
+                  </select></div>
+                {statusEdit.status !== 'active' && <div className="field"><label htmlFor="m-status-note">Note</label>
+                  <input id="m-status-note" value={statusEdit.note} onChange={(e) => setStatusEdit({ ...statusEdit, note: e.target.value })} placeholder="For example: moved to Canada, October 2026" /></div>}
+                {statusEdit.status !== 'active' && <div className="muted fr-note">Their open tasks close and no more are made. They stay in the records and reports.</div>}
+                <div className="form-actions-row"><button className="btn sm" onClick={saveStatus} disabled={updateMember.isPending}>Save</button><button className="btn sm ghost" onClick={() => setStatusEdit(null)}>Cancel</button></div>
+              </div>
+            )}
+            {member.status && member.status !== 'active' && member.status_note && <div className="muted fr-note">{member.status_note}{member.status_date ? `, ${longDate(member.status_date)}` : ''}</div>}
+            <div className="pf">
+              <span>Away<HelpMark topic="faAway" /></span>
+              <span>
+                {member.away_to && member.away_to >= new Date().toLocaleDateString('en-CA') ? `${dayText(member.away_from)} to ${dayText(member.away_to)}` : 'No'}
+                {canEdit && <button className="linkish" style={{ marginLeft: 8 }} onClick={() => setAwayOpen(true)}>{member.away_to ? 'Change' : 'Mark away'}</button>}
+              </span>
+            </div>
+            <div className="pf">
+              <span>Leader<HelpMark topic="faLeader" /></span>
+              {canEdit ? (
+                <label className="fr-tick" style={{ margin: 0 }}><input type="checkbox" aria-label="Leader, expected at leadership meetings" checked={!!member.is_leader} onChange={(e) => toggleLeader(e.target.checked)} />Expected at leadership meetings</label>
+              ) : <b>{member.is_leader ? 'Yes' : 'No'}</b>}
+            </div>
+            {statusError && <p className="form-error" role="alert">{statusError}</p>}
             <div className="pf"><span>Household</span><span>{household?.name ?? 'None'}</span></div>
             <div className="pf"><span>Member since</span><span>{longDate(member.joined_date)}</span></div>
             {person?.first_came && <div className="pf"><span>First came</span><span>{longDate(person.first_came)}</span></div>}
@@ -277,6 +353,29 @@ export function MemberProfilePage() {
         </div>
         <PersonTabs tabs={tabs} />
       </div>
+      {awayOpen && <AwayModal type="member" id={memberId} name={member.full_name} current={member} onClose={() => setAwayOpen(false)} />}
+      {losses && (
+        <div className="fu-modal" role="dialog" aria-modal="true" aria-label={`Delete ${member.full_name}?`} onMouseDown={(e) => { if (e.target === e.currentTarget) setLosses(null); }}>
+          <div className="fu-box" style={{ maxWidth: 380 }}>
+            <h3 style={{ margin: '0 0 6px' }}>Delete {member.full_name}?</h3>
+            <p style={{ fontSize: '.88rem', margin: '0 0 8px' }}>This also removes for good:</p>
+            <ul style={{ fontSize: '.86rem', margin: '0 0 10px', paddingLeft: 18 }}>
+              <li>{losses.check_ins} attendance check-in{losses.check_ins === 1 ? '' : 's'}</li>
+              <li>{losses.follow_ups} follow-up{losses.follow_ups === 1 ? '' : 's'} and their visit records</li>
+              <li>{losses.message_plans} message plan{losses.message_plans === 1 ? '' : 's'}</li>
+              <li>their category history{losses.category_changes ? ` (${losses.category_changes} change${losses.category_changes === 1 ? '' : 's'})` : ''}</li>
+            </ul>
+            {losses.giving_kept > 0 && <p className="muted" style={{ fontSize: '.8rem', margin: '0 0 8px' }}>Their {losses.giving_kept} giving entr{losses.giving_kept === 1 ? 'y stays' : 'ies stay'} in Finance, without their name.</p>}
+            <div className="gender-notice" style={{ margin: '0 0 12px', fontSize: '.84rem' }}>If they have moved away or left the church, set their <b>Status</b> instead. That keeps their history.</div>
+            {deleteErr && <p className="form-error" role="alert">{deleteErr}</p>}
+            <div className="form-actions-row">
+              <button className="btn sm" onClick={() => { setLosses(null); setStatusEdit({ status: 'left', note: '' }); }}>Set status instead</button>
+              <button className="btn sm ghost" style={{ color: '#B42318' }} onClick={deleteAnyway} disabled={deleteMember.isPending}>Delete anyway</button>
+              <button className="btn sm ghost" onClick={() => setLosses(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

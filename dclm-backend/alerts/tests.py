@@ -80,13 +80,13 @@ class DeviceTests(AlertsBase):
     def test_choices_are_saved_and_only_relevant_kinds_shown(self):
         self.client.force_authenticate(self.gloria)
         kinds = [k["key"] for k in self.client.get("/api/alerts/settings/").data["kinds"]]
-        self.assertEqual(kinds, ["morning", "assigned", "announcements"])       # no Admin access
+        self.assertEqual(kinds, ["morning", "assigned", "announcements", "followup"])  # no Admin access, but she shepherds
         r = self.client.patch("/api/alerts/settings/", {"morning": False}, format="json")
         self.assertFalse(next(k for k in r.data["kinds"] if k["key"] == "morning")["on"])
         self.assertEqual(self.client.patch("/api/alerts/settings/", {"morning": "no"}, format="json").status_code, 400)
         self.client.force_authenticate(self.admin)
         kinds = [k["key"] for k in self.client.get("/api/alerts/settings/").data["kinds"]]
-        self.assertEqual(kinds, ["morning", "assigned", "arrivals", "weekly", "announcements"])
+        self.assertEqual(kinds, ["morning", "assigned", "arrivals", "weekly", "announcements", "followup"])
 
     def test_test_alert(self):
         self.assertEqual(self.client.post("/api/alerts/test/").status_code, 400)

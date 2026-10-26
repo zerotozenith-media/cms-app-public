@@ -132,7 +132,9 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
         return Response({
             "sessions_this_month": this_month.count(),
             "filled": base.filter(status="filled").count(),
-            "pending": base.filter(status="pending").count(),
+            # Only services whose day has come: one made early is Upcoming.
+            "pending": base.filter(status="pending", date__lte=today).count(),
+            "did_not_hold": base.filter(status="did-not-hold").count(),
         })
 
     @staticmethod
@@ -211,8 +213,14 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
                 if data.get("led_by"):
                     session.led_by_id = data["led_by"]
 
-            self._record_offering(session, data.get("offering") or {})
+            # O2 (review, 25 October 2026): only when the offering boxes were
+            # sent, so saving a headcount never rewrites giving corrected
+            # since.
+            if "offering" in request.data:
+                self._record_offering(session, data.get("offering") or {})
+            # Recording attendance shows the service did take place.
             session.status = AttendanceSession.Status.FILLED
+            session.not_held_reason = ""
             session.track_named = data["track_named"]
 
             log_audit(
@@ -239,6 +247,9 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
                     AttendanceSessionMember(session=session, member_id=mid)
                     for mid in data["attendee_ids"]
                 ])
+                # Ticked after their task was made: they were there.
+                from .absence import close_was_present
+                close_was_present(session, member_ids=data["attendee_ids"])
 
         return Response(AttendanceSessionSerializer(session).data)
 
@@ -246,7 +257,7 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
         # Manual check: undoing a check-in by tapping again was refused for
         # ushers, because the general rule treats any DELETE as deleting a
         # record. check_in applies its own rule (edit attendance) inside.
-        if getattr(self, "action", None) in ("check_in", "follow_up_absent"):
+        if getattr(self, "action", None) in ("check_in", "follow_up_absent", "did_not_hold"):
             from rest_framework.permissions import IsAuthenticated
             return [IsAuthenticated()]
         return super().get_permissions()
@@ -290,11 +301,20 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
         else:
             who = {"member_id": member_id}
 
+        if session.status == AttendanceSession.Status.DID_NOT_HOLD:
+            return Response(
+                {"detail": "This service is marked Did not hold, so nobody can be checked in. "
+                           "Undo Did not hold first if it did take place."}, status=400)
+        was_present = []
         if request.method == "POST":
             mode = request.data.get("mode", AttendanceSessionMember.Mode.IN_PERSON)
             if mode not in AttendanceSessionMember.Mode.values:
                 return Response({"mode": "Must be 'in-person' or 'online'."}, status=400)
             AttendanceSessionMember.objects.update_or_create(session=session, **who, defaults={"mode": mode})
+            # Ticked after their task was made: they were there.
+            from .absence import close_was_present
+            was_present = close_was_present(session, member_ids=[member_id] if member_id else [],
+                                            newcomer_ids=[newcomer_id] if newcomer_id else [])
         elif request.method == "DELETE":
             AttendanceSessionMember.objects.filter(session=session, **who).delete()
         elif request.method == "PATCH":
@@ -315,6 +335,7 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
         fresh_attendees = AttendanceSessionMember.objects.filter(session=session).select_related("member", "newcomer")
         return Response({
             "attendees": AttendanceSessionMemberSerializer(fresh_attendees, many=True).data,
+            "was_present": was_present,
         })
 
     @action(detail=True, methods=["get", "post"], url_path="follow-up-absent")
@@ -338,23 +359,59 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
             msg = "Tick who came first. With nobody ticked, everyone would be followed up."
             if request.method == "POST":
                 return Response({"detail": msg}, status=400)
-            return Response({"blocked": msg, "to_follow_up": 0, "names": [], "ticked": [], "already": 0,
+            return Response({"blocked": msg, "to_follow_up": 0, "names": [], "ticked": [], "already": 0, "newcomers": 0,
                              "open_elsewhere": 0, "tracked": bool(session.meeting_type.counts_for_absence)})
         names = lambda ms: [m.full_name for m in ms]
         if request.method == "POST":
-            made = create_tasks(session, p["to_follow_up"])
+            made = len(create_tasks(session, p["to_follow_up"], p["newcomers"]))
             log_audit(request.user, "Followed up absentees", "Attendance Session", str(session),
-                      f"{made} follow-up task(s) for members not ticked", instance=session)
+                      f"{made} follow-up task(s) for people not ticked", instance=session)
             return Response({"created": made}, status=201)
         from members.models import Member
         return Response({
-            "to_follow_up": len(p["to_follow_up"]),
-            "names": names(p["to_follow_up"]),
+            "to_follow_up": len(p["to_follow_up"]) + len(p["newcomers"]),
+            "names": names(p["to_follow_up"]) + [n.name for n in p["newcomers"]],
+            "newcomers": len(p["newcomers"]),
             "ticked": names(Member.objects.filter(id__in=p["ticked"]).order_by("surname", "first_name")),
             "already": len(p["already"]),
             "open_elsewhere": len(p["open_elsewhere"]),
             "tracked": bool(session.meeting_type.counts_for_absence),
         })
+
+    @action(detail=True, methods=["post", "delete"], url_path="did-not-hold")
+    def did_not_hold(self, request, pk=None):
+        """
+        Review item O3: mark a service that did not take place, with a
+        reason, such as a public holiday. It is then left out of the
+        absence check, the pending counts and the averages. DELETE undoes
+        it, back to waiting for attendance.
+        """
+        require(request.user, ("attendance", "can_edit"))
+        session = self.get_object()
+        name = str(session)
+        if request.method == "DELETE":
+            if session.status != AttendanceSession.Status.DID_NOT_HOLD:
+                return Response({"detail": "This service is not marked Did not hold."}, status=400)
+            session.status = AttendanceSession.Status.PENDING
+            session.not_held_reason = ""
+            session.save(update_fields=["status", "not_held_reason"])
+            log_audit(request.user, "Undid Did not hold", "Attendance Session", name, instance=session)
+            return Response(AttendanceSessionSerializer(session).data)
+        if session.date > timezone.localdate():
+            return Response({"detail": f"This service is on {session.date:%A %-d %B}. It can be marked "
+                                       f"Did not hold on the day or after."}, status=400)
+        if session.status == AttendanceSession.Status.FILLED or session.attendees.exists():
+            return Response({"detail": "Attendance is already recorded for this service, so it did "
+                                       "take place. Correct the attendance instead."}, status=400)
+        reason = (request.data.get("reason") or "").strip()
+        if not reason:
+            return Response({"reason": "Say why it did not hold, for example a public holiday. "
+                                       "The reason is kept with the service."}, status=400)
+        session.status = AttendanceSession.Status.DID_NOT_HOLD
+        session.not_held_reason = reason[:200]
+        session.save(update_fields=["status", "not_held_reason"])
+        log_audit(request.user, "Marked Did not hold", "Attendance Session", name, reason, instance=session)
+        return Response(AttendanceSessionSerializer(session).data)
 
     @action(detail=True, methods=["get"], url_path="newcomer-roster")
     def newcomer_roster(self, request, pk=None):

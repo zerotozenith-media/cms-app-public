@@ -17,7 +17,14 @@ KIND_LABELS = {
     "arrivals": ("New contacts and newcomers", "When someone contacts the church online or registers as a newcomer."),
     "weekly": ("Weekly summary", "Monday morning, how follow-up went last week. For leaders."),
     "announcements": ("Church announcements", "Messages sent by an administrator."),
+    "followup": ("Follow-up accountability", "Late tasks and reasons, the Review list, repeated absences, "
+                 "and reminders to tick names after a service."),
 }
+
+
+def _is_admin(user):
+    from core.followup_access import is_administrator
+    return is_administrator(user)
 
 
 def kinds_for(user):
@@ -28,6 +35,9 @@ def kinds_for(user):
     if user_can_view_module(user, "admin"):
         out.append("weekly")
     out.append("announcements")
+    if (getattr(user, "can_shepherd", False) or getattr(user, "is_followup_coordinator", False)
+            or user_has(user, "followup-review", "can_view") or _is_admin(user)):
+        out.append("followup")
     return out
 
 
@@ -191,3 +201,28 @@ class AnnouncementView(APIView):
                                         location_id=loc, sent_by=request.user, people=people, devices=devices)
         log_audit(request.user, "Sent an alert", "Alert", a.title, f"To {label}: {people} people, {devices} devices")
         return Response({"id": a.id, "people": people, "devices": devices}, status=201)
+
+
+class NoticesView(APIView):
+    """
+    The alerts kept in the app (Kay, 26 October 2026): the newest 50, and
+    how many are unread. POST marks them read: the ids given, or all.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from .models import Notice
+        qs = Notice.objects.filter(user=request.user)
+        rows = [{"id": n.id, "kind": n.kind, "title": n.title, "body": n.body, "url": n.url,
+                 "created_at": n.created_at, "read": bool(n.read_at)} for n in qs[:50]]
+        return Response({"unread": qs.filter(read_at__isnull=True).count(), "results": rows})
+
+    def post(self, request):
+        from django.utils import timezone
+        from .models import Notice
+        qs = Notice.objects.filter(user=request.user, read_at__isnull=True)
+        ids = request.data.get("ids")
+        if ids:
+            qs = qs.filter(id__in=ids)
+        n = qs.update(read_at=timezone.now())
+        return Response({"marked": n})

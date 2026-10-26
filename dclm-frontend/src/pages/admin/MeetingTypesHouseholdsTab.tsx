@@ -10,6 +10,7 @@ import { HelpMark } from '../../components/ui/HelpMark';
 
 import { useAuth } from '../../context/AuthContext';
 import { Skeleton } from '../../components/ui/Skeleton';
+import { MeetingSettingsModal } from '../../components/admin/MeetingSettingsModal';
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export function MeetingTypesHouseholdsTab() {
@@ -54,6 +55,7 @@ export function MeetingTypesHouseholdsTab() {
   const deleteHousehold = useDeleteHousehold();
 
   const [showMeetingForm, setShowMeetingForm] = useState(false);
+  const [settingsFor, setSettingsFor] = useState<string | null>(null);
   const [mtId, setMtId] = useState('');
   const [mtName, setMtName] = useState('');
   const [mtDay, setMtDay] = useState('');
@@ -182,6 +184,14 @@ export function MeetingTypesHouseholdsTab() {
                   <tr key={m.id}>
                     <td data-label="Meeting">
                       {m.name}
+                      <div className="muted" style={{ fontSize: '.76rem' }}>
+                        {m.start_time ? `Starts ${m.start_time.slice(0, 5)}` : 'No start time'}
+                        {m.frequency === 'weekly' && ` · created ${m.create_days_ahead ? `${m.create_days_ahead} day${m.create_days_ahead === 1 ? '' : 's'} before` : 'on the day'}`}
+                        {m.held_at && m.held_at.length > 0 && ` · ${(m.held_at_names ?? []).join(', ')}`}
+                      </div>
+                      {(m.setup_warnings ?? []).map((w) => (
+                        <div key={w} className="warn-line"><Icon name="alert" size={13} /> {w}</div>
+                      ))}
                       {!m.generates_sessions && m.frequency === 'weekly' && (
                         <div className="warn-line">
                           <Icon name="alert" size={13} /> No sessions are being generated.
@@ -239,12 +249,20 @@ export function MeetingTypesHouseholdsTab() {
                           : <span className="muted">No</span>}
                       </label>
                     </td>
-                    <td className="td-actions">{churchWide && <button className="icon-btn" title="Remove meeting" aria-label="Remove meeting" onClick={() => handleDeleteMeeting(m.id)}><Icon name="trash" size={14} /></button>}</td>
+                    <td className="td-actions">
+                      <button className="btn sm outline" style={{ marginRight: 6 }} onClick={() => setSettingsFor(m.id)}
+                        title="Start time, when sessions are created, and where it is held">Settings</button>
+                      {churchWide && <button className="icon-btn" title="Remove meeting" aria-label="Remove meeting" onClick={() => handleDeleteMeeting(m.id)}><Icon name="trash" size={14} /></button>}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
             {!meetingTypes && <Skeleton shape="rows" rows={4} />}
+            {settingsFor && meetingTypes?.find((m) => m.id === settingsFor) && (
+              <MeetingSettingsModal meeting={meetingTypes.find((m) => m.id === settingsFor)!} readOnly={!churchWide}
+                onClose={() => setSettingsFor(null)} />
+            )}
           </div>
         </div>
 

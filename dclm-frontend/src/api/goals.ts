@@ -21,8 +21,11 @@ export function useGoals() {
 export function useCreateGoal() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: { name: string; horizon: string; target: number; unit: string; target_date: string; measured_by: string }) =>
-      (await apiClient.post<Goal>('/goals/', {
+    mutationFn: async (payload: { name: string; horizon: string; target: number; unit: string; target_date: string; measured_by: string; auto?: Record<string, unknown> }) =>
+      (await apiClient.post<Goal>('/goals/', payload.auto ? {
+        ...payload, auto: undefined, ...payload.auto, tracking: 'auto',
+        source: 'Updates itself from the records in the app.',
+      } : {
         ...payload,
         tracking: 'manual',
         // Matches the demo's createGoal() exactly , the user is never

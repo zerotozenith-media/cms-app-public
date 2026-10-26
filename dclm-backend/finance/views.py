@@ -57,7 +57,8 @@ class ProjectViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
 class GivingViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
     module = "finance"
     permission_classes = [ModulePermission]
-    queryset = Giving.objects.select_related("fund", "method", "location", "project", "member")
+    queryset = Giving.objects.select_related("fund", "method", "location", "project", "member", "session",
+                                             "session__meeting_type")
     serializer_class = GivingSerializer
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ["date", "amount"]
@@ -88,7 +89,23 @@ class GivingViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
             f"{instance.fund.name} · {instance.amount}", instance=instance,
         )
 
+    @staticmethod
+    def _from_session(instance):
+        """O2 (review, 25 October 2026): an offering recorded on a service is
+        changed on that service, so the two never disagree."""
+        if instance.session_id:
+            from rest_framework.exceptions import ValidationError
+            s = instance.session
+            raise ValidationError({"detail": f"This was recorded on {s.meeting_type.name}, {s.date.day} {s.date:%B}. "
+                                             f"Open that session in Attendance to change it."})
+
+    def perform_update(self, serializer):
+        self._from_session(serializer.instance)
+        instance = serializer.save()
+        log_audit(self.request.user, "Changed", "Giving", f"{instance.fund.name} · {instance.amount}", instance=instance)
+
     def perform_destroy(self, instance):
+        self._from_session(instance)
         name = f"{instance.fund.name} · {instance.amount}"
         log_audit(self.request.user, "Deleted", "Giving", name)
         instance.delete()

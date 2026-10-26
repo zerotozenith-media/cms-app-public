@@ -82,6 +82,84 @@ class TodayView(APIView):
         return Response({"date": timezone.localdate().isoformat(), "results": rows})
 
 
+class MissedView(APIView):
+    """
+    Item 10 (Kay, 26 October 2026): planned messages from the last 14 days
+    not sent, or skipped. GET lists them; POST {enrolment, date, action:
+    "sent" with text, or "dismiss"} records it on that day's plan or takes
+    it off the list.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def _mine(self, user):
+        mine_all = oversees(user)
+        qs = Enrolment.objects.filter(status=Enrolment.Status.ACTIVE).select_related("newcomer", "member", "enquiry")
+        return [e for e in qs if (can_act(user, e) if mine_all else engine.owner(e) == user)]
+
+    def get(self, request):
+        if not can_follow_up(request.user):
+            return refuse()
+        rows = []
+        for e in self._mine(request.user):
+            p = e.person
+            name = getattr(p, "full_name", None) or p.name
+            who = engine.owner(e)
+            for m in engine.missed(e):
+                t = m["template"]
+                rows.append({
+                    "enrolment": e.id, "date": m["date"], "day": m["day"], "skipped": m["skipped"],
+                    "journey": e.journey, "journey_label": e.get_journey_display(),
+                    "person": {"name": name, "first": (getattr(p, "first_name", "") or name.split()[0]), "phone": p.phone or "",
+                               "kind": "member" if e.member_id else "newcomer" if e.newcomer_id else "enquiry", "id": p.id},
+                    "template": {"id": t.id, "theme": t.theme, "verse": t.verse, "reference": t.reference, "body": t.body,
+                                 "final": t.theme == "Final gentle message"},
+                    "next_service": engine.next_service(engine.location_id(e)),
+                    "follower": display_name(who) if who else "",
+                })
+        rows.sort(key=lambda r: (r["date"], r["person"]["name"]))
+        return Response({"results": rows})
+
+    def post(self, request):
+        import datetime
+        from django.utils.dateparse import parse_date
+        e = get_object_or_404(Enrolment, pk=request.data.get("enrolment"), status=Enrolment.Status.ACTIVE)
+        if not can_act(request.user, e):
+            return refuse()
+        d = parse_date(str(request.data.get("date") or ""))
+        today = timezone.localdate()
+        if not d or not (today - datetime.timedelta(days=engine.MISSED_DAYS) <= d < today):
+            return refuse("Choose a day in the last 14 days.", status.HTTP_400_BAD_REQUEST)
+        item = next((m for m in engine.missed(e) if m["date"] == d), None)
+        if item is None:
+            return refuse("That message is no longer missed. It may have been sent or dismissed already.",
+                          status.HTTP_400_BAD_REQUEST)
+        existing = e.log.filter(on_date=d, extra=False).first()
+        action = request.data.get("action")
+        if action == "dismiss":
+            if existing:
+                existing.dismissed = True
+                existing.save(update_fields=["dismissed"])
+            else:
+                MessageLog.objects.create(enrolment=e, day=item["day"], kind=MessageLog.Kind.SKIPPED, template=item["template"],
+                                          theme=item["template"].theme, sent_by=request.user, on_date=d, dismissed=True)
+            return Response({"dismissed": True})
+        if action == "sent":
+            text = (request.data.get("text") or "").strip()[:4000]
+            if not text:
+                return refuse("The message is empty.", status.HTTP_400_BAD_REQUEST)
+            if existing:
+                existing.kind, existing.text, existing.sent_by, existing.template = MessageLog.Kind.PLANNED, text, request.user, item["template"]
+                existing.theme = item["template"].theme
+                existing.save(update_fields=["kind", "text", "sent_by", "template", "theme"])
+            else:
+                MessageLog.objects.create(enrolment=e, day=item["day"], kind=MessageLog.Kind.PLANNED, template=item["template"],
+                                          theme=item["template"].theme, text=text, sent_by=request.user, on_date=d)
+            if item["template"].theme == "Final gentle message":
+                engine.end(e, "Plan completed with the final gentle message")
+            return Response({"sent": True})
+        return refuse("Choose Send now or Dismiss.", status.HTTP_400_BAD_REQUEST)
+
+
 class RecordView(APIView):
     """What the sender did today: sent, replied personally, own message, or skipped."""
     permission_classes = [IsAuthenticated]
@@ -228,6 +306,9 @@ class StartView(APIView):
         if person is None:
             return refuse("Not found.", status.HTTP_404_NOT_FOUND)
         kind = person._meta.model_name
+        if kind == "newcomer" and journey != "converts" and not person.keep_in_touch:
+            return refuse(f"{person.name} unticked Keep in touch on their form, so planned messages are not started. "
+                          f"Their shepherd can still message them personally.", status.HTTP_400_BAD_REQUEST)
         kw = {"newcomer": person} if kind == "newcomer" else {"member": person} if kind == "member" else {"enquiry": person}
         note = "Decision for Christ recorded" if journey == "converts" else "Started by " + display_name(request.user)
         if journey == "converts" and kind == "newcomer":
@@ -347,11 +428,14 @@ class SendExtraView(APIView):
         return Response({"id": log.id, **person_payload(e.person, request.user)}, status=status.HTTP_201_CREATED)
 
 
-def _startable(user):
-    """Newcomers at the user's location who are not on any journey."""
+def _startable(user, said_no=False):
+    """Newcomers at the user's location who are not on any journey. P5
+    (review, 25 October 2026): those who unticked Keep in touch on their
+    form are never started here; said_no lists them on their own."""
     from newcomers.models import Newcomer
     on = Enrolment.objects.filter(status=Enrolment.Status.ACTIVE, newcomer__isnull=False).values_list("newcomer_id", flat=True)
-    qs = Newcomer.objects.filter(stage__in=["new", "contacted", "attending"]).exclude(id__in=on).select_related("assigned_to")
+    qs = (Newcomer.objects.filter(stage__in=["new", "contacted", "attending"], keep_in_touch=not said_no)
+          .exclude(id__in=on).select_related("assigned_to"))
     loc = scope_location_id(user)
     return qs.filter(location_id=loc) if loc else qs
 
@@ -381,7 +465,10 @@ class StartManyView(APIView):
         rows = [{"id": n.id, "name": n.name, "stage": n.get_stage_display(),
                  "shepherd": display_name(n.assigned_to) if n.assigned_to else "", "has_phone": bool(n.phone)}
                 for n in _startable(request.user).order_by("name")]
-        return Response({"results": rows})
+        said_no = [{"id": n.id, "name": n.name, "stage": n.get_stage_display(),
+                    "shepherd": display_name(n.assigned_to) if n.assigned_to else "", "since": n.created_at}
+                   for n in _startable(request.user, said_no=True).order_by("name")]
+        return Response({"results": rows, "said_no": said_no})
 
     def post(self, request):
         if not user_has(request.user, "newcomers", "can_edit"):

@@ -152,3 +152,38 @@ def todays_entry(enrolment, today=None):
         "next_service": next_service(location_id(enrolment)),
         "done": None if not done else {"kind": done.kind, "text": done.text},
     }
+
+
+MISSED_DAYS = 14
+
+
+def day_on(enrolment, date):
+    """The plan day a past date was, counting the personal replies before
+    it, each of which moved the plan on a day."""
+    replies = enrolment.log.filter(kind=MessageLog.Kind.REPLY, extra=False, on_date__lt=date).count()
+    return max(1, (date - enrolment.started).days + 1 - replies)
+
+
+def missed(enrolment, today=None):
+    """
+    Item 10 (Kay, 26 October 2026): planned messages from the last 14 days
+    that were never sent, or were skipped, and not dismissed. Oldest first.
+    """
+    import datetime
+    today = today or timezone.localdate()
+    out = []
+    first = max(enrolment.started, today - datetime.timedelta(days=MISSED_DAYS))
+    logs = {l.on_date: l for l in enrolment.log.filter(on_date__gte=first, on_date__lt=today, extra=False)}
+    d = first
+    while d < today:
+        if enrolment.ended_on and d >= enrolment.ended_on:
+            break
+        log = logs.get(d)
+        if log is None or (log.kind == MessageLog.Kind.SKIPPED and not log.dismissed):
+            if log is None or not log.dismissed:
+                day = log.day if log else day_on(enrolment, d)
+                tpl = due_template(enrolment, day)
+                if tpl:
+                    out.append({"date": d, "day": day, "template": tpl, "skipped": log is not None})
+        d += datetime.timedelta(days=1)
+    return out

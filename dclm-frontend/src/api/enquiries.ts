@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from './client';
-import type { PaginatedResponse } from '../types/members';
+import { apiClient, getAllPages } from './client';
 import type {
   Enquiry, EnquirySource, EnquiryTask, EnquiryStats, EnquiryStage,
 } from '../types/enquiries';
@@ -16,12 +15,11 @@ export function useEnquiries(params: { stage?: string; source?: number; search?:
   return useQuery({
     queryKey: ['enquiries', params],
     queryFn: async () => {
-      const query: Record<string, string> = { page_size: '200' };
+      const query: Record<string, string> = {};
       if (params.stage) query.stage = params.stage;
       if (params.source !== undefined) query.source = String(params.source);
       if (params.search) query.search = params.search;
-      const resp = await apiClient.get<PaginatedResponse<Enquiry>>('/enquiries/', { params: query });
-      return resp.data.results;
+      return getAllPages<Enquiry>('/enquiries/', query);
     },
   });
 }
@@ -105,11 +103,10 @@ export function useEnquiryTasks(params: { enquiry?: number; done?: boolean } = {
   return useQuery({
     queryKey: ['enquiry-tasks', params],
     queryFn: async () => {
-      const query: Record<string, string> = { page_size: '200' };
+      const query: Record<string, string> = {};
       if (params.enquiry !== undefined) query.enquiry = String(params.enquiry);
       if (params.done !== undefined) query.done = String(params.done);
-      const resp = await apiClient.get<PaginatedResponse<EnquiryTask>>('/enquiry-tasks/', { params: query });
-      return resp.data.results;
+      return getAllPages<EnquiryTask>('/enquiry-tasks/', query);
     },
   });
 }

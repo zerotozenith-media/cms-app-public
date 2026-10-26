@@ -25,7 +25,8 @@ def morning(now=None):
     from .models import AlertSettings
     from .push import send
     now = timezone.localtime(now or timezone.now())
-    if now.time() < MORNING:
+    from core.followup_rules import rules
+    if now.time() < rules().morning_alert_time:
         return 0
     today = now.date()
     sent = 0
@@ -68,7 +69,8 @@ def weekly(now=None):
             + NewcomerTask.objects.filter(done=True, contact_date__gte=week_ago).count())
     open_m = MemberFollowUpTask.objects.filter(done=False)
     open_n = NewcomerTask.objects.filter(done=False)
-    overdue = open_m.filter(due_date__lt=today).count() + open_n.filter(due_date__lt=today).count()
+    from core.followup_rules import late_q
+    overdue = open_m.filter(late_q()).count() + open_n.filter(late_q()).count()
     nobody = open_m.filter(assigned_to__isnull=True).count() + open_n.filter(assigned_to__isnull=True, newcomer__assigned_to__isnull=True).count()
     body = (f"{done} follow-up{'' if done == 1 else 's'} done last week. "
             f"{overdue} overdue, {nobody} with nobody. Tap for the dashboard.")

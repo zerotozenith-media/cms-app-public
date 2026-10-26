@@ -67,3 +67,19 @@ def arrival(kind, obj, by=None):
         body = f"{obj.name} registered{' at ' + where if where else ''}{who}."
         url = f"/newcomers/{obj.pk}"
     send_later(ids, "arrivals", title, body, url, tag=f"{kind}-{obj.pk}")
+
+
+def notify(user_ids, title, body, url="/", tag=None, kind="followup"):
+    """
+    Keep an alert in the app for each person, and send it to their phones
+    if they have phone alerts on (Kay, 26 October 2026). Kept even when
+    the phone is off, so nothing depends on a phone.
+    """
+    from .models import Notice
+    ids = sorted({i for i in ([user_ids] if isinstance(user_ids, int) else user_ids) if i})
+    if not ids:
+        return 0
+    Notice.objects.bulk_create([Notice(user_id=i, kind=kind, title=title[:120], body=body[:400], url=url or "/")
+                                for i in ids])
+    send_later(ids, kind, title, body, url, tag)
+    return len(ids)
