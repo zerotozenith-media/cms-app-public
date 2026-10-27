@@ -9,6 +9,7 @@ import './styles/design-system.css';
 import './styles/app.css';
 import { registerServiceWorker } from './lib/push';
 import { RefusalToast, reportRefusal } from './components/ui/RefusalToast';
+import { reloadOnceForUpdate } from './lib/lazyPage';
 
 /**
  * F11. Lists keep showing while a filter or page changes, with a thin bar
@@ -41,6 +42,10 @@ const queryClient: QueryClient = new QueryClient({
 });
 
 registerServiceWorker();
+
+// After an update the old page files are gone: reload once to get the new
+// version rather than failing (Kay, 27 October 2026).
+window.addEventListener('vite:preloadError', (e) => { if (reloadOnceForUpdate()) e.preventDefault(); });
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

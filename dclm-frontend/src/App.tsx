@@ -1,49 +1,59 @@
-import { TeamListPage } from './components/service/ServiceBadge';
-import { FollowUpMessagesPage } from './pages/newcomers/FollowUpMessagesPage';
+import { Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
+import { lazyPage } from './lib/lazyPage';
 import { AppShell } from './components/layout/AppShell';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
-import { ResetPasswordPage } from './pages/ResetPasswordPage';
-import { MyProfilePage } from './pages/MyProfilePage';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
-import { MembersListPage } from './pages/members/MembersListPage';
-import { MemberFollowUpTab } from './pages/members/MemberFollowUpTab';
-import { MemberProfilePage } from './pages/members/MemberProfilePage';
-import { AddMemberPage } from './pages/members/AddMemberPage';
-import { AttendanceListPage } from './pages/attendance/AttendanceListPage';
-import { NewSessionPage } from './pages/attendance/NewSessionPage';
-import { SessionRecordPage } from './pages/attendance/SessionRecordPage';
-import { LiveCheckInPage } from './pages/attendance/LiveCheckInPage';
-import { NewcomersListPage } from './pages/newcomers/NewcomersListPage';
-import { EnquiriesPage } from './pages/enquiries/EnquiriesPage';
-import { AddEnquiryPage } from './pages/enquiries/AddEnquiryPage';
-import { EnquiryProfilePage } from './pages/enquiries/EnquiryProfilePage';
-import { OutreachPage } from './pages/enquiries/OutreachPage';
-import { NewcomerFollowUpTab } from './pages/newcomers/NewcomerFollowUpTab';
-import { NewcomerProfilePage } from './pages/newcomers/NewcomerProfilePage';
-import { ManualEntryPage } from './pages/newcomers/ManualEntryPage';
-import { QrRegistrationPage } from './pages/newcomers/QrRegistrationPage';
-import { FinancePage } from './pages/finance/FinancePage';
-import { GoalsPage } from './pages/goals/GoalsPage';
-import { ReportsPage } from './pages/reports/ReportsPage';
-import { AdminPage } from './pages/admin/AdminPage';
-import { PublicRegistrationPage } from './pages/PublicRegistrationPage';
-import { HelpPage } from './pages/HelpPage';
-import { MyFollowUpPage } from './pages/followup/MyFollowUpPage';
-import { FollowUpReviewPage } from './pages/followup/FollowUpReviewPage';
+import { TeamListPage } from './components/service/ServiceBadge';
+import { PageLoadBoundary } from './components/ui/PageLoadBoundary';
+
+
+// Opened only when needed, so signing in downloads less (Kay, 27 October 2026).
+const FollowUpMessagesPage = lazyPage(() => import('./pages/newcomers/FollowUpMessagesPage'), 'FollowUpMessagesPage');
+const ForgotPasswordPage = lazyPage(() => import('./pages/ForgotPasswordPage'), 'ForgotPasswordPage');
+const ResetPasswordPage = lazyPage(() => import('./pages/ResetPasswordPage'), 'ResetPasswordPage');
+const MyProfilePage = lazyPage(() => import('./pages/MyProfilePage'), 'MyProfilePage');
+const MembersListPage = lazyPage(() => import('./pages/members/MembersListPage'), 'MembersListPage');
+const MemberFollowUpTab = lazyPage(() => import('./pages/members/MemberFollowUpTab'), 'MemberFollowUpTab');
+const MemberProfilePage = lazyPage(() => import('./pages/members/MemberProfilePage'), 'MemberProfilePage');
+const AddMemberPage = lazyPage(() => import('./pages/members/AddMemberPage'), 'AddMemberPage');
+const AttendanceListPage = lazyPage(() => import('./pages/attendance/AttendanceListPage'), 'AttendanceListPage');
+const NewSessionPage = lazyPage(() => import('./pages/attendance/NewSessionPage'), 'NewSessionPage');
+const SessionRecordPage = lazyPage(() => import('./pages/attendance/SessionRecordPage'), 'SessionRecordPage');
+const LiveCheckInPage = lazyPage(() => import('./pages/attendance/LiveCheckInPage'), 'LiveCheckInPage');
+const NewcomersListPage = lazyPage(() => import('./pages/newcomers/NewcomersListPage'), 'NewcomersListPage');
+const EnquiriesPage = lazyPage(() => import('./pages/enquiries/EnquiriesPage'), 'EnquiriesPage');
+const AddEnquiryPage = lazyPage(() => import('./pages/enquiries/AddEnquiryPage'), 'AddEnquiryPage');
+const EnquiryProfilePage = lazyPage(() => import('./pages/enquiries/EnquiryProfilePage'), 'EnquiryProfilePage');
+const OutreachPage = lazyPage(() => import('./pages/enquiries/OutreachPage'), 'OutreachPage');
+const NewcomerFollowUpTab = lazyPage(() => import('./pages/newcomers/NewcomerFollowUpTab'), 'NewcomerFollowUpTab');
+const NewcomerProfilePage = lazyPage(() => import('./pages/newcomers/NewcomerProfilePage'), 'NewcomerProfilePage');
+const ManualEntryPage = lazyPage(() => import('./pages/newcomers/ManualEntryPage'), 'ManualEntryPage');
+const QrRegistrationPage = lazyPage(() => import('./pages/newcomers/QrRegistrationPage'), 'QrRegistrationPage');
+const FinancePage = lazyPage(() => import('./pages/finance/FinancePage'), 'FinancePage');
+const GoalsPage = lazyPage(() => import('./pages/goals/GoalsPage'), 'GoalsPage');
+const ReportsPage = lazyPage(() => import('./pages/reports/ReportsPage'), 'ReportsPage');
+const AdminPage = lazyPage(() => import('./pages/admin/AdminPage'), 'AdminPage');
+const PublicRegistrationPage = lazyPage(() => import('./pages/PublicRegistrationPage'), 'PublicRegistrationPage');
+const HelpPage = lazyPage(() => import('./pages/HelpPage'), 'HelpPage');
+const MyFollowUpPage = lazyPage(() => import('./pages/followup/MyFollowUpPage'), 'MyFollowUpPage');
+const FollowUpReviewPage = lazyPage(() => import('./pages/followup/FollowUpReviewPage'), 'FollowUpReviewPage');
+
+const LOADING = <div className="empty" role="status">Loading…</div>;
 
 function page(title: string, module: string | undefined, children: React.ReactNode) {
   return (
     <ProtectedRoute requiredModule={module}>
-      <AppShell pageTitle={title}>{children}</AppShell>
+      <AppShell pageTitle={title}><PageLoadBoundary><Suspense fallback={LOADING}>{children}</Suspense></PageLoadBoundary></AppShell>
     </ProtectedRoute>
   );
 }
 
 export default function App() {
   return (
+    <PageLoadBoundary>
+    <Suspense fallback={LOADING}>
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -83,5 +93,7 @@ export default function App() {
       {/* No requiredModule: the guide is for everyone, whatever their role. */}
       <Route path="/help" element={page('Help & Guide', undefined, <HelpPage />)} />
     </Routes>
+    </Suspense>
+    </PageLoadBoundary>
   );
 }

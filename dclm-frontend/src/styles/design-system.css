@@ -424,6 +424,7 @@
     .toolbar .tabs{justify-content:stretch}
     .toolbar .tabs .tab{flex:1;text-align:center}
     .side-close{display:inline-flex}
+    .side-brand{padding-right:60px}
     .topbar{padding:10px 16px}
 
     /* card-list table transform */

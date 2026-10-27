@@ -8,7 +8,7 @@ import { useOutstanding } from '../../api/notifications';
 import { useMarkNoticesRead, useNotices, whenText } from '../../api/accountability';
 import { openManual } from '../../api/help';
 import type { HelpMsg } from '../../api/help';
-import { helpForPath, slug } from '../../help/content';
+import { helpForPath, slug } from '../../help/pages';
 
 /** Closes a popover when the person taps elsewhere or presses Escape. */
 function usePopover() {
