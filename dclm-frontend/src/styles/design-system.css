@@ -1349,3 +1349,42 @@ td.td-actions .icon-btn + .icon-btn,.row-actions .icon-btn + .icon-btn,td.td-act
   .tb-badge{width:32px;height:32px;min-width:32px}
   .tb-badge .tb-face.sm{width:28px;height:28px;font-size:.7rem}
 }
+
+/* Month-end balance (Kay, 30 October 2026). */
+.me-steps{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 14px}
+.me-step{flex:1 1 180px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:.82rem;background:#fff}
+.me-step.on{border-color:var(--blue);background:var(--sky)}
+.me-table{width:100%;max-width:680px;border-collapse:collapse}
+.me-table td{padding:10px 6px;border-bottom:1px solid var(--line);vertical-align:middle;font-size:.9rem}
+.me-table tr.me-total td{border-top:2px solid var(--ink)}
+.me-amt{text-align:right;white-space:nowrap}
+.me-sub{font-size:.78rem;margin-top:2px}
+.me-form,.me-actions{max-width:680px;margin-top:14px}
+.me-two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.me-notice{max-width:680px;margin:10px 0;font-size:.86rem}
+.me-warn{border-left:4px solid var(--amber)}
+.me-ok{border-left:4px solid var(--green)}
+.me-gap{font-size:.82rem;margin-top:10px}
+.me-actions .btn{margin:0 10px 8px 0}
+.me-reopen{border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:8px;background:var(--sky-2)}
+@media (max-width:600px){.me-two{grid-template-columns:1fr}.me-actions .btn{width:100%;margin-right:0}}
+.gender-notice.me-ok{background:#EAF6EE;border-color:#BFE3CB;color:var(--ink)}
+.me-label{display:inline-flex;align-items:center;flex-wrap:wrap;gap:2px 0}
+
+/* v11.16: Go to Journey note in the newcomer edit form, search boxes, check-in filters */
+.edit-journey-note{background:#EEF4FF;border-left:4px solid var(--blue);border-radius:6px;padding:9px 10px;font-size:.84rem;margin:4px 0 12px}
+.rc-go{display:flex;margin:2px 0 0;min-height:36px;padding:4px 0}
+.nc-search{width:100%;margin-top:12px}
+.enq-search .search{width:100%;margin-top:6px}
+.enq-search .field-note{margin-top:6px}
+@media (max-width:620px){
+  .viewtoggle{display:flex;width:100%}
+  .viewtoggle button{flex:1}
+}
+.who-chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}
+.who-chip{border:1px solid var(--line);background:#fff;color:var(--text,#14213d);border-radius:18px;padding:7px 12px;font:inherit;font-size:.82rem;font-weight:600;cursor:pointer;min-height:36px}
+.who-chip.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.named-row{display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid var(--line);font-size:.88rem;cursor:pointer}
+.named-list .checkin-group{margin-top:6px}
+.nc-stage-tag{display:inline-block;font-size:.7rem;font-weight:700;background:var(--amber-bg,#FFF3D6);color:#7a5200;border-radius:8px;padding:1px 7px;vertical-align:middle}
+.checkin-more{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-top:12px;font-size:.82rem}

@@ -73,7 +73,16 @@ class EnquiryViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         before = serializer.instance.assigned_to_id
+        # Details edited from the pencil on the enquiry (Kay, 31 October
+        # 2026) are audited, naming what changed.
+        labels = {"name": "Name", "phone": "Phone", "email": "Email", "social_handle": "Social handle",
+                  "area": "Where they are", "enquiry_text": "What they asked"}
+        old = {f: getattr(serializer.instance, f) for f in labels}
         instance = serializer.save()
+        changed = [labels[f] for f in labels if getattr(instance, f) != old[f]]
+        if changed:
+            log_audit(self.request.user, "Updated", "Enquiry", instance.name,
+                      ", ".join(changed) + " changed", instance=instance)
         if instance.assigned_to_id and instance.assigned_to_id != before:
             from alerts.events import given
             given([("contact", instance.pk, instance.name, instance.assigned_to_id)], by=self.request.user)

@@ -343,3 +343,23 @@ class CampaignTestCase(APITestCase):
         self.client.force_authenticate(user=self.admin)
         self.client.post("/api/campaigns/", {"name": "Easter 2027", "spend": "50.000"})
         self.assertTrue(AuditLog.objects.filter(entity_type="Campaign", entity_name="Easter 2027").exists())
+
+
+class EnquiryEditDetails(EnquiryAPITestCase):
+    """The pencil on an enquiry (Kay, 31 October 2026)."""
+    def test_details_can_be_corrected_and_are_audited(self):
+        from accounts.models import AuditLog
+        e = self._enquiry()
+        r = self.client.patch(f"/api/enquiries/{e.id}/", {"name": "Joy Mensah-Ofori", "phone": "+973 3312 4455",
+                                                          "area": "Riffa"}, format="json")
+        self.assertEqual(r.status_code, 200, r.data)
+        e.refresh_from_db()
+        self.assertEqual((e.name, e.phone, e.area, e.social_handle), ("Joy Mensah-Ofori", "+973 3312 4455", "Riffa", "@joy"))
+        log = AuditLog.objects.filter(action="Updated", entity_type="Enquiry").latest("id")
+        self.assertIn("Name, Phone, Where they are changed", log.details)
+
+    def test_every_way_to_reach_them_cannot_be_removed(self):
+        e = self._enquiry()
+        r = self.client.patch(f"/api/enquiries/{e.id}/", {"social_handle": ""}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("at least one way to reach them", str(r.data))

@@ -57,6 +57,7 @@ export function RolePermissionMatrix({ role, readOnly = false }: { role: Role; r
                 <td data-label="Module" style={{ textTransform: MODULE_LABELS[moduleName] ? 'none' : 'capitalize' }}>
                   {MODULE_LABELS[moduleName] ?? moduleName}
                   {moduleName === 'followup-review' && <HelpMark topic="fuReviewModule" />}
+                  {moduleName === 'monthend' && <HelpMark topic="monthendModule" />}
                 </td>
                 {ACTIONS.map((action) => (
                   <td data-label={ACTION_LABELS[action]} key={action}>

@@ -1,6 +1,7 @@
 import { Skeleton } from '../../components/ui/Skeleton';
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { WhoChips, NEWCOMER_STAGE, PAGE, type Who } from '../../components/attendance/WhoChips';
 import { useSession, useCheckIn, useCheckOut, useSetCheckInMode, useNewcomerRoster, useAbsentPreview, useFollowUpAbsent, type RosterNewcomer } from '../../api/attendance';
 import { useMemberRoster } from '../../api/members';
 import { Icon } from '../../components/ui/Icon';
@@ -28,6 +29,11 @@ export function LiveCheckInPage() {
   const setMode = useSetCheckInMode(sessionId);
 
   const [query, setQuery] = useState('');
+  // Everyone / Members / Newcomers / Not ticked, and 50 rows at a time
+  // (Kay, 31 October 2026), so nobody scrolls past every member to find
+  // the newcomers.
+  const [who, setWho] = useState<Who>('everyone');
+  const [limit, setLimit] = useState(PAGE);
   // A tap that fails says so, rather than leaving the row silently unchanged.
   const [tapError, setTapError] = useState('');
   const [presentNote, setPresentNote] = useState<string[]>([]);
@@ -72,7 +78,24 @@ export function LiveCheckInPage() {
   // The absence check looks at services up to 7 days old.
   const recentAbsence = past && !!session.counts_for_absence && daysAgo <= 7;
   const total = (roster?.length ?? 0) + (ncRoster?.results.length ?? 0);
-  const anyVisible = CATEGORY_ORDER.some((c) => grouped[c].length > 0) || newcomers.length > 0;
+  // Who is shown: the chip chosen, then the first `limit` rows,
+  // newcomers first as there are few of them and they are easy to miss.
+  const memberRows = CATEGORY_ORDER.reduce((sum, c) => sum + grouped[c].length, 0);
+  const memberTicked = CATEGORY_ORDER.reduce((sum, c) => sum + grouped[c].filter((m) => attendeeByMember.has(m.id)).length, 0);
+  const ncPick = who === 'members' ? [] : newcomers.filter((n) => who !== 'unticked' || !attendeeByNewcomer.has(n.id));
+  const memPick: [string, Member[]][] = who === 'newcomers' ? [] : CATEGORY_ORDER
+    .map((c) => [c, grouped[c].filter((m) => who !== 'unticked' || !attendeeByMember.has(m.id))] as [string, Member[]])
+    .filter(([, rows]) => rows.length > 0);
+  const matching = ncPick.length + memPick.reduce((sum, [, rows]) => sum + rows.length, 0);
+  let budget = limit;
+  const shownNewcomers = ncPick.slice(0, budget); budget -= shownNewcomers.length;
+  const shownGroups: [string, Member[]][] = [];
+  for (const [cat, rows] of memPick) {
+    if (budget <= 0) break;
+    shownGroups.push([cat, rows.slice(0, budget)]); budget -= Math.min(rows.length, budget);
+  }
+  const hiddenCount = Math.max(0, matching - limit);
+  const anyVisible = matching > 0;
 
   function toggle(member: Member) {
     // Each tap is its own request. Several ushers on different doors work
@@ -152,62 +175,22 @@ export function LiveCheckInPage() {
           style={{ width: '100%', marginTop: 10 }}
           placeholder="Search members and newcomers..."
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => { setQuery(e.target.value); setLimit(PAGE); }}
         />
       </div>
 
       <div className="card section-gap">
-        {anyVisible ? CATEGORY_ORDER.map((cat) => {
-          const rows = grouped[cat];
-          if (!rows.length) return null;
-          return (
-            <div key={cat}>
-              <div className="checkin-group">{cat}</div>
-              {rows.map((m) => {
-                const att = attendeeByMember.get(m.id);
-                const online = att?.mode === 'online';
-                return (
-                  <div
-                    key={m.id}
-                    className={`checkin-row${att ? ' checked' : ''}`}
-                    aria-pressed={!!att}
-                    onClick={() => toggle(m)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(m); } }}
-                  >
-                    <span className="avatar" style={att ? { background: 'var(--green-bg)', color: 'var(--green)' } : undefined}>
-                      {att ? <Icon name="check" size={18} /> : m.full_name.charAt(0)}
-                    </span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <b>{m.full_name}</b>
-                      <div className="muted" style={{ fontSize: '.78rem' }}>
-                        {att ? `Checked in · ${online ? 'Online' : 'In person'}` : 'Not checked in'}
-                      </div>
-                    </div>
-                    {att && (
-                      <button
-                        className="btn sm outline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setMode.mutate({ memberId: m.id, mode: online ? 'in-person' : 'online' }, { onError: failed });
-                        }}
-                      >
-                        {online ? 'Mark in person' : 'Mark online'}
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        }).concat(newcomers.length ? [
-          <div key="newcomers" className="checkin-newcomers">
+        <WhoChips value={who} onChange={(w) => { setWho(w); setLimit(PAGE); }} counts={{
+          everyone: memberRows + newcomers.length, members: memberRows, newcomers: newcomers.length,
+          unticked: memberRows - memberTicked + newcomers.filter((n) => !attendeeByNewcomer.has(n.id)).length,
+        }} />
+        {shownNewcomers.length > 0 && (
+          <div className="checkin-newcomers">
             <div className="checkin-group">Newcomers</div>
             <p className="muted checkin-newcomers-note">
               Tap a newcomer as you would a member. Their Friday attendance builds up on their profile, towards membership.
             </p>
-            {newcomers.map((n) => {
+            {shownNewcomers.map((n) => {
               const att = attendeeByNewcomer.get(n.id);
               const online = att?.mode === 'online';
               return (
@@ -224,7 +207,7 @@ export function LiveCheckInPage() {
                     {att ? <Icon name="check" size={18} /> : n.name.charAt(0)}
                   </span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <b>{n.name}</b>
+                    <b>{n.name}</b> <span className="nc-stage-tag">Newcomer, {NEWCOMER_STAGE[n.stage] ?? n.stage}</span>
                     <div className="muted" style={{ fontSize: '.78rem' }}>
                       {att ? `Checked in · ${online ? 'Online' : 'In person'}` : 'Not checked in'}{fridays(n, !!att)}
                     </div>
@@ -243,10 +226,63 @@ export function LiveCheckInPage() {
                 </div>
               );
             })}
-          </div>,
-        ] : []) : (
+          </div>
+        )}
+        {shownGroups.map(([cat, rows]) => (
+          <div key={cat}>
+            <div className="checkin-group">{cat}</div>
+            {rows.map((m) => {
+              const att = attendeeByMember.get(m.id);
+              const online = att?.mode === 'online';
+              return (
+                <div
+                  key={m.id}
+                  className={`checkin-row${att ? ' checked' : ''}`}
+                  aria-pressed={!!att}
+                  onClick={() => toggle(m)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(m); } }}
+                >
+                  <span className="avatar" style={att ? { background: 'var(--green-bg)', color: 'var(--green)' } : undefined}>
+                    {att ? <Icon name="check" size={18} /> : m.full_name.charAt(0)}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <b>{m.full_name}</b>
+                    <div className="muted" style={{ fontSize: '.78rem' }}>
+                      {att ? `Checked in · ${online ? 'Online' : 'In person'}` : 'Not checked in'}
+                    </div>
+                  </div>
+                  {att && (
+                    <button
+                      className="btn sm outline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMode.mutate({ memberId: m.id, mode: online ? 'in-person' : 'online' }, { onError: failed });
+                      }}
+                    >
+                      {online ? 'Mark in person' : 'Mark online'}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+        {!anyVisible && (
           <div className="empty">
-            {query ? 'Nobody matches this search.' : 'No members or newcomers at this location yet.'}
+            {who === 'unticked' ? 'Everyone here is checked in.'
+              : who === 'newcomers' ? (query ? 'No newcomers match this search.' : 'No newcomers are being followed up at this location.')
+              : who === 'members' ? (query ? 'No members match this search.' : 'No members at this location yet.')
+              : query ? 'Nobody matches this search.' : 'No members or newcomers at this location yet.'}
+          </div>
+        )}
+        {hiddenCount > 0 && (
+          <div className="checkin-more">
+            <span className="muted">Showing {matching - hiddenCount} of {matching}. Search to find someone quickly.</span>
+            <button type="button" className="btn sm outline" onClick={() => setLimit(limit + PAGE)}>
+              Show {Math.min(PAGE, hiddenCount)} more
+            </button>
           </div>
         )}
       </div>

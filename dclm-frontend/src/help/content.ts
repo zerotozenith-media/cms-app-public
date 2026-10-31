@@ -7,7 +7,7 @@
  * in one place only. "Why can't I...?" answers every message where the app
  * says no, in the app's own words, so nobody has to ask.
  */
-export type HelpRole = 'Everyone' | 'Usher' | 'Shepherd' | 'Follow-up Coordinator' | 'Administrator' | 'Location Coordinator' | 'Finance' | 'Welcome team';
+export type HelpRole = 'Everyone' | 'Usher' | 'Shepherd' | 'Follow-up Coordinator' | 'Administrator' | 'Location Coordinator' | 'Finance' | 'Finance Approver' | 'Welcome team';
 
 export interface HelpEntry {
   h: string;
@@ -56,7 +56,7 @@ export const HELP_SECTIONS: HelpSection[] = [
   { key: 'goals', label: 'Goals and reports', group: 'Reference' },
   { key: 'alerts', label: 'Alerts on your phone', group: 'Reference' },
   { key: 'admin', label: 'Accounts and roles', group: 'Reference' },
-  { key: 'new', label: 'Version 11.14', group: "What's new", intro: 'What changed in version 11.14, and where to read about it.' },
+  { key: 'new', label: 'Versions 11.16, 11.15 and 11.14', group: "What's new", intro: 'What changed in versions 11.16, 11.15 and 11.14, and where to read about it.' },
 ];
 
 const SH: HelpRole[] = ['Shepherd'];
@@ -64,6 +64,8 @@ const FC: HelpRole[] = ['Follow-up Coordinator', 'Administrator'];
 const AD: HelpRole[] = ['Administrator'];
 const ADL: HelpRole[] = ['Administrator', 'Location Coordinator'];
 const ALL: HelpRole[] = ['Everyone'];
+const FN: HelpRole[] = ['Finance'];
+const APPR: HelpRole[] = ['Finance Approver'];
 
 export const HELP_CONTENT: Record<string, HelpEntry[]> = {
   start: [
@@ -98,12 +100,19 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
     ], manual: 21 },
     { h: 'Ticking people off by name (what makes follow-up work)', roles: ['Usher'], img: 'checkin', steps: [
       "Press Check in on today's row.",
-      'Every member is listed by category, then the newcomers at this location. Type part of a name to find someone fast.',
+      'Newcomers at this location are listed first, then members by category. Type part of a name to find someone fast.',
+      'Use the buttons Everyone, Members, Newcomers and Not ticked to narrow the list. 50 names show at a time: press Show more for the next 50.',
       'Tap each name as the person arrives. It turns green and saves straight away. Tap again to undo.',
       'Press Mark online for anyone joining remotely.',
       'Tick newcomers too. On Friday Worship each shows their Fridays so far, which counts towards membership.',
       'When the meeting ends just leave the page. There is no Save button.',
     ], note: 'Anyone not ticked is treated as absent and their shepherd gets a task. Tick everyone who came, newcomers included, or people who were there will be followed up.', manual: 22 },
+    { h: 'Ticking names on the session page', roles: ['Usher'], steps: [
+      "Press the session's row in All sessions.",
+      'Tick Track named attendance for this session.',
+      'Search, or press Members or Newcomers, then tick each person who came.',
+      'Press Save session. Untick someone and save to remove them.',
+    ], note: 'Newcomers listed are those being followed up at this location: stages New, Contacted and Attending.', manual: 77 },
     { h: 'Recording the headcount and offering', roles: ['Usher'], steps: [
       "Press the session's row in All sessions.",
       'Check the Mode: In person and online, Online or In person.',
@@ -181,6 +190,12 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
       'Show them the code on screen, or project it during the announcement.',
       'They scan it and fill in the form. They appear in the New column straight away.',
     ], note: 'Each phone can send 5 forms a day, enough for a family. Visitors on the church Wi-Fi are counted phone by phone, so they never block each other.', manual: 25 },
+    { h: 'Finding a newcomer', roles: ['Welcome team', 'Shepherd', 'Administrator'], p: 'Open Newcomers & Follow-up and type a name, phone number or email in the search box above the filters. Phone numbers match on digits, so 3312 4455 finds +973 33124455. The search looks in active stages. Choose All stages to include Not Interested.', manual: 76 },
+    { h: 'Recording Salvation', roles: ['Welcome team', 'Shepherd', 'Administrator'], steps: [
+      "Open the newcomer's profile.",
+      'Press the Journey tab, or Go to Journey on the Salvation card.',
+      'Tick Salvation under Spiritual milestones. The date is saved for you.',
+    ], note: 'The pencil edits contact details only. Milestones are always ticked on the Journey tab.', manual: 76 },
     { h: 'Typing in a paper card', roles: ['Welcome team'], steps: [
       'Open Newcomers & Follow-up, then Manual Entry.',
       'Work down the form. It matches the paper card field for field.',
@@ -229,6 +244,18 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
       'Check the amount sent for each fund and where it went, then the date and bank reference.',
       'If you send more or less than is due, say why in the box that appears. Press Save.',
     ], manual: 43 },
+    { h: 'Balancing the month', roles: FN, steps: [
+      'Open Giving & Finance, then the Month-end balance tab, and choose the month.',
+      'Check the Expected closing balance: opening balance, plus giving, less expenses, less remittance sent.',
+      'Two people count the cash together on the last day of the month. Type the amount, and both names.',
+      'If it says It balances, press Send for approval. If not, look for a missing entry first, then explain the difference and send.',
+    ], note: 'A month can be balanced from its last day, and only once the month before is closed, because it opens with that month\'s closing balance.', manual: 72 },
+    { h: 'Approving and closing a month', roles: [...APPR, 'Administrator'], steps: [
+      'Open the alert in the bell, or Giving & Finance, Month-end balance, and choose the month.',
+      'Check the figures, the counters and any difference explained.',
+      'Press Approve and close, or Send back with a note to say what needs correcting.',
+    ], note: 'The person who prepared a month never approves it, so every month is checked by two people. Once closed, nothing dated in that month can be added, changed or deleted.', manual: 74 },
+    { h: 'Reopening a closed month', roles: AD, p: 'Press Reopen on the month and say why, for example a receipt handed in late. The reason is kept in the Audit Log, and the month must be balanced and approved again. Only the latest closed month can be reopened.', manual: 75 },
   ],
 
   runchurch: [
@@ -254,6 +281,13 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
       'Press Save changes.',
     ], note: 'Until one is chosen, late tasks and alerts go to the administrators. A Location Coordinator\'s account coordinates its own location only.', manual: 64 },
     { h: 'Someone is leaving', roles: ADL, p: 'Switch off their account in Admin, Users, Edit. Their open tasks go to the Follow-up Coordinator. If they shepherd people, untick Can shepherd others and run Auto-assign on Members to share their people out.', manual: 52 },
+    { h: 'How the money is kept', roles: AD, steps: [
+      'Open Admin, Config Lists, and find Money.',
+      'Choose the location, then Cash or Bank account.',
+      'Set the Start month and the Opening balance on its first day. Bahrain HQ starts in July 2026 with BHD 0.000.',
+      'Press Save.',
+    ], note: 'The start month and opening balance can change until the first month is sent for approval.', manual: 75 },
+    { h: 'Who approves the month end', roles: AD, p: 'The Finance Approver role, or any role given Approve month-end in Admin, Roles & Permissions. Give it to someone other than the person who records the money.', manual: 75 },
     { h: 'Removing a location', roles: AD, p: 'A location with accounts, house fellowships or a Follow-up Coordinator cannot be removed. The message names them. Move them to another location in Admin first.', manual: 55 },
   ],
 
@@ -330,6 +364,18 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
     { h: "Why can't I change this giving entry?", say: '"This was recorded on …. Open that session in Attendance to change it."', why: 'It is the offering from a service, so it is changed there and the two never disagree.', fix: 'Press Change on the session and correct the offering boxes.', roles: ['Finance'], manual: 71 },
     { h: 'Why will the remittance not save?', say: '"The amount sent differs from the amount due. Say why before recording it."', why: 'A difference needs an explanation.', fix: 'Say why in the box that appears, then save.', roles: ['Finance'], manual: 43 },
     { h: 'Why is this remittance already there?', say: '"… is already recorded for …. Open it with Edit to change it."', why: 'One remittance a month for each location.', fix: 'Press Edit on that month.', roles: ['Finance'], manual: 43 },
+    // Month-end balance
+    { h: "Why can't I add, change or delete this giving or expense?", say: '"October 2026 is closed for Bahrain HQ, so an expense dated in October cannot be added, changed or deleted."', why: 'The month is balanced and approved, so its figures must not change. While it waits for approval it is locked too.', fix: 'Use a date in a month still open, or ask an administrator to reopen the month. While it waits for approval, the approver can send it back.', roles: FN, manual: 74 },
+    { h: "Why can't I change this offering or remittance?", say: '"… has been sent for approval for Bahrain HQ, so the offering dated in … cannot be added, changed or deleted."', why: 'Offerings and remittances count in the month-end balance too.', fix: 'Ask the approver to send the month back, or an administrator to reopen it.', roles: ['Finance', 'Usher'], manual: 74 },
+    { h: "Why can't I balance this month yet?", say: '"… has not ended yet. It can be balanced from …, its last day."', why: 'The money is counted on the last day of the month.', fix: 'Balance it from its last day. Keep recording giving and expenses until then.', roles: FN, manual: 72 },
+    { h: "Why can't I send August?", say: '"July 2026 is not closed yet, and its closing balance is August 2026\'s opening balance. Close July 2026 first."', why: 'Each month opens with the closing balance of the month before.', fix: 'Close the earlier month first, in order.', roles: FN, manual: 74 },
+    { h: 'Why must two people count the cash?', say: '"Give the names of the two people who counted the cash together." or "… so the two names must differ."', why: 'Counting by two people is general practice for church cash, so nobody is ever left alone with an unchecked count.', fix: 'Count together and type both names.', roles: FN, manual: 72 },
+    { h: 'Why must I explain the difference?', say: '"There is a difference of BHD … Find it, or explain it."', why: 'The approver and the month-end report need to know why the money held is not what the records say.', fix: 'Look for an expense not recorded, or giving recorded twice. If it cannot be found, explain it.', roles: FN, manual: 72 },
+    { h: "Why can't I approve this month?", say: '"You prepared …, so a different person approves it."', why: 'Every month is checked by two people.', fix: 'Ask someone else whose role includes Approve month-end.', roles: [...APPR, 'Administrator'], manual: 74 },
+    { h: "Why is Approve and close not shown?", why: 'Your role does not include Approve month-end, or the month has not been sent for approval yet.', fix: 'Ask an administrator to give your role Approve month-end in Admin, Roles & Permissions.', roles: FN, manual: 75 },
+    { h: 'Why must I say what needs correcting?', say: '"Say what needs correcting, for example …"', why: 'The Accounts person sees your note at the top of the month.', fix: 'Write what to correct, such as an expense with no receipt.', roles: APPR, manual: 74 },
+    { h: "Why can't I reopen this month?", say: '"… is closed too, and its opening balance comes from …. Reopen … first." or "Only an administrator can reopen a closed month."', why: 'Each later month opens with its closing balance, so the latest closed month is reopened first.', fix: 'Reopen the later months first, newest first, or ask an administrator.', roles: AD, manual: 75 },
+    { h: "Why can't I change the start month?", say: '"… is already …, so the start month and opening balance can no longer change."', why: 'Every month after it was balanced from that opening balance.', fix: 'Reopen every month from the start month first, then change it.', roles: AD, manual: 75 },
     // Accounts and admin
     { h: "Why can't I change the Follow-up Rules?", say: '"These rules apply at every location, so only an administrator covering All locations can change them."', why: 'One set of rules for every location.', fix: 'Ask an administrator who covers All locations.', roles: ADL, manual: 69 },
     { h: 'Why is my Follow-up Rules change refused?', say: '"Use a number from … to …" or "… must be more hours than Follow-up due after."', why: 'The times must follow in order: due, then reason, then Review list, then decision.', fix: 'Correct the rule shown in red, then save.', roles: AD, manual: 69 },
@@ -356,6 +402,9 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
     { h: 'Why is my photo refused?', say: '"That picture is too large. Choose one under 8 MB." or "Use a JPG or PNG."', why: 'Only ordinary pictures of a sensible size are kept.', fix: 'Choose a smaller JPG or PNG.', roles: ALL, manual: 7 },
     { h: 'Why do I not get alerts?', say: '"Turn alerts on for this device first."', why: 'Alerts are turned on once on each phone or computer.', fix: 'Open My profile on that device and press Turn on. If they are blocked, it shows the steps for your device.', roles: ALL, manual: 7 },
     { h: 'Why was the QR form refused?', say: '"This phone has already sent 5 forms today."', why: 'To stop a flood of false forms.', fix: 'A leader at the welcome desk adds them by Manual Entry, or an administrator presses Let them in under Phones turned away today on the QR page.', roles: ['Welcome team'], manual: 71 },
+    { h: "Why can't I save this contact's details?", say: '"Keep at least one way to reach them: phone, email or social handle."', why: 'A contact nobody can reach cannot be followed up.', fix: 'Leave at least one of phone, email or social handle filled in.', roles: ['Welcome team', 'Administrator'], manual: 77 },
+    { h: 'Why is a newcomer not on the check-in list?', why: 'Check-in lists newcomers still being followed up at the session\'s location: stages New, Contacted and Attending. Members are listed as members, and Not Interested are left out.', fix: 'Check the person\'s stage and location on their profile. Press Newcomers on the check-in page to see only newcomers.', roles: ALL, manual: 77 },
+    { h: "Why can't I record Salvation with the pencil?", why: 'The pencil edits contact details. Milestones have their own place, with the date they were ticked.', fix: 'Press Go to Journey, then tick Salvation under Spiritual milestones.', roles: ALL, manual: 76 },
     { h: 'A box at the bottom says Not saved', why: 'The server refused the change, and the message says why in its own words.', fix: 'Do what it says. If it is not clear, search this Help for a word from the message.', roles: ALL },
   ],
 
@@ -428,13 +477,15 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
 
   enquiries: [
     { h: 'Online enquiries', roles: ['Welcome team'], p: 'Contacts from social media and the website. Give each a follow-up person, answer them, and when they come to church, add them as a newcomer so their story continues.', manual: 39 },
+    { h: 'Finding and correcting a contact', roles: ['Welcome team', 'Administrator'], p: 'Type a name, phone, email or handle in Find a contact. Open the contact and press the pencil beside the name to correct the name, phone, email, social handle, where they are, or what they asked. Gender, follow-up person and stage are changed lower down the page.', manual: 77 },
     { h: 'A follow-up person for every contact', roles: ['Welcome team'], p: 'Tick several and assign, or press Auto-assign. Only people of the same gender are offered.', manual: 40 },
   ],
 
   finance: [
     { h: 'Who can see this', roles: ['Finance'], p: 'Giving and finance figures appear only for roles with finance access, including on the dashboard.', manual: 42 },
     { h: 'Projects', roles: ['Finance'], p: 'Giving tagged to a project shows progress against its target.', manual: 42 },
-    { h: 'Correcting an entry', roles: ['Finance'], p: 'Press the pencil on the entry, correct it and save. An entry From session is corrected on the session.', manual: 43 },
+    { h: 'Correcting an entry', roles: ['Finance'], p: 'Press the pencil on the entry, correct it and save. An entry From session is corrected on the session. An entry in a closed month cannot be corrected until the month is reopened.', manual: 43 },
+    { h: 'The month-end figures', roles: FN, p: 'Opening balance, plus giving received, less expenses, less remittance sent, gives the expected closing balance. Remittances count in the month they were sent. The difference is shown to the fils. The month-end report shows the money held at each month end.', manual: 73 },
   ],
 
   goals: [
@@ -462,6 +513,9 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
   ],
 
   new: [
+    { h: '11.16: Finding people and ticking newcomers', roles: ALL, p: 'Search on Newcomers and Online Enquiries, a pencil to correct an enquiry, Go to Journey for Salvation, and newcomers with Everyone, Members, Newcomers and Not ticked on check-in and the session page.', links: [{ to: 'welcome', t: 'I welcome newcomers' }, { to: 'usher', t: 'I record attendance' }], manual: 76 },
+    { h: '11.15: Month-end balance', roles: [...FN, ...APPR, 'Administrator'], p: 'Balance the money held each month, send it for approval, and a second person closes it. Closed months cannot change, and the report shows the money held at each month end.', links: [{ to: 'giving', t: 'I handle giving' }], manual: 72 },
+    { h: '11.15: Faster loading', roles: ALL, p: 'Each page downloads only when first opened, so the app opens faster on phones.' },
     { h: 'My follow-up and reasons for late tasks', roles: SH, p: 'One list for each shepherd, members and newcomers together. Late tasks need a reason and a new date.', links: [{ to: 'shepherd', t: 'I follow up people' }], manual: 60 },
     { h: 'The Follow-up Coordinator and Follow-up Review', roles: FC, p: 'The Review list, the four choices, the Overview with measures, and alerts on repeated absences.', links: [{ to: 'coordinator', t: 'I coordinate follow-up' }], manual: 64 },
     { h: 'Attendance', roles: ALL, p: 'Sessions made on the day, clear status words, Did not hold, and Was present when someone is ticked late.', links: [{ to: 'usher', t: 'I record attendance' }], manual: 67 },

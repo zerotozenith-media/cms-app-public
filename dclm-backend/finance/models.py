@@ -118,3 +118,4 @@ class Expense(models.Model):
 # record from giving and expenses, recorded once a month rather than as
 # money moves.
 from .remittance_models import Remittance, RemittanceLine  # noqa: E402,F401
+from .monthend_models import MoneySettings, MonthEnd  # noqa: E402,F401

@@ -1,8 +1,9 @@
 import { refusal } from '../../api/accountability';
 import { useState } from 'react';
 import { RemittanceTab } from './RemittanceTab';
+import { MonthEndTab } from './MonthEndTab';
 import { DATE_RANGES, rangeBounds, type DateRangeKey } from '../../lib/dateRanges';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   useFunds, usePaymentMethods, useExpenseCategories, useProjects, useFinanceSummary,
   useGivingList, useExpenseList, useCreateGiving, useUpdateGiving, useDeleteGiving,
@@ -37,7 +38,10 @@ function bringFormIntoView(firstFieldId: string) {
 export function FinancePage() {
   // Remittance is a monthly act, not a property of each entry, so it
   // gets its own tab rather than a field on the giving form.
-  const [tab, setTab] = useState<'entries' | 'remittance'>('entries');
+  // The tab is in the address, so a month-end alert opens the right one.
+  const [params, setParams] = useSearchParams();
+  const tab = (['remittance', 'monthend'].includes(params.get('tab') ?? '') ? params.get('tab') : 'entries') as 'entries' | 'remittance' | 'monthend';
+  const setTab = (t: 'entries' | 'remittance' | 'monthend') => setParams(t === 'entries' ? {} : { tab: t });
   const navigate = useNavigate();
   const { data: funds } = useFunds();
   const { data: methods } = usePaymentMethods();
@@ -223,11 +227,14 @@ export function FinancePage() {
           onClick={() => setTab('entries')}>Giving and expenses</button>
         <button className={`tab${tab === 'remittance' ? ' active' : ''}`}
           onClick={() => setTab('remittance')}>Remittance</button>
+        <button className={`tab${tab === 'monthend' ? ' active' : ''}`}
+          onClick={() => setTab('monthend')}>Month-end balance</button>
       </div>
     </div>
   );
 
   if (tab === 'remittance') return <>{tabs}<RemittanceTab /></>;
+  if (tab === 'monthend') return <>{tabs}<MonthEndTab /></>;
 
   return (
     <>

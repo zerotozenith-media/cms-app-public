@@ -116,6 +116,20 @@ export const HELP_TOPICS: Record<string, HelpTopic> = {
   faLocationMove: { title: 'Location', body: "Where they worship. Changing it moves their open tasks to that location's Follow-up Coordinator unless a shepherd there is chosen. Their history stays with them." },
   faStage: { title: 'Stage', body: 'New, Contacted and Attending: they get a task each time they miss a tracked service. Not Interested stops follow-up, and a note is required. Member moves them to the member roll.' },
   faLeader: { title: 'Leader', body: 'Expected at leadership meetings, so they are followed up when they miss one. Untick when they step down.' },
+  // Month-end balance (Kay, 30 October 2026).
+  meBalance: { title: 'Month-end balance', body: 'Each month the money held is balanced: what the records say should be there against what is actually there, counted or on the bank statement. A difference is found or explained, a second person approves, and the month is closed so its figures never change afterwards.' },
+  meOpening: { title: 'Opening balance', body: "The previous month's approved closing balance. For the start month it is the opening balance set in Admin, Config Lists, Money. Example: July 2026 opens at BHD 0.00, August opens at July's closing balance." },
+  meExpected: { title: 'Expected closing balance', body: 'Opening balance, plus giving, less expenses, less remittance sent in the month. What the records say should be held on the last day of the month.' },
+  meRemit: { title: 'Remittance sent', body: 'Counted in the month the money left, by its sent date. Example: September\'s remittance sent on 3 October comes out of October.' },
+  meCounted: { title: 'Money actually held', body: 'Count the cash on the last day of the month, or read the closing balance on the bank statement, and type it here. Example: 665.250.' },
+  meCountedBy: { title: 'Counted by two people', body: 'Cash is counted by two people together, and both names are kept. General practice for church money, so nobody is ever left alone with an unchecked count.' },
+  meDifference: { title: 'Difference', body: 'Money held less the expected closing balance. Look for a missing entry first: an expense not recorded, or giving recorded twice. If it cannot be found, explain it. Example: "BHD 5.00 bank charge on 31 October".' },
+  meLock: { title: 'Why lock the month?', body: 'So the figures in the month-end report never change after they are approved. A month is closed once it is balanced and checked by a second person, and any later change is made by reopening it on purpose, with a reason kept in the Audit Log.' },
+  meApprove: { title: 'Approve and close', body: 'Someone whose role includes Approve month-end checks the figures and closes the month. It is never the person who prepared it, so every month is checked by two people.' },
+  meKeptAs: { title: 'Money kept as', body: 'Cash: the month is balanced against the cash counted by two people. Bank account: against the closing balance on the bank statement. Change it if the church opens a bank account.' },
+  meStart: { title: 'Start month', body: 'The first month balanced. Example: July 2026, the month the church started. It can change until that month is sent for approval.' },
+  meStartOpening: { title: 'Opening balance', body: 'The money held on the first day of the start month. Example: BHD 0.00 if there was no money yet.' },
+  monthendModule: { title: 'Approve month-end', body: 'Approve or send back a month that has been balanced, which closes it. The person who prepared a month can never approve it. The Finance Approver role has it, and it can be given to any role.' },
 };
 
 export type HelpTopicKey = keyof typeof HELP_TOPICS;

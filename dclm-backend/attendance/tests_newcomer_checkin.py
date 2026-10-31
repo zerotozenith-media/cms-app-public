@@ -216,3 +216,32 @@ class AfterTheService(Base):
         self.assertTrue(self.client.get(f"/api/attendance-sessions/{s.id}/").data["counts_for_absence"])
         call_command("check_absences", verbosity=0)
         self.assertEqual(list(MemberFollowUpTask.objects.values_list("member_id", flat=True)), [missed.id])
+
+
+class NamedOnSessionPage(Base):
+    """Newcomers ticked under Track named attendance (Kay, 31 October 2026)."""
+    def record(self, s, **extra):
+        body = {"men": 1, "track_named": True, "attendee_ids": [], **extra}
+        return self.client.post(f"/api/attendance-sessions/{s.id}/record/", body, format="json")
+
+    def test_newcomers_ticked_and_unticked_on_the_session_page(self):
+        s, a, b = self.session(), self.newcomer("Abel"), self.newcomer("Bunmi", stage="new")
+        AttendanceSessionMember.objects.create(session=s, newcomer=a, mode="online")
+        r = self.record(s, newcomer_ids=[a.id, b.id])
+        self.assertEqual(r.status_code, 200, r.data)
+        rows = dict(AttendanceSessionMember.objects.filter(session=s).values_list("newcomer_id", "mode"))
+        # Abel kept as checked in at the door (online), Bunmi added.
+        self.assertEqual(rows, {a.id: "online", b.id: "in-person"})
+        self.record(s, newcomer_ids=[b.id])
+        self.assertEqual(set(AttendanceSessionMember.objects.filter(session=s).values_list("newcomer_id", flat=True)), {b.id})
+
+    def test_an_older_page_leaves_newcomers_alone(self):
+        s, a = self.session(), self.newcomer("Abel")
+        AttendanceSessionMember.objects.create(session=s, newcomer=a)
+        self.assertEqual(self.record(s).status_code, 200)
+        self.assertTrue(AttendanceSessionMember.objects.filter(session=s, newcomer=a).exists())
+
+    def test_unknown_newcomer_is_explained(self):
+        r = self.record(self.session(), newcomer_ids=[99999])
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("Reload the page", str(r.data))

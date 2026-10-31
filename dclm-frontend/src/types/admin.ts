@@ -60,7 +60,7 @@ export interface LoginAttempt {
 // from 'admin': whoever runs the church's adverts should be able to see
 // what a campaign cost per person reached without also being able to
 // create accounts and change church settings.
-export const MODULES = ['members', 'attendance', 'newcomers', 'finance', 'goals', 'reports', 'outreach', 'admin', 'followup-review'] as const;
+export const MODULES = ['members', 'attendance', 'newcomers', 'finance', 'goals', 'reports', 'outreach', 'admin', 'followup-review', 'monthend'] as const;
 
 /** How each module is named on screen. */
-export const MODULE_LABELS: Record<string, string> = { 'followup-review': 'Follow-up review' };
+export const MODULE_LABELS: Record<string, string> = { 'followup-review': 'Follow-up review', monthend: 'Approve month-end' };

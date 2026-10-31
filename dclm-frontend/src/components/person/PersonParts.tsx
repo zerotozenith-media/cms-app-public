@@ -19,11 +19,18 @@ export function timeSince(from?: string | null) {
 }
 
 /** The tab bar and its panels. Tabs scroll sideways on a phone. */
-export function PersonTabs({ tabs }: { tabs: { key: string; label: string; body: React.ReactNode }[] }) {
-  const [active, setActive] = useState(tabs[0]?.key);
+/** Tabs on a person's profile. Pass active and onChange when something
+ *  else on the page needs to open a tab, such as Go to Journey. */
+export function PersonTabs({ tabs, active: activeProp, onChange }: {
+  tabs: { key: string; label: string; body: React.ReactNode }[];
+  active?: string; onChange?: (key: string) => void;
+}) {
+  const [own, setOwn] = useState(tabs[0]?.key);
+  const active = activeProp ?? own;
+  const setActive = (k: string) => { setOwn(k); onChange?.(k); };
   const current = tabs.find((t) => t.key === active) ?? tabs[0];
   return (
-    <div className="card person-main">
+    <div className="card person-main" id="person-main">
       <div className="person-tabs" role="tablist">
         {tabs.map((t) => (
           <button key={t.key} role="tab" aria-selected={t.key === current?.key}

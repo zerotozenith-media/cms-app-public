@@ -2,7 +2,8 @@ import { Skeleton } from '../../components/ui/Skeleton';
 import { useQuery } from '@tanstack/react-query';
 import { Fragment, useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useSession, useDeleteSession, useRecordSession, useMeetingTypes } from '../../api/attendance';
+import { useSession, useDeleteSession, useRecordSession, useMeetingTypes, useNewcomerRoster } from '../../api/attendance';
+import { WhoChips, NEWCOMER_STAGE, PAGE, type Who } from '../../components/attendance/WhoChips';
 import { apiClient } from '../../api/client';
 import type { Member, PaginatedResponse } from '../../types/members';
 import { Badge } from '../../components/ui/Badge';
@@ -32,6 +33,8 @@ export function SessionRecordPage() {
   const sessionId = Number(id);
   const navigate = useNavigate();
   const { data: session, isLoading } = useSession(sessionId);
+  const auth = useAuth();
+  const { data: ncRoster } = useNewcomerRoster(sessionId, !!session && auth.hasPermission('attendance', 'edit'));
   const { data: meetingTypes } = useMeetingTypes();
   const deleteSession = useDeleteSession();
   const recordSession = useRecordSession(sessionId);
@@ -71,6 +74,10 @@ export function SessionRecordPage() {
   const [selectedNames, setSelectedNames] = useState<Map<number, string>>(new Map());
   const [search, setSearch] = useState('');
   const [searchResults, setSearchResults] = useState<Member[]>([]);
+  const [memberCount, setMemberCount] = useState(0);
+  // Newcomers in named attendance (Kay, 31 October 2026).
+  const [newcomerIds, setNewcomerIds] = useState<Set<number>>(new Set());
+  const [who, setWho] = useState<Who>('everyone');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -105,6 +112,7 @@ export function SessionRecordPage() {
     setAttendeeIds(ids);
     const names = new Map(members.map((a) => [a.member as number, a.member_name ?? ""] as const));
     setSelectedNames(names);
+    setNewcomerIds(new Set(session.attendees.filter((a) => a.newcomer != null).map((a) => a.newcomer as number)));
   }, [session]);
 
   useEffect(() => {
@@ -113,9 +121,10 @@ export function SessionRecordPage() {
       // No location restriction , any member, from any location, can be
       // checked into any session (Batch 0.2 approved decision).
       const resp = await apiClient.get<PaginatedResponse<Member>>('/attendance-roster/', {
-        params: { search: search || undefined, page_size: 50 },
+        params: { search: search || undefined, page_size: PAGE },
       });
       setSearchResults(resp.data.results);
+      setMemberCount(resp.data.count ?? resp.data.results.length);
     }, 300);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [search]);
@@ -132,7 +141,7 @@ export function SessionRecordPage() {
   const showOnline = mode !== 'in-person' || onlineCount > 0;
   const isFellowship = !!session?.fellowship;
   const isOccasional = meetingTypes?.find((t) => t.id === session?.meeting_type)?.frequency === 'occasional';
-  const { hasPermission } = useAuth();
+  const { hasPermission } = auth;
   const canEdit = hasPermission('attendance', 'edit');
   const canDelete = hasPermission('attendance', 'delete');
   // A service that has not happened yet cannot be recorded. Said up front,
@@ -156,6 +165,12 @@ export function SessionRecordPage() {
     }
     setAttendeeIds(next);
     setSelectedNames(names);
+  }
+
+  function toggleNewcomer(id: number) {
+    const next = new Set(newcomerIds);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setNewcomerIds(next);
   }
 
   async function handleDelete() {
@@ -188,6 +203,7 @@ export function SessionRecordPage() {
       ...(collectsOffering && offeringChanged() ? { offering } : {}),
       track_named: trackNamed,
       attendee_ids: Array.from(attendeeIds),
+      ...(trackNamed && ncRoster ? { newcomer_ids: Array.from(newcomerIds) } : {}),
     });
     } catch (err) { explain(err); return; }
     navigate('/attendance');
@@ -373,32 +389,62 @@ export function SessionRecordPage() {
             Track named attendance for this session
           </label>
 
-          {trackNamed && (
+          {trackNamed && (() => {
+            const q = search.trim().toLowerCase();
+            const ncAll = (ncRoster?.results ?? []).filter((n) => !q || n.name.toLowerCase().includes(q));
+            const ncUnticked = ncAll.filter((n) => !newcomerIds.has(n.id)).length;
+            const memRows = who === 'newcomers' ? [] : searchResults.filter((m) => who !== 'unticked' || !attendeeIds.has(m.id));
+            const ncRows = who === 'members' ? [] : ncAll.filter((n) => who !== 'unticked' || !newcomerIds.has(n.id));
+            const ticked = selectedNames.size + newcomerIds.size;
+            return (
             <div className="form-card">
               <div className="muted" style={{ fontSize: '.8rem', marginBottom: 10 }}>
-                Any member, from any location, can be checked in here. Headcounts above remain the source of
-                truth for attendance totals; this list is supplementary.
-                {selectedNames.size > 0 && ` ${selectedNames.size} selected.`}
+                Tick members, from any location, and newcomers at this location who came. Headcounts above remain the
+                source of truth for attendance totals. This list is supplementary.
+                {ticked > 0 && ` ${ticked} ticked.`}
               </div>
+              <label htmlFor="named-search" className="sr-only">Search members and newcomers</label>
               <input
-                className="search" style={{ width: '100%', marginBottom: 10 }}
-                placeholder="Search members..." value={search}
+                id="named-search" type="search"
+                className="search" style={{ width: '100%', marginBottom: 8 }}
+                placeholder="Search members and newcomers..." value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
-              <div style={{ maxHeight: 280, overflowY: 'auto', display: 'grid', gap: 2 }}>
-                {searchResults.length ? searchResults.map((m) => (
-                  <label
-                    key={m.id}
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 4px', borderBottom: '1px solid var(--line)', fontSize: '.88rem', cursor: 'pointer' }}
-                  >
+              <WhoChips value={who} onChange={setWho} counts={{
+                everyone: memberCount + ncAll.length, members: memberCount, newcomers: ncAll.length,
+                unticked: q ? null : Math.max(0, memberCount - attendeeIds.size) + ncUnticked,
+              }} />
+              <div className="named-list" style={{ maxHeight: 320, overflowY: 'auto', display: 'grid', gap: 2 }}>
+                {ncRows.length > 0 && who !== 'members' && <div className="checkin-group">Newcomers</div>}
+                {ncRows.map((n) => (
+                  <label key={`n${n.id}`} className="named-row">
+                    <input type="checkbox" checked={newcomerIds.has(n.id)} onChange={() => toggleNewcomer(n.id)} style={{ width: 16, height: 16 }} />
+                    <span style={{ flex: 1 }}>{n.name}</span>
+                    <Badge color="amber">Newcomer, {NEWCOMER_STAGE[n.stage] ?? n.stage}</Badge>
+                  </label>
+                ))}
+                {memRows.length > 0 && who !== 'newcomers' && ncRows.length > 0 && <div className="checkin-group">Members</div>}
+                {memRows.map((m) => (
+                  <label key={m.id} className="named-row">
                     <input type="checkbox" checked={attendeeIds.has(m.id)} onChange={() => toggleAttendee(m)} style={{ width: 16, height: 16 }} />
                     <span style={{ flex: 1 }}>{m.full_name}</span>
                     <Badge color={categoryBadgeColor(m.category)}>{m.category}</Badge>
                   </label>
-                )) : <div className="empty">No members match this search.</div>}
+                ))}
+                {!memRows.length && !ncRows.length && (
+                  <div className="empty">
+                    {who === 'unticked' ? 'Everyone shown here is ticked.'
+                      : who === 'newcomers' ? (q ? 'No newcomers match this search.' : 'No newcomers are being followed up at this location.')
+                      : q ? 'Nobody matches this search.' : 'Nobody to show.'}
+                  </div>
+                )}
               </div>
+              {who !== 'newcomers' && memberCount > searchResults.length && (
+                <div className="muted field-note">Showing {searchResults.length} of {memberCount} members. Search to find anyone else.</div>
+              )}
             </div>
-          )}
+            );
+          })()}
 
           {isFuture && (
             <p className="form-note">

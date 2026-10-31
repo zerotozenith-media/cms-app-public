@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Icon } from '../ui/Icon';
 import type { Readiness } from '../../api/newcomers';
 
@@ -22,16 +23,16 @@ function Ring({ percent, colour }: { percent: number; colour: string }) {
   );
 }
 
-function Foot({ met, metText, notText }: { met: boolean; metText: string; notText: string }) {
+function Foot({ met, metText, notText, action }: { met: boolean; metText: string; notText: string; action?: ReactNode }) {
   return (
     <div className={`rc-foot${met ? ' ok' : ''}`}>
       <Icon name={met ? 'check' : 'alert'} size={14} />
-      {met ? metText : notText}
+      <span>{met ? metText : notText}{!met && action}</span>
     </div>
   );
 }
 
-export function ReadinessCards({ r }: { r: Readiness }) {
+export function ReadinessCards({ r, onGoToJourney }: { r: Readiness; onGoToJourney?: () => void }) {
   const GREEN = 'var(--green)';
   const AMBER = 'var(--amber)';
   const BLUE = 'var(--blue)';
@@ -68,7 +69,8 @@ export function ReadinessCards({ r }: { r: Readiness }) {
             <div className="rc-sub">{r.has_salvation ? 'Milestone recorded' : 'No milestone'}</div>
           </div>
         </div>
-        <Foot met={r.has_salvation} metText="Milestone met" notText="Record it on the profile" />
+        <Foot met={r.has_salvation} metText="Milestone met" notText="Tick Salvation on the Journey tab."
+          action={onGoToJourney && <> <button type="button" className="linkish rc-go" onClick={onGoToJourney}>Go to Journey</button></>} />
       </div>
 
       <div className="rc">

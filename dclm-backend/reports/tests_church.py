@@ -209,6 +209,20 @@ class OverseerPdf(Church):
         self.assertNotIn("Summary", t.split("Appendix")[0].replace("Monthly Report", ""))   # empty box, no section
         self.assertIn("Net shortfall (BHD)", t)
 
+    def test_money_held_from_closed_month_ends(self):
+        """Month-end balances approved and closed appear in the report (Kay, 30 October 2026)."""
+        from finance.monthend_models import MonthEnd
+        MonthEnd.objects.create(location=self.bh, month=datetime.date(2026, 7, 1), status="closed",
+                                opening=Decimal("0"), giving=Decimal("1016.57"), expenses=Decimal("874.91"),
+                                remittance=Decimal("100"), expected=Decimal("41.66"), counted_amount=Decimal("40.66"),
+                                difference_note="Bank charge")
+        ctx = gather(month_list((2026, 7), (2026, 8)), self.bh)
+        self.assertEqual(len(ctx["balances"]), 1)
+        pdf, _ = build(ctx, {})
+        t = " ".join(text(pdf).split())
+        self.assertIn("Money held at each month end (BHD)", t)
+        self.assertIn("July 2026 difference of BHD 1.00: Bank charge", t)
+
     def test_quarter_with_written_parts_and_goals(self):
         texts = {"summary": "By the grace of God, a good quarter.", "challenges": "Members live far apart.\n- Transport plan",
                  "training": "1. Training lasts 2 months.", "conclusion": "We end well."}

@@ -83,6 +83,9 @@ class GivingViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
+        from .monthend import refuse_if_locked
+        v = serializer.validated_data
+        refuse_if_locked(v.get("location"), v.get("date"), "giving")
         instance = serializer.save()
         log_audit(
             self.request.user, "Recorded giving", "Giving",
@@ -100,12 +103,18 @@ class GivingViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
                                              f"Open that session in Attendance to change it."})
 
     def perform_update(self, serializer):
+        from .monthend import refuse_if_locked
         self._from_session(serializer.instance)
+        old, v = serializer.instance, serializer.validated_data
+        refuse_if_locked(old.location, old.date, "giving")
+        refuse_if_locked(v.get("location", old.location), v.get("date", old.date), "giving")
         instance = serializer.save()
         log_audit(self.request.user, "Changed", "Giving", f"{instance.fund.name} · {instance.amount}", instance=instance)
 
     def perform_destroy(self, instance):
+        from .monthend import refuse_if_locked
         self._from_session(instance)
+        refuse_if_locked(instance.location, instance.date, "giving")
         name = f"{instance.fund.name} · {instance.amount}"
         log_audit(self.request.user, "Deleted", "Giving", name)
         instance.delete()
@@ -137,13 +146,25 @@ class ExpenseViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
+        from .monthend import refuse_if_locked
+        v = serializer.validated_data
+        refuse_if_locked(v.get("location"), v.get("date"), "an expense")
         instance = serializer.save()
         log_audit(
             self.request.user, "Recorded expense", "Expense",
             f"{instance.category.name} · {instance.amount}", instance=instance,
         )
 
+    def perform_update(self, serializer):
+        from .monthend import refuse_if_locked
+        old, v = serializer.instance, serializer.validated_data
+        refuse_if_locked(old.location, old.date, "an expense")
+        refuse_if_locked(v.get("location", old.location), v.get("date", old.date), "an expense")
+        serializer.save()
+
     def perform_destroy(self, instance):
+        from .monthend import refuse_if_locked
+        refuse_if_locked(instance.location, instance.date, "an expense")
         name = f"{instance.category.name} · {instance.amount}"
         log_audit(self.request.user, "Deleted", "Expense", name)
         instance.delete()

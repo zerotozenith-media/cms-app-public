@@ -14,6 +14,7 @@ import { canPair } from '../../lib/gender';
 import { apiClient } from '../../api/client';
 import { refusal } from '../../api/accountability';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { matchesPerson } from '../../lib/personSearch';
 
 function stageBadgeColor(stage: NewcomerStage): 'blue' | 'green' | 'gray' {
   if (stage === 'member') return 'green';
@@ -38,6 +39,7 @@ export function NewcomersListPage() {
   const [shepherdFilter, setShepherdFilter] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all');
   const [sort, setSort] = useState('days-desc');
+  const [query, setQuery] = useState('');
   const [view, setView] = useState<'board' | 'table'>('board');
   const [page, setPage] = useState(1);
   const pageSize = 12;
@@ -68,6 +70,7 @@ export function NewcomersListPage() {
     if (shepherdFilter === 'none' && n.assigned_to_name) return false;
     if (shepherdFilter !== 'all' && shepherdFilter !== 'none' && n.assigned_to_name !== shepherdFilter) return false;
     if (sourceFilter !== 'all' && n.source_name !== sourceFilter) return false;
+    if (!matchesPerson(n, query)) return false;
     return true;
   });
   const sorted = [...filtered].sort((a, b) => {
@@ -85,6 +88,7 @@ export function NewcomersListPage() {
   if (shepherdFilter === 'none') headingBits.push('with no shepherd');
   else if (shepherdFilter !== 'all') headingBits.push(`assigned to ${shepherdFilter}`);
   if (sourceFilter !== 'all') headingBits.push(`from ${sourceFilter}`);
+  if (query.trim()) headingBits.push(`matching "${query.trim()}"`);
   const heading = headingBits.length ? `Newcomers ${headingBits.join(', ')}` : 'Newcomer pipeline';
   const baseCount = everyone.filter((n) => n.stage !== 'not-interested').length;
   const subhead = !allNewcomers ? 'Loading' : headingBits.length || stageFilter === 'all'
@@ -148,6 +152,13 @@ export function NewcomersListPage() {
             <button className={view === 'table' ? 'on' : ''} onClick={() => setView('table')}>Table</button>
           </div>
         </div>
+
+        <label htmlFor="nc-search" className="sr-only">Search newcomers</label>
+        <input id="nc-search" type="search" className="search nc-search" placeholder="Search by name, phone or email..."
+          value={query} onChange={(e) => { setQuery(e.target.value); setPage(1); }} />
+        {query.trim() && stageFilter === 'active' && (
+          <div className="muted field-note">Searching active stages. Choose All stages to include Not Interested.</div>
+        )}
 
         <div className="nc-filters">
           <select className="selectbox" value={stageFilter} aria-label="Stage"

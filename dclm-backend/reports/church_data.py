@@ -281,5 +281,18 @@ def gather(months, location=None):
         "testimonies": testimonies_in(start, end),
         "goals": goals_by_horizon(),
         "newcomer_visits": sum(mf["newcomer_visits"] for mf in per_month),
+        "balances": closed_balances(scope, months),
         "taken_on": datetime.date.today(),
     }
+
+
+def closed_balances(scope, months):
+    """Month-end balances approved and closed in these months (Kay, 30
+    October 2026), oldest first, so the report shows the money held."""
+    from finance.monthend_models import MonthEnd
+    firsts = [datetime.date(y, m, 1) for y, m in months]
+    qs = scope(MonthEnd.objects.filter(month__in=firsts, status=MonthEnd.Status.CLOSED).select_related("location"))
+    return [{"month": me.month, "location": me.location.name, "opening": me.opening, "giving": me.giving,
+             "expenses": me.expenses, "remittance": me.remittance, "expected": me.expected,
+             "closing": me.counted_amount, "difference": me.difference, "note": me.difference_note}
+            for me in qs.order_by("month", "location__name")]

@@ -18,9 +18,9 @@ export const HELP_PAGES: { path: RegExp; help: PageHelp }[] = [
   ], links: [{ t: 'The four choices', s: 'coordinator', h: 'The four choices' }, { t: 'Why is a shepherd not offered?', s: 'why', h: 'Why is the shepherd I want not offered to hand on to?' }, { t: 'The Overview', s: 'coordinator', h: 'The Overview' }] } },
   { path: /^\/attendance\/\d+\/check-in/, help: { title: 'Ticking names', manual: 22, steps: [
     'Tap each name as the person arrives. Tap again to undo.',
-    'Press Mark online for anyone joining remotely.',
+    'Press Newcomers, Members or Not ticked to narrow the list.',
     'Tick newcomers too. Anyone not ticked gets a follow-up task.',
-  ], links: [{ t: 'Ticking names after the service', s: 'usher', h: 'Ticking names after the service' }, { t: "Why can't I check people in?", s: 'why', h: "Why can't I check people in?" }] } },
+  ], links: [{ t: 'Why is a newcomer not on the list?', s: 'why', h: 'Why is a newcomer not on the check-in list?' }, { t: 'Ticking names after the service', s: 'usher', h: 'Ticking names after the service' }, { t: "Why can't I check people in?", s: 'why', h: "Why can't I check people in?" }] } },
   { path: /^\/attendance\/new/, help: { title: 'New session', manual: 23, steps: [
     'Use this only for one-off meetings. Weekly sessions are made for you.',
     'Choose the meeting, date and location, then press Create.',
@@ -29,7 +29,8 @@ export const HELP_PAGES: { path: RegExp; help: PageHelp }[] = [
     'Type the headcount for each group, and new comers and converts.',
     'Type the offering for each fund.',
     'Press Save session.',
-  ], links: [{ t: 'Why is Save session greyed out?', s: 'why', h: 'Why is Save session greyed out?' }, { t: 'Recording the headcount and offering', s: 'usher', h: 'Recording the headcount and offering' }] } },
+    'To tick names here, tick Track named attendance. Newcomers are listed too.',
+  ], links: [{ t: 'Why is Save session greyed out?', s: 'why', h: 'Why is Save session greyed out?' }, { t: 'Ticking names on the session page', s: 'usher', h: 'Ticking names on the session page' }, { t: 'Recording the headcount and offering', s: 'usher', h: 'Recording the headcount and offering' }] } },
   { path: /^\/attendance/, help: { title: 'Attendance', manual: 21, steps: [
     "Press Check in on today's row to tick names as people arrive.",
     "Press the row to record the headcount and offering.",
@@ -60,15 +61,17 @@ export const HELP_PAGES: { path: RegExp; help: PageHelp }[] = [
   { path: /^\/newcomers\/follow-up/, help: { title: 'Newcomers, Follow-up', manual: 31, steps: ['Every newcomer task, for anyone overseeing. Shepherds use My follow-up.'], links: [{ t: 'My follow-up', s: 'shepherd', h: 'Your list: My follow-up' }] } },
   { path: /^\/newcomers\/\d+/, help: { title: "A newcomer's profile", manual: 30, steps: [
     'Choose their Shepherd, and set Away dates, on the left.',
+    'Tick Salvation and other milestones on the Journey tab.',
     'The Tasks tab shows every task and its record.',
     'Mark as Not Interested needs a note and stops follow-up.',
-  ], links: [{ t: 'Why must I say why for Not Interested?', s: 'why', h: 'Why must I say why for Not Interested?' }] } },
+  ], links: [{ t: 'Recording Salvation', s: 'welcome', h: 'Recording Salvation' }, { t: 'Why must I say why for Not Interested?', s: 'why', h: 'Why must I say why for Not Interested?' }] } },
   { path: /^\/newcomers/, help: { title: 'Newcomers', manual: 27, steps: [
+    'Search by name, phone or email above the filters.',
     'Drag a card, or use its dropdown, to move someone along.',
     'In Table, tick several and press Assign to give them a shepherd.',
   ], links: [{ t: 'Giving several newcomers a shepherd', s: 'welcome', h: 'Giving several newcomers a shepherd' }, { t: 'Why is this shepherd refused?', s: 'why', h: 'Why is this shepherd refused for these newcomers?' }] } },
-  { path: /^\/enquiries/, help: { title: 'Online enquiries', manual: 39, steps: ['Give each contact a follow-up person.', 'Answer them, and add them as a newcomer when they come.'], links: [{ t: 'Online enquiries', s: 'enquiries' }] } },
-  { path: /^\/finance/, help: { title: 'Giving & Finance', manual: 42, steps: ['Record giving and expenses in the forms.', 'Entries From session are changed on the session.', 'The Remittance tab records each month.'], links: [{ t: "Why can't I change this giving entry?", s: 'why', h: "Why can't I change this giving entry?" }, { t: 'Why will the remittance not save?', s: 'why', h: 'Why will the remittance not save?' }] } },
+  { path: /^\/enquiries/, help: { title: 'Online enquiries', manual: 39, steps: ['Find a contact by name, phone, email or handle.', 'Press the pencil on a contact to correct their details.', 'Give each contact a follow-up person, and add them as a newcomer when they come.'], links: [{ t: 'Finding and correcting a contact', s: 'enquiries', h: 'Finding and correcting a contact' }, { t: 'Online enquiries', s: 'enquiries' }] } },
+  { path: /^\/finance/, help: { title: 'Giving & Finance', manual: 42, steps: ['Record giving and expenses on the day, in the forms.', 'The Remittance tab records each month\'s remittance.', 'The Month-end balance tab balances, approves and closes each month.'], links: [{ t: 'Balancing the month', s: 'giving', h: 'Balancing the month' }, { t: "Why can't I add, change or delete this?", s: 'why', h: "Why can't I add, change or delete this giving or expense?" }, { t: "Why can't I change this giving entry?", s: 'why', h: "Why can't I change this giving entry?" }] } },
   { path: /^\/goals/, help: { title: 'Goals', manual: 46, steps: ['Type the figure for goals typed by hand.', 'Add goal, Automatically, makes a goal that updates itself.'], links: [{ t: 'Two kinds of goals', s: 'goals', h: 'Two kinds of goals' }, { t: 'Why is a goal refused?', s: 'why', h: 'Why is a goal refused?' }] } },
   { path: /^\/reports/, help: { title: 'Reports', manual: 48, steps: ['Choose the report and months, then press Generate.'], links: [{ t: 'Why is the report refused?', s: 'why', h: 'Why is the report refused?' }] } },
   { path: /^\/admin/, help: { title: 'Admin', manual: 51, steps: [

@@ -1,3 +1,4 @@
+from decimal import Decimal
 from accounts.permissions import require
 from django.utils import timezone
 from django.db import transaction
@@ -109,6 +110,9 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
         )
 
     def perform_destroy(self, instance):
+        if instance.giving.exists():
+            from finance.monthend import refuse_if_locked
+            refuse_if_locked(instance.location, instance.date, "a session with an offering")
         name = f"{instance.meeting_type.name} · {instance.date}"
         log_audit(self.request.user, "Deleted", "Attendance Session", name)
         instance.delete()
@@ -151,6 +155,12 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
 
         if not session.meeting_type.collects_offering:
             return
+        # A closed month's offering cannot change (Kay, 30 October 2026).
+        before = {g.fund.name.lower(): g.amount for g in session.giving.select_related("fund")}
+        after = {k.lower(): Decimal(str(v)) for k, v in (amounts or {}).items() if v}
+        if before != after:
+            from finance.monthend import refuse_if_locked
+            refuse_if_locked(session.location, session.date, "the offering")
         session.giving.all().delete()
         if not amounts:
             return
@@ -247,9 +257,23 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
                     AttendanceSessionMember(session=session, member_id=mid)
                     for mid in data["attendee_ids"]
                 ])
+                # Newcomers ticked on this page (Kay, 31 October 2026). Only
+                # when the page sent them: an older page leaves them alone.
+                # Rows already there are kept as they are, so a newcomer
+                # checked in online at the door stays online.
+                newcomer_ids = data.get("newcomer_ids")
+                if newcomer_ids is not None:
+                    keep = set(newcomer_ids)
+                    AttendanceSessionMember.objects.filter(session=session, newcomer__isnull=False).exclude(
+                        newcomer_id__in=keep).delete()
+                    have = set(AttendanceSessionMember.objects.filter(
+                        session=session, newcomer__isnull=False).values_list("newcomer_id", flat=True))
+                    AttendanceSessionMember.objects.bulk_create([
+                        AttendanceSessionMember(session=session, newcomer_id=nid) for nid in keep - have
+                    ])
                 # Ticked after their task was made: they were there.
                 from .absence import close_was_present
-                close_was_present(session, member_ids=data["attendee_ids"])
+                close_was_present(session, member_ids=data["attendee_ids"], newcomer_ids=list(newcomer_ids or []))
 
         return Response(AttendanceSessionSerializer(session).data)
 

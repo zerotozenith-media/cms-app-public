@@ -244,6 +244,22 @@ class RecordAttendanceSerializer(serializers.Serializer):
         help_text="Member IDs present. No location restriction, per Batch 0.2.",
     )
 
+    # Newcomers ticked on the session page (Kay, 31 October 2026). Left out
+    # by older pages, in which case newcomers' ticks are not touched.
+    newcomer_ids = serializers.ListField(
+        child=serializers.IntegerField(), required=False,
+        help_text="Newcomer IDs present. Only sent by pages that list newcomers.",
+    )
+
+    def validate_newcomer_ids(self, value):
+        from newcomers.models import Newcomer
+        existing = set(Newcomer.objects.filter(id__in=value).values_list("id", flat=True))
+        missing = set(value) - existing
+        if missing:
+            raise serializers.ValidationError(
+                "Some newcomers ticked here are no longer on the system. Reload the page and tick again.")
+        return value
+
     def validate_attendee_ids(self, value):
         existing = set(Member.objects.filter(id__in=value).values_list("id", flat=True))
         missing = set(value) - existing

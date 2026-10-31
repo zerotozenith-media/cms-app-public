@@ -30,6 +30,7 @@ export function EnquiryProfilePage() {
   const canEdit = hasPermission('newcomers', 'edit');
   const canDelete = hasPermission('newcomers', 'delete');
   const updateEnquiry = useUpdateEnquiry();
+  const editEnquiry = useUpdateEnquiry();
   const { data: followUpPeople = [] } = useFollowUpPeople(canEdit);
   // Men follow up men, women follow up women (Kay). Not known: anyone, with a warning.
   const { id } = useParams();
@@ -51,6 +52,11 @@ export function EnquiryProfilePage() {
   const [newTaskDue, setNewTaskDue] = useState(today());
   const [convertLocation, setConvertLocation] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // Edit details (Kay, 31 October 2026): name and contact details could
+  // not be corrected once an enquiry was recorded.
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState({ name: '', phone: '', email: '', social_handle: '', area: '', enquiry_text: '' });
+  const [editError, setEditError] = useState<string | null>(null);
 
   if (isLoading) return <Skeleton shape="profile" />;
   if (!enquiry) return <div className="card">Enquiry not found.</div>;
@@ -73,6 +79,31 @@ export function EnquiryProfilePage() {
     await changeStage.mutateAsync({ id: record.id, stage: target, note });
   }
 
+  function startEdit() {
+    setDraft({ name: record.name, phone: record.phone ?? '', email: record.email ?? '', social_handle: record.social_handle ?? '',
+      area: record.area ?? '', enquiry_text: record.enquiry_text ?? '' });
+    setEditError(null);
+    setEditing(true);
+  }
+
+  function saveEdit() {
+    if (!draft.name.trim()) { setEditError('Enter their name.'); return; }
+    if (!draft.phone.trim() && !draft.email.trim() && !draft.social_handle.trim()) {
+      setEditError('Keep at least one way to reach them: phone, email or social handle.');
+      return;
+    }
+    editEnquiry.mutate({ id: record.id, ...draft, name: draft.name.trim() }, {
+      onSuccess: () => setEditing(false),
+      onError: (e: any) => {
+        const d = e?.response?.data ?? {};
+        const first = (v: unknown) => (Array.isArray(v) ? v[0] : typeof v === 'string' ? v : null);
+        setEditError(first(d.non_field_errors) ?? first(d.email) ?? first(d.phone) ?? first(d.name) ?? first(d.detail)
+          ?? 'It could not be saved. Check your connection and try again.');
+      },
+    });
+  }
+  const set = (k: keyof typeof draft) => (e: { target: { value: string } }) => { setDraft({ ...draft, [k]: e.target.value }); setEditError(null); };
+
   async function handleConvert() {
     if (!convertLocation) {
       setError('Choose which location they attended.');
@@ -90,7 +121,12 @@ export function EnquiryProfilePage() {
 
       <div className="grid g2">
         <div className="card">
-          <h2 style={{ fontSize: '1.3rem', marginBottom: 2 }}>{enquiry.name}</h2>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+            <h2 style={{ fontSize: '1.3rem', marginBottom: 2, flex: 1 }}>{enquiry.name}</h2>
+            {canEdit && !editing && (
+              <button className="icon-btn edit" title="Edit details" aria-label="Edit details" onClick={startEdit}><Icon name="edit" size={15} /></button>
+            )}
+          </div>
           <div className="muted">
             Came through {enquiry.source_name} on {enquiry.received_at}
           </div>
@@ -98,6 +134,27 @@ export function EnquiryProfilePage() {
             <Badge color="blue">{ENQUIRY_STAGES.find((s) => s.key === enquiry.stage)?.label ?? enquiry.stage}</Badge>
             {enquiry.converted_newcomer && <Badge color="green">Now a newcomer</Badge>}
           </div>
+
+          {editing && (
+            <div className="form-card section-gap enq-edit">
+              <div className="field"><label htmlFor="enq-edit-name">Name</label><input id="enq-edit-name" value={draft.name} onChange={set('name')} /></div>
+              <div className="form-row">
+                <div className="field"><label htmlFor="enq-edit-phone">Phone</label><input id="enq-edit-phone" value={draft.phone} onChange={set('phone')} /></div>
+                <div className="field"><label htmlFor="enq-edit-email">Email</label><input id="enq-edit-email" type="email" value={draft.email} onChange={set('email')} /></div>
+              </div>
+              <div className="form-row">
+                <div className="field"><label htmlFor="enq-edit-handle">Social handle</label><input id="enq-edit-handle" value={draft.social_handle} onChange={set('social_handle')} /></div>
+                <div className="field"><label htmlFor="enq-edit-area">Where they are</label><input id="enq-edit-area" value={draft.area} onChange={set('area')} /></div>
+              </div>
+              <div className="field"><label htmlFor="enq-edit-text">What they asked</label><textarea id="enq-edit-text" rows={3} value={draft.enquiry_text} onChange={set('enquiry_text')} /></div>
+              <div className="field-hint">At least one of phone, email or social handle is needed, so someone can reach them. Gender, follow-up person and stage are changed below.</div>
+              {editError && <p className="form-error" role="alert">{editError}</p>}
+              <div className="form-actions-row">
+                <button className="btn sm" onClick={saveEdit} disabled={editEnquiry.isPending}>{editEnquiry.isPending ? 'Saving...' : 'Save changes'}</button>
+                <button className="btn sm ghost" onClick={() => setEditing(false)}>Cancel</button>
+              </div>
+            </div>
+          )}
 
           <div className="section-gap" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: '.9rem' }}>
             <div><span className="muted">Phone</span><div>{enquiry.phone || '–'}</div></div>

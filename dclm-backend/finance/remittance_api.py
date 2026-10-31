@@ -128,6 +128,8 @@ class RemittanceViewSet(viewsets.ModelViewSet):
                                      location=location).exists():
             raise ValidationError({"month": f"{month:%B %Y} is already recorded for "
                                             f"{location.name}. Open it with Edit to change it."})
+        from .monthend import refuse_if_locked
+        refuse_if_locked(location, serializer.validated_data.get("sent_on") or timezone.localdate(), "a remittance")
         obj = serializer.save(recorded_by=self.request.user, location=location)
         log_audit(self.request.user, "Recorded", "Remittance",
                   f"{obj.month:%B %Y}",
@@ -135,11 +137,21 @@ class RemittanceViewSet(viewsets.ModelViewSet):
                   + (f", ref {obj.reference}" if obj.reference else ""), instance=obj)
 
     def perform_update(self, serializer):
+        from .monthend import refuse_if_locked
+        old = serializer.instance
+        refuse_if_locked(old.location, old.sent_on, "a remittance")
+        refuse_if_locked(old.location, serializer.validated_data.get("sent_on", old.sent_on), "a remittance")
         before = serializer.instance.total_sent
         obj = serializer.save()
         log_audit(self.request.user, "Updated", "Remittance",
                   f"{obj.month:%B %Y}",
                   f"Was {before}, now {obj.total_sent}", instance=obj)
+
+    def perform_destroy(self, instance):
+        from .monthend import refuse_if_locked
+        refuse_if_locked(instance.location, instance.sent_on, "a remittance")
+        log_audit(self.request.user, "Deleted", "Remittance", f"{instance.month:%B %Y}")
+        instance.delete()
 
     @action(detail=False, methods=["get"])
     def proposed(self, request):

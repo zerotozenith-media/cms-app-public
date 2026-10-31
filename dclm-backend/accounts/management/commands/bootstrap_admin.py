@@ -18,7 +18,7 @@ from core.models import Location
 
 MODULES = [
     "members", "attendance", "newcomers", "finance",
-    "goals", "reports", "outreach", "admin",
+    "goals", "reports", "outreach", "admin", "followup-review", "monthend",
 ]
 
 

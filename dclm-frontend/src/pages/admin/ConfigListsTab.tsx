@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ChipList } from '../../components/admin/ChipList';
+import { MoneySettingsCard } from '../../components/admin/MoneySettingsCard';
 import { useAdminLocations, useCreateLocation, useDeleteLocation, useUpdateLocation } from '../../api/admin';
 import { Badge } from '../../components/ui/Badge';
 import { Icon } from '../../components/ui/Icon';
@@ -282,6 +283,7 @@ export function ConfigListsTab() {
   return (
     <>
       <LocationsCard />
+      <MoneySettingsCard />
       <div className="grid g3 section-gap">
         <ChipList title="Funds" endpoint="funds" module="finance" badgeColor="blue" placeholder="New fund" />
         <ChipList title="Payment methods" endpoint="payment-methods" module="finance" badgeColor="green" placeholder="New payment method" />

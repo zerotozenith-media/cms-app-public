@@ -9,6 +9,7 @@ import { Icon } from '../../components/ui/Icon';
 import { useState } from 'react';
 import { ContactFollowUpBar, applyContactFilter, type ContactFilter } from '../../components/enquiries/ContactFollowUpBar';
 import type { Enquiry, EnquiryStage } from '../../types/enquiries';
+import { matchesPerson } from '../../lib/personSearch';
 
 /**
  * Same pipeline pattern as Newcomers, on purpose: a worker who has
@@ -26,6 +27,7 @@ export function EnquiriesPage() {
   const [filter, setFilter] = useState<ContactFilter>('everyone');
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [query, setQuery] = useState('');
   const canSeeOutreach = hasPermission('outreach', 'view');
   const canCreate = hasPermission('newcomers', 'create');
   const canEdit = hasPermission('newcomers', 'edit');
@@ -47,7 +49,9 @@ export function EnquiriesPage() {
   }
 
   const all = enquiries ?? [];
-  const notPursuing = all.filter((e) => e.stage === 'not-pursuing');
+  const notPursuing = all.filter((e) => e.stage === 'not-pursuing' && matchesPerson(e, query));
+  const shown = applyContactFilter(all, filter, user?.id).filter((e) => matchesPerson(e, query));
+  const found = shown.filter((e) => e.stage !== 'not-pursuing').length + notPursuing.length;
 
   const statItems: StatItem[] = [
     { icon: 'userplus', color: 'blue', label: 'Active enquiries', value: stats?.active ?? 0 },
@@ -80,11 +84,24 @@ export function EnquiriesPage() {
 
       {isLoading && <div className="card section-gap"><Skeleton shape="list" /></div>}
 
+      <div className="card section-gap enq-search">
+        <label htmlFor="enq-search" className="cfu-label">Find a contact</label>
+        <input id="enq-search" type="search" className="search" placeholder="Search by name, phone, email or handle..."
+          value={query} onChange={(e) => setQuery(e.target.value)} />
+        {query.trim() && (
+          <div className="muted field-note" role="status">
+            {found === 0
+              ? `Nobody matches "${query.trim()}"${filter !== 'everyone' ? ' with this follow-up person filter. Choose Everyone to search all contacts.' : '.'}`
+              : `${found} found.`}
+          </div>
+        )}
+      </div>
+
       <ContactFollowUpBar all={all} filter={filter} setFilter={setFilter} me={user?.id} canEdit={canEdit}
         selecting={selecting} setSelecting={setSelecting} selected={selected} setSelected={setSelected} />
 
       <EnquiryKanbanBoard
-        enquiries={applyContactFilter(all, filter, user?.id)}
+        enquiries={shown}
         selected={selecting ? selected : undefined}
         onToggle={(id) => { const s = new Set(selected); if (s.has(id)) s.delete(id); else s.add(id); setSelected(s); }}
         onCardClick={(id) => navigate(`/enquiries/${id}`)}

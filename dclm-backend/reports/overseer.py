@@ -258,6 +258,21 @@ def build(ctx, texts, generated_by=None):
             + f", {ctx['label']}"), fig))
     story += by_month(cats, "by_category", "Total expenses", "Expenses by category" + (" and month" if many else "") + " (BHD)")
 
+    # Money held, from the month-end balances approved and closed (Kay, 30 October 2026).
+    bal = ctx.get("balances") or []
+    if bal:
+        all_locs = ctx["scope"].location is None
+        rows = [[(f"{b['location']}, " if all_locs else "") + f"{b['month']:%B %Y}", H.money(b["opening"]),
+                 H.money(b["giving"]), H.money(b["expenses"]), H.money(b["remittance"]), H.money(b["closing"]),
+                 H.money(b["difference"])] for b in bal]
+        story += H.captioned_table(n.table("Money held at each month end (BHD)"),
+                                   ["Month", "Opening", "Giving", "Expenses", "Remittance sent", "Closing", "Difference"],
+                                   rows, [0.22, 0.13, 0.13, 0.13, 0.15, 0.12, 0.12])
+        notes = [b for b in bal if b["difference"] and b["note"]]
+        for b in notes:
+            story.append(H.para(H.safe(f"{b['month']:%B %Y} difference of BHD {H.money(abs(b['difference']))}: "
+                                       f"{b['note']}")))
+
     offering = next((f for f in funds if f.strip().lower() == "offering"), None)
 
     def ratios(mf_list):

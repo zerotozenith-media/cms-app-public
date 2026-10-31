@@ -184,7 +184,7 @@ export function HelpPage() {
         <div className="help-top-btns">
           <button type="button" className="btn outline" onClick={async () => setErr(await downloadManual())}
             title="The whole user manual, with pictures of every screen">Download the manual (PDF, about 7 MB)</button>
-          <button type="button" className="btn outline" onClick={() => jump('new')}>What's new in 11.14</button>
+          <button type="button" className="btn outline" onClick={() => jump('new')}>What's new</button>
           <button type="button" className="btn outline" onClick={() => jump('why')}>Why can't I...?</button>
         </div>
         {err && <div className={err.error ? 'form-error' : 'help-ok'} role={err.error ? 'alert' : 'status'} style={{ marginTop: 10 }}>{err.text}</div>}

@@ -58,6 +58,13 @@ export function NewcomerProfilePage() {
   const deleteNewcomer = useDeleteNewcomer();
   const changeStage = useChangeStage(newcomerId);
   const setMilestone = useSetMilestone(newcomerId);
+  // Go to Journey (Kay, 31 October 2026): Salvation is ticked there, and
+  // "record it on the profile" pointed at the page you were already on.
+  const [tab, setTab] = useState('overview');
+  function goToJourney() {
+    setTab('journey');
+    setTimeout(() => document.getElementById('person-main')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  }
   // Controls a person cannot use are not shown. Making a member also adds
   // them to the member roll, so it needs the Members permission too.
   const { hasPermission } = useAuth();
@@ -198,7 +205,7 @@ export function NewcomerProfilePage() {
           )}
         </div>
         {makeError && <p className="form-error" role="alert">{makeError}</p>}
-        {readiness && <ReadinessCards r={readiness} />}
+        {readiness && <ReadinessCards r={readiness} onGoToJourney={goToJourney} />}
         <div className="muted" style={{ fontSize: '.8rem' }}>
           A newcomer is proposed once the Salvation milestone is recorded, they have attended at
           least half the Friday services at their location since their first check-in, and they first
@@ -368,6 +375,10 @@ export function NewcomerProfilePage() {
                 </select>
                 <div className="field-hint">Moving them gives them a shepherd at the new location if theirs cannot serve it.</div>
               </div>
+              <div className="edit-journey-note">
+                Salvation and other milestones are ticked on the <b>Journey</b> tab.
+                <div><button type="button" className="linkish" onClick={goToJourney}>Go to Journey</button></div>
+              </div>
               {editError && <p className="form-error" role="alert">{editError}</p>}
               <div className="form-actions-row">
                 <button className="btn sm" onClick={saveEdit} disabled={updateNewcomer.isPending}>Save changes</button>
@@ -414,7 +425,7 @@ export function NewcomerProfilePage() {
             <div className="section-gap" style={{ fontSize: '.86rem' }}><span className="muted">Prayer request</span><div>{n.prayer_request}</div></div>
           )}
         </div>
-        <PersonTabs tabs={tabs} />
+        <PersonTabs tabs={tabs} active={tab} onChange={setTab} />
       </div>
       {awayOpen && <AwayModal type="newcomer" id={newcomerId} name={n.name} current={n} onClose={() => setAwayOpen(false)} />}
     </>
