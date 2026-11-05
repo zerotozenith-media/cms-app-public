@@ -141,7 +141,7 @@ function StepBox({ when, what, done, disabled, onSave }: { when: string; what: s
 }
 
 /**
- * Kay: send a message on any day, besides the plan. Choose from the bank, a
+ * Send a message on any day, besides the plan. Choose from the bank, a
  * saved message, or write one, check it, send it in WhatsApp, then confirm.
  * It is recorded in their journey and their plan carries on unchanged.
  */

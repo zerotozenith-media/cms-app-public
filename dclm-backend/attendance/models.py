@@ -65,7 +65,7 @@ class MeetingType(models.Model):
         help_text="Whether the session form asks for an offering. Set here rather "
                   "than fixed in code, so the church can change it.",
     )
-    # Item 20 (Kay, 26 October 2026): sessions were made up to 6 days
+    # Item 20 (26 October 2026): sessions were made up to 6 days
     # ahead and showed Pending, so next Friday looked like work not done.
     # 0 makes each session at 2:07 am on its day.
     create_days_ahead = models.PositiveSmallIntegerField(
@@ -186,7 +186,7 @@ class AttendanceSession(models.Model):
     class Mode(models.TextChoices):
         IN_PERSON = "in-person", "In person"
         ONLINE = "online", "Online"
-        # Kay: every meeting has people joining online, and some meet in
+        # Every meeting has people joining online, and some meet in
         # person too, such as the Friday Worship Service.
         BOTH = "in-person-and-online", "In person and online"
 

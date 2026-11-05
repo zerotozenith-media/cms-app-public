@@ -67,7 +67,7 @@ def outstanding(user):
             items.append({"key": "member-follow-ups", "count": n, "level": "overdue",
                           "label": f"{n} {whose}member {_plural(n, 'follow-up', 'follow-ups')} overdue",
                           "link": "/members/follow-up" if mine_all else "/follow-up"})
-    # Kay, 26 October 2026: reasons owed come first, then the Review list.
+    # 26 October 2026: reasons owed come first, then the Review list.
     from core import followup_review as rev
     from core.followup_access import can_review, coverage
     owed = rev.my_followup(user)["needs_reason"]

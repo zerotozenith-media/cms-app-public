@@ -5,7 +5,7 @@ import { useMyLocations } from '../../api/locations';
 import { useAuth } from '../../context/AuthContext';
 import { Skeleton } from '../../components/ui/Skeleton';
 
-/** Admin, Alerts (Kay, October 2026): send a church announcement to phones
+/** Admin, Alerts (October 2026): send a church announcement to phones
  *  and computers, and see what was sent. */
 export function AlertsTab() {
   const { user: me, hasPermission } = useAuth();

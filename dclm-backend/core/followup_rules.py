@@ -1,5 +1,5 @@
 """
-The follow-up clock and a service's status words (Kay, 26 October 2026).
+The follow-up clock and a service's status words (26 October 2026).
 
 Every time limit counts from the clock start (6:00 pm by default) on the
 day of the service. When names are ticked after the absence check has run,

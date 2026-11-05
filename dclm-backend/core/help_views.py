@@ -1,5 +1,5 @@
 """
-Help & Guide files (Kay, 26 October 2026): the user manual and Help
+Help & Guide files (26 October 2026): the user manual and Help
 pictures, for signed-in people only, because the pictures show church
 names. Also who to ask when Help does not answer it.
 """

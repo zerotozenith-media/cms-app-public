@@ -1,5 +1,5 @@
 """
-Build 3 of the follow-up plan (Kay, 26 October 2026): the Follow-up
+Build 3 of the follow-up plan (26 October 2026): the Follow-up
 Coordinator, late reasons, the Review list and its four choices, alerts,
 the follow-up clock, attendance falling, and the account rules that go
 with them.

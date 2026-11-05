@@ -30,7 +30,7 @@ export const EMPTY_INTAKE_VALUES: IntakeFormValues = {
   gender: '', age_group: '', prayer_request: '', meeting_attended: '',
   is_first_timer: false, is_new_resident: false,
   wants_visit: false, wants_to_know_more: false, wants_salvation_info: false,
-  // F19: ticked by default, as Kay chose.
+  // F19: ticked by default, as chosen.
   keep_in_touch: true,
   invited_by_name: '',
 };

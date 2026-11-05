@@ -1,5 +1,5 @@
 """
-What every follow-up task records so it can be accounted for (Kay, 26
+What every follow-up task records so it can be accounted for (26
 October 2026): what kind of task it is, when its clock started, its exact
 due time, how it ended, who closed it, and how many times in a row the
 person had missed. Shared by member and newcomer tasks, so both follow the

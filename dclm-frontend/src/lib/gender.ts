@@ -1,5 +1,5 @@
 /**
- * Men follow up men, women follow up women (Kay, 10 October 2026). Someone
+ * Men follow up men, women follow up women (10 October 2026). Someone
  * whose gender is not known may go to anyone, with a warning. The server
  * applies the same rule, so these only decide what the lists offer.
  */

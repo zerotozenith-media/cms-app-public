@@ -37,7 +37,7 @@ export function LoginPage() {
       const data = err?.response?.data;
       setWarning(Boolean(data?.warning));
       if (!err?.response) {
-        // No answer from the server is not a wrong password (Kay, 5 November
+        // No answer from the server is not a wrong password (5 November
         // 2026): during the server move everyone was told their password
         // was wrong.
         setError('Cannot reach the server, so you could not be signed in. Your password was not checked. Check your internet connection and try again. If it keeps happening, tell your administrator.');

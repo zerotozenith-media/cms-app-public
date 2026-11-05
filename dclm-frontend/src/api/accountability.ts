@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
 
 /**
- * Follow-up accountability (Kay, 26 October 2026): a shepherd's one list,
+ * Follow-up accountability (26 October 2026): a shepherd's one list,
  * results, reasons for late tasks, the Follow-up Coordinator's Review list,
  * alerts kept in the app, and Away dates.
  */

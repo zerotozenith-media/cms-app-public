@@ -29,7 +29,7 @@ export interface AdminUser {
   can_shepherd?: boolean;
   gender?: '' | 'Male' | 'Female';
   last_login: string | null;
-  /** Follow-up Coordinator tick (Kay, 26 October 2026), any role. */
+  /** Follow-up Coordinator tick (26 October 2026), any role. */
   is_followup_coordinator?: boolean;
   /** Blank with the tick on means All locations. */
   coordinates_location?: string | null;

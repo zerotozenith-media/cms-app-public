@@ -4,7 +4,7 @@ Working out each person's points, level and next steps (F21).
 Points come from the last 90 days. About 70% reward effort, which is in
 the person's hands, and 30% reward results, which are shared credit,
 because how people respond is not in the shepherd's control. The figures
-are the drafts Kay approved.
+are the drafts the church approved.
 """
 import datetime
 import math

@@ -90,7 +90,7 @@ class Member(models.Model):
     status_date = models.DateField(null=True, blank=True)
     status_note = models.CharField(max_length=300, blank=True, default="")
 
-    # A known absence, such as travel or illness (Kay, 26 October 2026). No
+    # A known absence, such as travel or illness (26 October 2026). No
     # absence tasks are made from away_from to away_to.
     class AwayReason(models.TextChoices):
         TRAVELLING = "travelling", "Travelling"
@@ -173,7 +173,7 @@ class MemberFollowUpTask(AccountableTask):
         "attendance.AttendanceSession", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="generated_followups",
     )
-    # Blank for a task added by hand on the member's profile (Kay, 17 Oct
+    # Blank for a task added by hand on the member's profile (17 Oct
     # 2026), which is not about a particular missed service.
     missed_meeting_name = models.CharField(max_length=150, blank=True, default="")
     missed_date = models.DateField(null=True, blank=True)

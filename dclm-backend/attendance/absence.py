@@ -1,7 +1,7 @@
 """
 Who missed a service, and their follow-up tasks. Used by the automatic
 absence check and by "Follow up those not ticked" on a service ticked off
-afterwards, so both follow the same rules (Kay, 26 October 2026):
+afterwards, so both follow the same rules (26 October 2026):
 
   - only people expected at that meeting: its audience, its location, not
     marked Away that day, members still attending (not Moved away or
@@ -148,7 +148,7 @@ def close_was_present(session, member_ids=(), newcomer_ids=()):
     """
     Somebody ticked after their task was made was there after all: the
     task closes as Was present and does not count against the shepherd,
-    who is told (Kay, 26 October 2026). Returns the names closed.
+    who is told (26 October 2026). Returns the names closed.
     """
     from core.accountable import TaskResult
     from core.task_actions import person_name

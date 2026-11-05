@@ -4,7 +4,7 @@ import { HelpMark } from '../../components/ui/HelpMark';
 import { Skeleton } from '../../components/ui/Skeleton';
 
 /**
- * Admin, Follow-up Rules (Kay, 26 October 2026, plan demos 1 and 2). Every
+ * Admin, Follow-up Rules (26 October 2026, plan demos 1 and 2). Every
  * follow-up time and number in one place, one set for every location.
  * Only an administrator covering All locations changes them, and each
  * change is written to the Audit Log.
@@ -143,6 +143,9 @@ export function FollowUpRulesTab() {
       <div className="card fr-card">
         <h3>Shepherds and newcomers</h3>
         {row('People per shepherd before a warning', 'frLimit', num('shepherd_limit'), 'shepherd_limit', 'Auto-assign shows "7 of 6" and still lets you go ahead')}
+        {row('All-locations accounts can shepherd at any location', 'frAnywhere',
+          tick('On', !!draft.shepherd_anywhere, (v) => set('shepherd_anywhere', v)), 'shepherd_anywhere',
+          'Off: someone covering All locations shepherds only at the location on their member record')}
         {row('Newcomer stages followed up', 'frStages', <>
           {tick('New', stages.includes('new'), (v) => toggleStage('new', v))}
           {tick('Contacted', stages.includes('contacted'), (v) => toggleStage('contacted', v))}

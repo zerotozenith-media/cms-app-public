@@ -190,7 +190,7 @@ class RegisteredOnTheDay(Base):
 
 
 class AfterTheService(Base):
-    """Ticking names off for a session already filled in (Kay, 17 Oct 2026)."""
+    """Ticking names off for a session already filled in (17 Oct 2026)."""
 
     def test_a_filled_session_from_last_week_takes_check_ins_and_keeps_its_headcount(self):
         last_week = self.today - datetime.timedelta(days=7)
@@ -219,7 +219,7 @@ class AfterTheService(Base):
 
 
 class NamedOnSessionPage(Base):
-    """Newcomers ticked under Track named attendance (Kay, 31 October 2026)."""
+    """Newcomers ticked under Track named attendance (31 October 2026)."""
     def record(self, s, **extra):
         body = {"men": 1, "track_named": True, "attendee_ids": [], **extra}
         return self.client.post(f"/api/attendance-sessions/{s.id}/record/", body, format="json")

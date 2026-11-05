@@ -722,7 +722,7 @@
 @media (max-width:900px){ .contact-grid{grid-template-columns:repeat(2,minmax(0,1fr))} }
 @media (max-width:480px){ .contact-grid{grid-template-columns:1fr} }
 
-/* Sign-in, reset and new password screens (Kay's approved design).
+/* Sign-in, reset and new password screens (the church's approved design).
    Logo red #E01E28 for accents, blue for buttons, no gold. */
 .auth-screen{display:grid;grid-template-columns:1.05fr 1fr;min-height:100vh;background:#F3F6FB}
 .auth-brand{background:#0B1F44;color:#fff;padding:48px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:26px}
@@ -1056,14 +1056,14 @@
 .bl-total{font-size:.8rem}
 @media (max-width:900px){.bl-grid{grid-template-columns:1fr;gap:12px}}
 
-/* Tips placed from the screen's edges (Kay: cut off on phones). */
+/* Tips placed from the screen's edges (cut off on phones). */
 .help-pop{max-width:none;z-index:90}
 .help-pop.phone{padding:13px 15px}
 .help-pop.phone .help-pop-title{font-size:.95rem;display:flex;align-items:center;justify-content:space-between;gap:8px}
 .help-pop.phone .help-pop-body{font-size:.92rem;line-height:1.55}
 .help-pop-close{background:none;border:0;font-size:1.3rem;line-height:1;color:var(--muted);cursor:pointer;min-width:36px;min-height:36px;margin:-8px -8px -8px 0}
 
-/* Kay: on phones, tabs ran off the screen with no sign of the rest, such
+/* On phones, tabs ran off the screen with no sign of the rest, such
    as Attendance and Messages on a profile. Every tab bar now wraps, so all
    tabs are always in view. */
 @media (max-width:600px){
@@ -1084,7 +1084,7 @@
 .hc-grid input{border:1.5px solid var(--line);border-radius:9px;padding:.6rem .75rem;background:var(--sky-2);font:inherit}
 .hc-grid input:focus{outline:2px solid #7FB0F5;outline-offset:1px;background:#fff}
 
-/* Kay, October 2026: follow-up people for online contacts. Phone first,
+/* October 2026: follow-up people for online contacts. Phone first,
    so no button ever touches another: every row wraps with a gap, and on
    a phone the controls take the full width, one per line. */
 .cfu-bar{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center;justify-content:space-between;padding:12px 16px}
@@ -1119,7 +1119,7 @@
 }
 .enq-followup{width:100%;min-height:40px;margin-top:4px}
 
-/* Kay, October 2026: on phones the top bar's controls sat 2px apart and
+/* October 2026: on phones the top bar's controls sat 2px apart and
    looked joined. An 8px gap between each, with the service badge's
    invisible tap padding trimmed so the page title keeps its room. */
 @media (max-width:600px){
@@ -1131,7 +1131,7 @@
   .tb-service-btn{min-width:34px}
 }
 
-/* Kay, October 2026: the deep phone check found controls touching in
+/* October 2026: the deep phone check found controls touching in
    these places. Every one now has clear space around it. */
 .report-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .ts-arrows{gap:8px}
@@ -1141,13 +1141,13 @@
   .person-tabs{row-gap:8px}
   .report-actions .btn{flex:1 1 140px}
 }
-/* Kay, October 2026, deep check on tablets and computers: row Edit and
+/* October 2026, deep check on tablets and computers: row Edit and
    Delete buttons, and the help topics, touched each other. */
 td.td-actions{white-space:nowrap}
 td.td-actions .icon-btn + .icon-btn,.row-actions .icon-btn + .icon-btn,td.td-actions .btn + .icon-btn{margin-left:8px}
 .help-nav-item{margin-bottom:5px}
 
-/* Gender matching (Kay, 10 October 2026) */
+/* Gender matching (10 October 2026) */
 .gender-tag{display:inline-block;font-size:.72rem;font-weight:700;line-height:1.3;border-radius:6px;padding:2px 7px;white-space:nowrap;vertical-align:middle}
 .gender-tag.g-male{background:#E3EEFB;color:#1F4E79}
 .gender-tag.g-female{background:#FBE6EF;color:#8A2252}
@@ -1168,7 +1168,7 @@ td.td-actions .icon-btn + .icon-btn,.row-actions .icon-btn + .icon-btn,td.td-act
 .row-warn td{background:#FFFBEF}
 .form-actions-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px}
 
-/* Loading screens on every page (Kay, October 2026) */
+/* Loading screens on every page (October 2026) */
 .sk-value{width:56%;max-width:90px;height:22px;margin:4px 0 0}
 .sk-inline{padding:4px 0}
 .sk-board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
@@ -1179,7 +1179,7 @@ td.td-actions .icon-btn + .icon-btn,.row-actions .icon-btn + .icon-btn,td.td-act
 .sk-chart{width:100%;height:200px;border-radius:12px}
 .sk-mini{display:inline-block;width:40px;height:14px;margin:0;vertical-align:middle}
 
-/* Alerts on this device (Kay, October 2026) */
+/* Alerts on this device (October 2026) */
 .alerts-intro{font-size:.85rem;margin:4px 0 12px}
 .alerts-actions{margin-bottom:12px}
 .alerts-on{background:#E3F5EA;color:#1E7A43;border-radius:8px;padding:6px 10px;font-weight:700;font-size:.8rem}
@@ -1220,7 +1220,7 @@ td.td-actions .icon-btn + .icon-btn,.row-actions .icon-btn + .icon-btn,td.td-act
 .followup-confirm{background:#FFF7E6;border:1px solid #F0D9A8;border-radius:10px;padding:10px 12px}
 .followup-confirm .muted{font-size:.84rem;margin:4px 0 10px}
 
-/* Admin, Follow-up Rules (Kay, 26 October 2026). */
+/* Admin, Follow-up Rules (26 October 2026). */
 .fr-page .gender-notice{margin:0 0 14px}
 .fr-card{margin-bottom:14px}
 .fr-card h3{margin:0 0 2px}
@@ -1244,7 +1244,7 @@ td.td-actions .icon-btn + .icon-btn,.row-actions .icon-btn + .icon-btn,td.td-act
 .linkish{background:none;border:0;padding:4px 0;color:var(--blue);font:inherit;font-size:.82rem;text-decoration:underline;cursor:pointer;display:inline-flex;align-items:center;min-height:36px}
 .user-off{opacity:.6}
 
-/* Follow-up screens (Kay, 26 October 2026). */
+/* Follow-up screens (26 October 2026). */
 .fa-modal{align-items:flex-start;overflow:auto}
 .fa-modal .fu-box{margin:16px auto}
 .fa-person{padding:14px 16px;margin-bottom:12px}
@@ -1300,7 +1300,7 @@ td.td-actions .icon-btn + .icon-btn,.row-actions .icon-btn + .icon-btn,td.td-act
 .fu-missed-skip{font-size:.78rem;color:#5A6781}
 .att-acts{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
 
-/* Help & Guide for version 11.14 (Kay, 26 October 2026). */
+/* Help & Guide for version 11.14 (26 October 2026). */
 .tb-help-menu{width:340px;max-width:calc(100vw - 24px);max-height:75vh;overflow:auto}
 .tb-help-steps{margin:0 10px 8px;padding-left:20px;font-size:.86rem;line-height:1.6;color:var(--ink)}
 .tb-help-steps li{margin-bottom:4px}
@@ -1350,7 +1350,7 @@ td.td-actions .icon-btn + .icon-btn,.row-actions .icon-btn + .icon-btn,td.td-act
   .tb-badge .tb-face.sm{width:28px;height:28px;font-size:.7rem}
 }
 
-/* Month-end balance (Kay, 30 October 2026). */
+/* Month-end balance (30 October 2026). */
 .me-steps{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 14px}
 .me-step{flex:1 1 180px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:.82rem;background:#fff}
 .me-step.on{border-color:var(--blue);background:var(--sky)}
@@ -1403,3 +1403,9 @@ td.td-actions .icon-btn + .icon-btn,.row-actions .icon-btn + .icon-btn,td.td-act
 .other-day-actions{margin:-4px 0 12px}
 
 .form-error .linkish{min-height:0;padding:0;display:inline}
+
+/* v11.18: who is not offered as a shepherd, and why */
+.not-offered{background:#FFF6E0;border-left:4px solid #c98a00;border-radius:6px;padding:6px 10px;margin:6px 0 10px;font-size:.8rem;flex-basis:100%}
+.not-offered summary{font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;min-height:32px}
+.not-offered ul{margin:4px 0 2px;padding-left:16px}
+.not-offered li{margin:2px 0}

@@ -47,7 +47,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         """A Follow-up Coordinator covers All locations or one location, and
-        never more than the account itself can see (Kay, 26 October 2026)."""
+        never more than the account itself can see (26 October 2026)."""
         get = lambda f: attrs.get(f, getattr(self.instance, f, None))
         if get("is_followup_coordinator"):
             loc = get("location")

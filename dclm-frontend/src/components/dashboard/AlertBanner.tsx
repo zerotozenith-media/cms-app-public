@@ -22,7 +22,7 @@ function snooze(uid?: number) {
 }
 
 /**
- * Invites people to turn alerts on for the device they are using (Kay,
+ * Invites people to turn alerts on for the device they are using (
  * October 2026). Shown on the dashboard until alerts are on here, or until
  * Not now, which hides it on this device for 30 days. Never shown where the
  * browser cannot do alerts, or where they were blocked.

@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 
 def coordinator_role(apps, schema_editor):
-    """The Follow-up Coordinator role (Kay, 26 October 2026), for people who
+    """The Follow-up Coordinator role (26 October 2026), for people who
     do only this work: follow-up only, every tick changeable in Admin, Roles
     & Permissions. Administrators get the new Follow-up review module too."""
     Role = apps.get_model("accounts", "Role")

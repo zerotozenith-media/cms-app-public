@@ -1,5 +1,5 @@
 """
-Add the church records that were missing after the data load (Kay, 6 October 2026):
+Add the church records that were missing after the data load (6 October 2026):
 
   - the July GCK, "The Season of Divine Turnaround", 29 July to 2 August 2026;
   - September's Ministers' Renewal, 28 September 2026;
@@ -18,7 +18,7 @@ from django.db import transaction
 from django.utils import timezone
 
 THEME = "The Season of Divine Turnaround"
-# GCK days sent by Kay: brothers, sisters, boys and girls (children).
+# GCK days sent by the church: brothers, sisters, boys and girls (children).
 JULY_GCK = [("2026-07-29", 8, 4, 4, 2), ("2026-07-30", 6, 4, 3, 1), ("2026-07-31", 9, 4, 3, 2),
             ("2026-08-01", 5, 3, 3, 1), ("2026-08-02", 6, 4, 4, 2)]
 RENEWAL = ("2026-09-28", 4, 2)

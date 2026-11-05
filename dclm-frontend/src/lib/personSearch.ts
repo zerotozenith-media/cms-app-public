@@ -1,6 +1,6 @@
 /**
  * Search a loaded list of people by name, phone, email or social handle
- * (Kay, 31 October 2026: Newcomers and Online Enquiries had no search).
+ * (31 October 2026: Newcomers and Online Enquiries had no search).
  *
  * Phone numbers match on digits only, so "3312 4455", "+973 33124455" and
  * "33124455" all find the same person.

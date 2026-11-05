@@ -1,5 +1,5 @@
 """
-The follow-up screens' data (Kay, 26 October 2026):
+The follow-up screens' data (26 October 2026):
 
   GET  followup/my/                    a shepherd's one list, members and
                                        newcomers together, late first
@@ -84,7 +84,7 @@ class MyFollowUpView(APIView):
 
 class ReasonsView(APIView):
     """
-    POST every late task's reason at once (Kay, 26 October 2026): each task
+    POST every late task's reason at once (26 October 2026): each task
     still has its own reason and new date, but they are checked together,
     saved together, and the Follow-up Coordinator gets one alert.
     """

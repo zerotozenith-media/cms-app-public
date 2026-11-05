@@ -84,7 +84,7 @@ class TodayView(APIView):
 
 class MissedView(APIView):
     """
-    Item 10 (Kay, 26 October 2026): planned messages from the last 14 days
+    Item 10 (26 October 2026): planned messages from the last 14 days
     not sent, or skipped. GET lists them; POST {enrolment, date, action:
     "sent" with text, or "dismiss"} records it on that day's plan or takes
     it off the list.
@@ -409,7 +409,7 @@ class SavedView(APIView):
 
 
 class SendExtraView(APIView):
-    """Kay: send a message on any day, chosen from the bank, saved, or written.
+    """Send a message on any day, chosen from the bank, saved, or written.
     Recorded in their journey, and the plan carries on unchanged."""
     permission_classes = [IsAuthenticated]
 
@@ -442,7 +442,7 @@ def _startable(user, said_no=False):
 
 def _startable_contacts():
     """Online contacts still being followed up who are not on any journey
-    (Kay: the 59 Facebook contacts were loaded with messages not started).
+    (the 59 Facebook contacts were loaded with messages not started).
     Contacts have no location, so everyone who works on them sees all."""
     from enquiries.models import Enquiry
     on = Enrolment.objects.filter(status=Enrolment.Status.ACTIVE, enquiry__isnull=False).values_list("enquiry_id", flat=True)
@@ -451,7 +451,7 @@ def _startable_contacts():
 
 
 class StartManyView(APIView):
-    """Kay: choose which newcomers start receiving messages."""
+    """Choose which newcomers start receiving messages."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):

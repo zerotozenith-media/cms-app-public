@@ -2,7 +2,7 @@ import { lazy } from 'react';
 import type { ComponentType } from 'react';
 
 /**
- * Speed (Kay, 27 October 2026): each page is downloaded only when it is
+ * Speed (27 October 2026): each page is downloaded only when it is
  * first opened, so signing in loads less. After an update the old page
  * files are gone, so a page that cannot be fetched reloads the app once to
  * get the new version instead of showing a blank screen.

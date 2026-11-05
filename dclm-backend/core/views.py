@@ -220,7 +220,7 @@ class FollowUpRulesSerializer(serializers.ModelSerializer):
 
 class FollowUpRulesView(APIView):
     """
-    Admin, Follow-up Rules (Kay, 26 October 2026). Everyone signed in can
+    Admin, Follow-up Rules (26 October 2026). Everyone signed in can
     read the rules, because every follow-up screen shows times worked out
     from them. Only an administrator covering every location can change
     them, since they apply at every location; each change is logged.

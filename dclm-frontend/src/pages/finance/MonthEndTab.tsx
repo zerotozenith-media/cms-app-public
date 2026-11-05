@@ -1,5 +1,5 @@
 /**
- * Month-end balance (Kay, 30 October 2026).
+ * Month-end balance (30 October 2026).
  *
  * 1. Accounts records giving and expenses through the month.
  * 2. Accounts balances the month: what the records say should be held

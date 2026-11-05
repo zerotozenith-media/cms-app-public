@@ -155,7 +155,7 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
 
         if not session.meeting_type.collects_offering:
             return
-        # A closed month's offering cannot change (Kay, 30 October 2026).
+        # A closed month's offering cannot change (30 October 2026).
         before = {g.fund.name.lower(): g.amount for g in session.giving.select_related("fund")}
         after = {k.lower(): Decimal(str(v)) for k, v in (amounts or {}).items() if v}
         if before != after:
@@ -257,7 +257,7 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
                     AttendanceSessionMember(session=session, member_id=mid)
                     for mid in data["attendee_ids"]
                 ])
-                # Newcomers ticked on this page (Kay, 31 October 2026). Only
+                # Newcomers ticked on this page (31 October 2026). Only
                 # when the page sent them: an older page leaves them alone.
                 # Rows already there are kept as they are, so a newcomer
                 # checked in online at the door stays online.
@@ -366,7 +366,7 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
     def follow_up_absent(self, request, pk=None):
         """
         "Follow up those not ticked" on a service ticked off afterwards
-        (Kay, 17 Oct 2026). The automatic check covers services that follow
+        (17 Oct 2026). The automatic check covers services that follow
         up absence for 7 days; anything older, or any other meeting, is
         followed up only when somebody asks. GET says how many, POST makes
         the tasks. The same rules as the automatic check apply.
@@ -440,7 +440,7 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
     @action(detail=True, methods=["post"], url_path="change")
     def change(self, request, pk=None):
         """
-        Change a session's meeting or date (Kay, 5 November 2026), keeping
+        Change a session's meeting or date (5 November 2026), keeping
         its headcount, names ticked and offering. Monday Bible Study was
         added on Wednesday 14 October and the only way out was to delete it.
         Administrators only, with the same checks as adding a session.
@@ -550,13 +550,33 @@ class FellowshipViewSet(viewsets.ModelViewSet):
         # PROTECT on the session link already prevents this at the database
         # level, but the message it raises means nothing to a church
         # administrator.
-        if instance.sessions.exists():
+        # Empty sessions go with it (5 November 2026): Women / Sisters
+        # Meeting was added as a fellowship by mistake and had an empty
+        # session every Friday, each to be deleted by hand first. Sessions
+        # holding anything are listed instead, to be moved or deleted.
+        from django.db.models import Count, Q
+        sessions = instance.sessions.annotate(
+            n_names=Count("attendees", distinct=True), n_giving=Count("giving", distinct=True),
+            n_tasks=Count("generated_followups", distinct=True) + Count("newcomer_followups", distinct=True))
+        kept, empty = [], []
+        for s in sessions.order_by("date"):
+            held = (s.status == AttendanceSession.Status.FILLED or s.total or s.n_names or s.n_giving or s.n_tasks
+                    or s.new_comers or s.new_converts)
+            (kept if held else empty).append(s)
+        if kept:
+            dates = ", ".join(f"{s.date:%-d %b %Y}" for s in kept[:6]) + (" and more" if len(kept) > 6 else "")
             raise ValidationError({
-                "detail": f"{instance.name} has {instance.sessions.count()} session(s) "
-                          "recorded. Those records would lose what they belong to."
-            })
-        log_audit(self.request.user, "Deleted", "Fellowship", instance.name, "")
-        instance.delete()
+                "detail": f"{instance.name} has {len(kept)} session{'s' if len(kept) != 1 else ''} with attendance, "
+                          f"names, an offering or follow-up tasks recorded ({dates}). Open each in Attendance and "
+                          f"press Change date or meeting to move it to the right meeting, or delete it if it was "
+                          f"recorded by mistake. Then delete {instance.name} again. Empty sessions are removed "
+                          f"with it."})
+        with transaction.atomic():
+            n = len(empty)
+            AttendanceSession.objects.filter(pk__in=[s.pk for s in empty]).delete()
+            log_audit(self.request.user, "Deleted", "Fellowship", instance.name,
+                      f"{n} empty session{'s' if n != 1 else ''} removed with it." if n else "")
+            instance.delete()
 
 
 

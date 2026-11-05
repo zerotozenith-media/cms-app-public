@@ -12,6 +12,7 @@ import { Pagination } from '../../components/ui/Pagination';
 import { Badge } from '../../components/ui/Badge';
 import { Icon } from '../../components/ui/Icon';
 import { HelpMark } from '../../components/ui/HelpMark';
+import { NotOffered } from '../../components/members/NotOffered';
 import { useAuth } from '../../context/AuthContext';
 import { useLocationName } from '../../api/locations';
 
@@ -203,7 +204,7 @@ export function MembersListPage() {
         )}
 
         {/* Shepherds who break a rule: a man shepherding a woman, a woman
-            shepherding a man, or someone shepherding themselves (Kay). */}
+            shepherding a man, or someone shepherding themselves. */}
         {!previewMode && (problems?.count ?? 0) > 0 && (
           <div className="assign-preview shepherd-problems" role="status">
             <div className="assign-preview-title">
@@ -283,6 +284,9 @@ export function MembersListPage() {
             <button className="btn sm ghost" onClick={() => { setSelected([]); setBulkError(''); }}>Clear</button>
             {bulkError && <span className="form-error cfu-msg" role="alert">{bulkError}</span>}
           </div>
+        )}
+        {selected.length > 0 && (
+          <NotOffered genders={[]} eligible={shepherds} />
         )}
 
         <div style={{ overflowX: 'auto' }}>

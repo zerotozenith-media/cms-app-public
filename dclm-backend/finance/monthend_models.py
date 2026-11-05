@@ -1,5 +1,5 @@
 """
-Month-end balance (Kay, 30 October 2026).
+Month-end balance (30 October 2026).
 
 Each month the money held is balanced: what the records say should be
 there (the opening balance, plus giving, less expenses, less remittance

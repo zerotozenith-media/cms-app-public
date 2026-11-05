@@ -4,7 +4,7 @@ import { useAlertSettings, useSaveAlertKind, useTestAlert } from '../../api/aler
 import { currentSubscription, deviceKind, isIOS, isStandalone, pushState, turnOff, turnOn, type PushState } from '../../lib/push';
 
 /**
- * Item 16 (Kay, 26 October 2026): when alerts are blocked, the steps to
+ * Item 16 (26 October 2026): when alerts are blocked, the steps to
  * allow them on this kind of device, rather than "check your settings".
  */
 function BlockedSteps({ onTry, busy }: { onTry: () => void; busy: boolean }) {
@@ -48,7 +48,7 @@ function BlockedSteps({ onTry, busy }: { onTry: () => void; busy: boolean }) {
 }
 
 /**
- * Alerts on this device (Kay, October 2026). Turned on once per phone or
+ * Alerts on this device (October 2026). Turned on once per phone or
  * computer. The choices of which alerts to get belong to the person, so
  * they follow them to every device.
  */

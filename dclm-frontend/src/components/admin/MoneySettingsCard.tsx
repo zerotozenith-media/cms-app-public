@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { HelpMark } from '../ui/HelpMark';
 
 /**
- * Money (Kay, 30 October 2026): how each location keeps its money and where
+ * Money (30 October 2026): how each location keeps its money and where
  * its month-end balancing starts. The start month and opening balance can
  * change until the first month is sent for approval.
  */

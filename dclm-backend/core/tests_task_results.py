@@ -1,5 +1,5 @@
 """
-Build 2 of the follow-up plan (Kay, 26 October 2026): due times from the
+Build 2 of the follow-up plan (26 October 2026): due times from the
 6:00 pm clock, tasks that pile, newcomers followed up after missing a
 service, the five results, one visit closing all, Away, Was present,
 cancelling and changing a due time.

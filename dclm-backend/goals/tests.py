@@ -206,7 +206,7 @@ class SeedGoalsCommandTestCase(TestCase):
 
 
 class AutomaticGoalsTestCase(APITestCase):
-    """Item 11 (Kay, 26 October 2026): goals that update themselves from the records."""
+    """Item 11 (26 October 2026): goals that update themselves from the records."""
 
     def setUp(self):
         import datetime

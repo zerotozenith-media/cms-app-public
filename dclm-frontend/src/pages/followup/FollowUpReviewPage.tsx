@@ -122,7 +122,7 @@ function ShepherdRows({ id, location }: { id: number; location: string | null })
 }
 
 /**
- * Follow-up Review (Kay, 26 October 2026, plan demos 10 to 12): the
+ * Follow-up Review (26 October 2026, plan demos 10 to 12): the
  * measures against the targets, every shepherd's people and record, and
  * the Review list of late tasks with the four choices.
  */

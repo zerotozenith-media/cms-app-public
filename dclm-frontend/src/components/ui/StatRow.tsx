@@ -17,7 +17,7 @@ interface StatRowProps {
   stats: StatItem[];
   columns?: 3 | 4;
   /** While the figures are on their way, each value shows a pulsing bar
-   *  instead of a 0 that looks real (Kay, October 2026). */
+   *  instead of a 0 that looks real (October 2026). */
   loading?: boolean;
 }
 

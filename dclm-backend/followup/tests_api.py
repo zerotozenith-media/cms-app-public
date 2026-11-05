@@ -199,7 +199,7 @@ class OneJourneyAfterRestartTestCase(Base):
 
 
 class SendAnyDayTestCase(Base):
-    """Kay: a message on any day, besides the plan."""
+    """A message on any day, besides the plan."""
     as_ = FollowUpApiTestCase.as_
 
     def setUp(self):
@@ -229,7 +229,7 @@ class SendAnyDayTestCase(Base):
 
 
 class StartManyTestCase(Base):
-    """Kay: choose which newcomers start receiving messages."""
+    """Choose which newcomers start receiving messages."""
     as_ = FollowUpApiTestCase.as_
 
     def setUp(self):
@@ -258,7 +258,7 @@ class StartManyTestCase(Base):
 
 
 class MissedMessagesTestCase(Base):
-    """Item 10 (Kay, 26 October 2026): planned messages not sent, or skipped."""
+    """Item 10 (26 October 2026): planned messages not sent, or skipped."""
 
     def setUp(self):
         super().setUp()

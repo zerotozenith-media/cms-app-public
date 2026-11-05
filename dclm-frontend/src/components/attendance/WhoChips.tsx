@@ -1,5 +1,5 @@
 /**
- * Everyone / Members / Newcomers / Not ticked (Kay, 31 October 2026), so a
+ * Everyone / Members / Newcomers / Not ticked (31 October 2026), so a
  * long check-in list can be narrowed with one tap instead of scrolling.
  * Used on Live check-in and on the session page's named attendance.
  */

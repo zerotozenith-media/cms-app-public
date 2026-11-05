@@ -1,4 +1,4 @@
-"""Month-end balance (Kay, 30 October 2026)."""
+"""Month-end balance (30 October 2026)."""
 import datetime
 from decimal import Decimal
 

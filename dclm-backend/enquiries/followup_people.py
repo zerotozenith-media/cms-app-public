@@ -1,5 +1,5 @@
 """
-Who follows up online contacts (Kay, 10 October 2026).
+Who follows up online contacts (10 October 2026).
 
 Contacts are not tied to a location, so anyone ticked "Can shepherd others"
 whose role can work on contacts (the newcomers permission, which Online

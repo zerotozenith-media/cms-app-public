@@ -39,7 +39,7 @@ def build_shepherd_digest(shepherd_name, tasks, today=None):
         return (t.due_at < now) if t.due_at else (t.due_date < today)
 
     def _due(t):
-        # The exact due time where there is one (Kay, 26 October 2026).
+        # The exact due time where there is one (26 October 2026).
         return f"due {timezone.localtime(t.due_at):%a %-d %b, %-I:%M %p}" if t.due_at else f"due {t.due_date}"
 
     overdue = [t for t in tasks if _late(t)]

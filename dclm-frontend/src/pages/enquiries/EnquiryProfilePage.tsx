@@ -32,7 +32,7 @@ export function EnquiryProfilePage() {
   const updateEnquiry = useUpdateEnquiry();
   const editEnquiry = useUpdateEnquiry();
   const { data: followUpPeople = [] } = useFollowUpPeople(canEdit);
-  // Men follow up men, women follow up women (Kay). Not known: anyone, with a warning.
+  // Men follow up men, women follow up women. Not known: anyone, with a warning.
   const { id } = useParams();
   const enquiryId = Number(id);
   const navigate = useNavigate();
@@ -52,7 +52,7 @@ export function EnquiryProfilePage() {
   const [newTaskDue, setNewTaskDue] = useState(today());
   const [convertLocation, setConvertLocation] = useState('');
   const [error, setError] = useState<string | null>(null);
-  // Edit details (Kay, 31 October 2026): name and contact details could
+  // Edit details (31 October 2026): name and contact details could
   // not be corrected once an enquiry was recorded.
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ name: '', phone: '', email: '', social_handle: '', area: '', enquiry_text: '' });

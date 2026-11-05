@@ -13,7 +13,7 @@ function clock(t: string) {
 }
 
 /**
- * Settings for one meeting (Kay, 26 October 2026, plan demo 3): start time,
+ * Settings for one meeting (26 October 2026, plan demo 3): start time,
  * when each session is created, and where it is held. Every value is the
  * administrator's to change, so nothing about a meeting is fixed in code.
  */

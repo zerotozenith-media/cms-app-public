@@ -1,5 +1,5 @@
 """
-Build 1 of the follow-up plan (Kay, 26 October 2026): Follow-up Rules,
+Build 1 of the follow-up plan (26 October 2026): Follow-up Rules,
 meetings made on their day and only where held, the status words, Did not
 hold, and refusing a duplicate session.
 """

@@ -71,7 +71,7 @@ function PersonCard({ p, onRecord, onReasons, onAway }: { p: PersonGroup; onReco
 }
 
 /**
- * My follow-up (Kay, 26 October 2026, plan demo 6): one list of a
+ * My follow-up (26 October 2026, plan demo 6): one list of a
  * shepherd's members and newcomers, late tasks first. A Follow-up
  * Coordinator or administrator can open any shepherd's list.
  */

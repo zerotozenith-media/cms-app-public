@@ -1,7 +1,7 @@
 """
 Load the church's own records, which travel inside this update: the July to
 September 2026 monthly reports, the members, the newcomers and the Facebook
-advert contacts, with every correction Kay approved already applied.
+advert contacts, with every correction the church approved already applied.
 
     python manage.py load_church_data          checks everything, keeps nothing
     python manage.py load_church_data --yes    loads it, all at once or not at all

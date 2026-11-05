@@ -73,7 +73,7 @@ class EnquiryViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         before = serializer.instance.assigned_to_id
-        # Details edited from the pencil on the enquiry (Kay, 31 October
+        # Details edited from the pencil on the enquiry (31 October
         # 2026) are audited, naming what changed.
         labels = {"name": "Name", "phone": "Phone", "email": "Email", "social_handle": "Social handle",
                   "area": "Where they are", "enquiry_text": "What they asked"}
@@ -191,7 +191,7 @@ class EnquiryViewSet(viewsets.ModelViewSet):
         )
         return Response(EnquirySerializer(enquiry).data)
 
-    # ------------------------------------------------ follow-up people (Kay)
+    # ------------------------------------------------ follow-up people
     @action(detail=False, methods=["get"], url_path="followup-people")
     def followup_people(self, request):
         from .followup_people import people_payload

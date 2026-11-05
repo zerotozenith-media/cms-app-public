@@ -203,7 +203,7 @@ class NewcomerViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
 
         if to_stage == from_stage:
             return Response({"detail": f"Newcomer is already {to_stage}."}, status=400)
-        # Not Interested stops follow-up (Kay, 26 October 2026), so the
+        # Not Interested stops follow-up (26 October 2026), so the
         # reason is kept with it.
         if to_stage == Newcomer.Stage.NOT_INTERESTED and not note.strip():
             return Response({"note": "Say why, for example \"Moved back home\". Not Interested stops "
@@ -559,7 +559,7 @@ def convert_to_member(newcomer, user):
 
 
 class BulkAssignNewcomersView(APIView):
-    """Item 13 (Kay, 26 October 2026): give several newcomers one shepherd.
+    """Item 13 (26 October 2026): give several newcomers one shepherd.
     Same rules as one at a time: someone who may shepherd, of the same
     gender, at the newcomer's location; their open tasks move too."""
     permission_classes = [IsAuthenticated]

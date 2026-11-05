@@ -160,7 +160,7 @@ class MemberViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
         before_status = serializer.instance.status
         instance = serializer.save()
         if instance.assigned_to_id != before:
-            # Their open tasks move with them (Kay, 26 October 2026).
+            # Their open tasks move with them (26 October 2026).
             from core.task_actions import move_open_tasks
             move_open_tasks(instance, instance.assigned_to_id)
         if instance.status != before_status:
@@ -334,7 +334,7 @@ class MemberFollowUpTaskViewSet(TaskActionsMixin, LocationScopedMixin, viewsets.
     def complete(self, request, pk=None):
         """Record that the member was reached. The four outcome boxes are
         required; the visit closes every open absence task for the member
-        (Kay, 26 October 2026). The same as record-result with Reached."""
+        (26 October 2026). The same as record-result with Reached."""
         from core import task_actions as acts
         from core.task_views import block_until_reasons
         task = self.get_object()
@@ -540,6 +540,21 @@ class EligibleShepherdsView(APIView):
             {"id": s.id, "name": display_name(s), "gender": shepherd_gender(s)} for s in shepherds
         ])
 
+
+class NotOfferedShepherdsView(APIView):
+    """Who a shepherd list leaves out, and why (5 November 2026)."""
+    module = "members"
+    permission_classes = [ModulePermission]
+
+    def get(self, request):
+        from .assignment import not_offered
+        location = request.query_params.get("location") or scope_location_id(request.user)
+        if not request.user.is_superuser and request.user.location_id:
+            location = request.user.location_id
+        member = Member.objects.filter(id=request.query_params.get("member") or 0).first() \
+            if str(request.query_params.get("member") or "").isdigit() else None
+        return Response(not_offered(location, member))
+
 def _apply_reviewer_edits(changes, data, location):
     """
     Lay the reviewer's choices over a freshly computed set of changes.
@@ -578,7 +593,7 @@ def _apply_reviewer_edits(changes, data, location):
             skipped += 1
             continue
         if key in overrides and overrides[key] != ch["to_id"]:
-            # Men follow up men, women follow up women (Kay), and nobody
+            # Men follow up men, women follow up women, and nobody
             # shepherds themselves. A hand pick that breaks either is
             # ignored, like any other bad override.
             pick = eligible[overrides[key]]

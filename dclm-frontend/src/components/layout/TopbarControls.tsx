@@ -150,7 +150,7 @@ export function UserBadge({ onLogout }: { onLogout: () => void }) {
   );
 }
 
-/** Help for this page (Kay, 26 October 2026): the steps for the page you
+/** Help for this page (26 October 2026): the steps for the page you
  *  are on, the answers to what it may refuse, and its manual page. */
 export function PageHelpButton() {
   const route = useRoute();

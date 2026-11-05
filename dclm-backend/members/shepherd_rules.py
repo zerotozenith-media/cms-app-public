@@ -1,5 +1,5 @@
 """
-The two rules every member's shepherd must keep (Kay, 17 October 2026):
+The two rules every member's shepherd must keep (17 October 2026):
 
   1. Men shepherd men, and women shepherd women.
   2. Nobody shepherds themselves.

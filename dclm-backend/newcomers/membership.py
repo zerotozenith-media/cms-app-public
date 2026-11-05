@@ -5,7 +5,7 @@ Three conditions, all required:
   - the Salvation milestone is recorded,
   - they attended at least half the Friday Worship services held since
     their first check-in, and
-  - they first came at least six months ago (Kay, 16 Oct 2026: counted
+  - they first came at least six months ago (16 Oct 2026: counted
     from the First came date, not the first check-in, since Fridays were
     only recorded by name from then)
 

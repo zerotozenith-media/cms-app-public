@@ -1,6 +1,6 @@
 """
 Who may do what with follow-up tasks beyond their role's module rights,
-and who a task or an alert goes to (Kay, 26 October 2026).
+and who a task or an alert goes to (26 October 2026).
 
 A Follow-up Coordinator is an account with the Follow-up Coordinator tick,
 for its chosen location or All locations, or an account whose role has

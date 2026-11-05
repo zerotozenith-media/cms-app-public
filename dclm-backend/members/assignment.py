@@ -37,15 +37,52 @@ def eligible_shepherds(location=None):
     member record's location, or anywhere if it has none.
     """
     from django.db.models import Q
+    from core.followup_rules import rules
     qs = User.objects.filter(is_active=True, can_shepherd=True).select_related("member")
     if location:
         loc = getattr(location, "pk", location)
-        qs = qs.filter(
-            Q(location_id=loc)
-            | Q(location__isnull=True, member__location_id=loc)
-            | Q(location__isnull=True, member__isnull=True)
-        )
+        if rules().shepherd_anywhere:
+            # Admin, Follow-up Rules (5 November 2026): an account covering
+            # All locations can shepherd anywhere, so a Qatar leader can
+            # take a Bahrain HQ newcomer.
+            qs = qs.filter(Q(location_id=loc) | Q(location__isnull=True))
+        else:
+            qs = qs.filter(
+                Q(location_id=loc)
+                | Q(location__isnull=True, member__location_id=loc)
+                | Q(location__isnull=True, member__isnull=True)
+            )
     return list(qs)
+
+
+def not_offered(location=None, member=None):
+    """
+    Who is left out of a shepherd list, and why (5 November 2026), so the
+    page can say rather than leave people guessing. Gender is checked on
+    the page, which knows the person being given a shepherd.
+    """
+    from core.followup_rules import rules
+    from core.models import Location
+    from .shepherd_rules import is_self
+    loc = getattr(location, "pk", location) if location else None
+    anywhere = rules().shepherd_anywhere
+    names = dict(Location.objects.values_list("id", "name"))
+    out = []
+    for u in User.objects.filter(is_active=True).select_related("member").order_by("first_name", "last_name", "email"):
+        if not u.can_shepherd:
+            why = "Can shepherd others is not ticked for them in Admin, Users & Roles."
+        elif loc and u.location_id and u.location_id != loc:
+            why = f"their account covers {names.get(u.location_id, u.location_id)} only."
+        elif loc and not u.location_id and not anywhere and u.member_id and u.member.location_id != loc:
+            why = (f"their account covers All locations, but their member record is at "
+                   f"{names.get(u.member.location_id, u.member.location_id)}, and All-locations accounts shepherd "
+                   f"only there. This is set in Admin, Follow-up Rules.")
+        elif member is not None and is_self(u, member):
+            why = "nobody can shepherd themselves."
+        else:
+            continue
+        out.append({"id": u.id, "name": display_name(u), "reason": why})
+    return out
 
 
 def _shepherd_name(u):
@@ -127,7 +164,7 @@ def build_assignment_preview(location=None, reassign_everyone=False):
             me.add(m.assigned_to_id)
 
         # Household first: keep families with the same shepherd, but only
-        # where the gender matches (Kay). Checks people already assigned in
+        # where the gender matches. Checks people already assigned in
         # the database AND people given a shepherd earlier in this run.
         if m.household_id:
             ok = lambda sid: sid in by_id and sid not in me and shepherd_gender(by_id[sid]) and can_pair(m.gender, by_id[sid])
@@ -200,7 +237,7 @@ def apply_assignment_changes(changes, by=None):
         from core.task_actions import move_open_tasks
         for mid, sid in member_ids.items():
             applied_members += Member.objects.filter(id=mid).update(assigned_to_id=sid)
-            # Their open tasks move with them (Kay, 26 October 2026).
+            # Their open tasks move with them (26 October 2026).
             m = Member.objects.filter(id=mid).first()
             if m:
                 move_open_tasks(m, sid)

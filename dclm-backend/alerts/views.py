@@ -205,7 +205,7 @@ class AnnouncementView(APIView):
 
 class NoticesView(APIView):
     """
-    The alerts kept in the app (Kay, 26 October 2026): the newest 50, and
+    The alerts kept in the app (26 October 2026): the newest 50, and
     how many are unread. POST marks them read: the ids given, or all.
     """
     permission_classes = [IsAuthenticated]

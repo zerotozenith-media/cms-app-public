@@ -254,7 +254,7 @@ export function useDeleteFellowship() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: number) => (await apiClient.delete(`/fellowships/${id}/`)).data,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['fellowships'] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['fellowships'] }); qc.invalidateQueries({ queryKey: ['sessions'] }); },
   });
 }
 
@@ -323,7 +323,7 @@ export function useFollowUpAbsent(sessionId: number) {
   });
 }
 
-/** Change a session's meeting or date (administrators, Kay, 5 November 2026). */
+/** Change a session's meeting or date (administrators, 5 November 2026). */
 export function useChangeSession(sessionId: number) {
   const qc = useQueryClient();
   return useMutation({

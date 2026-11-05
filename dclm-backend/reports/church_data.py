@@ -118,7 +118,7 @@ class Service:
     """
     One meeting on one day, for the report. With All locations chosen,
     the same meeting held at two locations on the same day is one service
-    with their figures added (Kay, 5 November 2026): Qatar's Friday was a
+    with their figures added (5 November 2026): Qatar's Friday was a
     second row beside Bahrain HQ's, counted as a second service, and so
     halved the averages. A house fellowship stays its own service, as each
     fellowship is a different group.
@@ -327,7 +327,7 @@ def gather(months, location=None):
 
 
 def closed_balances(scope, months):
-    """Month-end balances approved and closed in these months (Kay, 30
+    """Month-end balances approved and closed in these months (30
     October 2026), oldest first, so the report shows the money held."""
     from finance.monthend_models import MonthEnd
     firsts = [datetime.date(y, m, 1) for y, m in months]

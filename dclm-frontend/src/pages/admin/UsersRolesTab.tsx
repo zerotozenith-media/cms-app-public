@@ -25,7 +25,7 @@ export function UsersRolesTab() {
   const [canShepherd, setCanShepherd] = useState(false);
   const [gender, setGender] = useState('');
   // Member record: which person on the member roll each account is, so
-  // nobody is ever given themselves to shepherd (Kay, 17 October 2026).
+  // nobody is ever given themselves to shepherd (17 October 2026).
   const { data: memberChoices } = useMemberChoices();
   const [linkError, setLinkError] = useState('');
   const manyPlaces = new Set((memberChoices ?? []).map((m) => m.location)).size > 1;
@@ -105,7 +105,7 @@ export function UsersRolesTab() {
   }
 
   const selectedRole = roles?.find((r) => r.id === selectedRoleId);
-  // Auto-assign gives a shepherd with no gender set nobody (Kay), so say so.
+  // Auto-assign gives a shepherd with no gender set nobody, so say so.
   const noGender = (users ?? []).filter((u) => u.can_shepherd && u.is_active && !u.gender).map((u) => u.full_name);
 
   return (

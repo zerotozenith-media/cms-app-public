@@ -30,7 +30,7 @@ export function LiveCheckInPage() {
 
   const [query, setQuery] = useState('');
   // Everyone / Members / Newcomers / Not ticked, and 50 rows at a time
-  // (Kay, 31 October 2026), so nobody scrolls past every member to find
+  // (31 October 2026), so nobody scrolls past every member to find
   // the newcomers.
   const [who, setWho] = useState<Who>('everyone');
   const [limit, setLimit] = useState(PAGE);

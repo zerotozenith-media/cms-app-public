@@ -34,7 +34,7 @@ KEEP = [
     "enquiries.EnquirySource", "newcomers.NewcomerSource", "newcomers.MilestoneType",
     "goals.Goal", "reports.Service", "reports.Department", "followup.MessageTemplate", "followup.PlanStep",
 ]
-SHOW_NAMES = []  # Kay confirmed the demo campaigns and project go too
+SHOW_NAMES = []  # the church confirmed the demo campaigns and project go too
 
 
 class Command(BaseCommand):

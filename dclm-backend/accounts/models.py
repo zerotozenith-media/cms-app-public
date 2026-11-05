@@ -95,7 +95,7 @@ class User(AbstractUser):
     # a member record. Blank means not set.
     gender = models.CharField(max_length=10, choices=[("Male", "Male"), ("Female", "Female")],
                               blank=True, default="")
-    # Follow-up Coordinator (Kay, 26 October 2026): reviews late tasks and
+    # Follow-up Coordinator (26 October 2026): reviews late tasks and
     # their reasons, gets alerts on repeated absences, and sees every
     # shepherd's record. A tick so any account can be one, an administrator
     # included; coordinates_location blank means All locations.

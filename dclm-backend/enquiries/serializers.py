@@ -152,7 +152,7 @@ class EnquirySerializer(serializers.ModelSerializer):
         return shepherd_gender(obj.assigned_to)
 
     def validate_assigned_to(self, value):
-        """Only people who may follow up contacts can be given one (Kay)."""
+        """Only people who may follow up contacts can be given one."""
         from .followup_people import followup_people
         if value is not None and value.id not in {p.id for p in followup_people()}:
             raise serializers.ValidationError("That person cannot be given contacts. Tick Can shepherd others for them in Admin.")
@@ -193,7 +193,7 @@ class EnquirySerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "Record at least one way to reach them: phone, email, or social handle."
             )
-        # Men follow up men, women follow up women (Kay). Checked when the
+        # Men follow up men, women follow up women. Checked when the
         # follow-up person is chosen. Setting a gender that no longer
         # matches the person already chosen is allowed, and the page warns.
         from accounts.gender import can_pair, mismatch_message

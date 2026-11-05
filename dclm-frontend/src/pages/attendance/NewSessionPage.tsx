@@ -26,7 +26,7 @@ export function NewSessionPage() {
   const [editionPlace, setEditionPlace] = useState('');
   const [error, setError] = useState('');
   const [existing, setExisting] = useState<number | null>(null);
-  // A weekly meeting on another day asks first (Kay, 5 November 2026).
+  // A weekly meeting on another day asks first (5 November 2026).
   const [otherDay, setOtherDay] = useState(false);
 
   if (meetingTypes && !meetingType && meetingTypes.length) { setMeetingType(meetingTypes[0].id); setMode(meetingTypes[0].usual_mode ?? 'online'); }

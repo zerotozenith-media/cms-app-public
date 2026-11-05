@@ -7,7 +7,7 @@ import { HELP_TOPICS } from '../../help/topics';
  *
  * The explanation is placed from the screen's own edges, so it always
  * stays fully on screen. On a phone it opens as a full-width panel just
- * under the "?", in larger text, with a close button (Kay: tips were cut
+ * under the "?", in larger text, with a close button (tips were cut
  * off at the sides when touched, and hard to read). Pressing elsewhere,
  * scrolling, or Escape closes it.
  */

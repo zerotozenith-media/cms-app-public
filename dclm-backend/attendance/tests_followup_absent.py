@@ -1,5 +1,5 @@
 """'Follow up those not ticked' on a service ticked off afterwards, and
-follow-up tasks added by hand on a member's profile (Kay, 17 Oct 2026)."""
+follow-up tasks added by hand on a member's profile (17 Oct 2026)."""
 import datetime
 
 from django.utils import timezone
@@ -63,7 +63,7 @@ class FollowUpThoseNotTicked(Base):
         MemberFollowUpTask.objects.create(member=self.a, text="x", due_date=self.today, missed_meeting_name="Earlier", missed_date=self.today)
         r = self.client.get(self.url(s))
         self.assertEqual(r.status_code, 200, r.data)
-        # Tasks pile (Kay, 26 October 2026): Henry's open task elsewhere no
+        # Tasks pile (26 October 2026): Henry's open task elsewhere no
         # longer stops a task for this service.
         self.assertEqual((r.data["to_follow_up"], r.data["ticked"], r.data["open_elsewhere"], r.data["already"]),
                          (3, ["Joshua Afari"], 1, 0))

@@ -14,7 +14,7 @@ export function bahrainTime(iso: string) {
 }
 
 /**
- * The Audit Log, with search and filters (Kay, 5 November 2026). It could
+ * The Audit Log, with search and filters (5 November 2026). It could
  * only be paged through, eight entries at a time, with one box that
  * needed the exact type name.
  */

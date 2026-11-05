@@ -1,6 +1,6 @@
 """
 Men shepherd men, women shepherd women, and nobody shepherds themselves
-(Kay, 17 October 2026). The live system had a woman shepherded by a man,
+(17 October 2026). The live system had a woman shepherded by a man,
 a man by a woman and a man shepherding himself, because older pairings
 were never rechecked and no account was linked to its member record.
 """

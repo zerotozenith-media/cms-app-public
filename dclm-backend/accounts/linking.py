@@ -1,5 +1,5 @@
 """
-Which member record a login account belongs to (Kay, 17 October 2026).
+Which member record a login account belongs to (17 October 2026).
 
 Without this link the app cannot tell that the account "Kwabena Afari"
 and the member "Kwabena Afari" are one person, so Auto-assign could give

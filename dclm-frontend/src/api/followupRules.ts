@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
 
-/** Admin, Follow-up Rules (Kay, 26 October 2026). Every follow-up time and
+/** Admin, Follow-up Rules (26 October 2026). Every follow-up time and
  *  number, one set for every location. */
 export interface FollowUpRules {
   clock_start: string;
@@ -17,6 +17,8 @@ export interface FollowUpRules {
   falling_percent: number;
   falling_window: number;
   shepherd_limit: number;
+  /** All-locations accounts can shepherd at any location (5 November 2026). */
+  shepherd_anywhere: boolean;
   newcomer_stages: string[];
   check_hours_after_start: number;
   remind_administrators: boolean;
@@ -42,7 +44,12 @@ export function useSaveFollowUpRules() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (patch: Partial<FollowUpRules>) => (await apiClient.patch<FollowUpRules>('/followup-rules/', patch)).data,
-    onSuccess: (data) => qc.setQueryData(['followup-rules'], data),
+    onSuccess: (data) => {
+      qc.setQueryData(['followup-rules'], data);
+      // Who can shepherd where follows the rules.
+      qc.invalidateQueries({ queryKey: ['eligible-shepherds'] });
+      qc.invalidateQueries({ queryKey: ['shepherds-not-offered'] });
+    },
   });
 }
 
@@ -50,6 +57,11 @@ export function useResetFollowUpRules() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async () => (await apiClient.post<FollowUpRules>('/followup-rules/', {})).data,
-    onSuccess: (data) => qc.setQueryData(['followup-rules'], data),
+    onSuccess: (data) => {
+      qc.setQueryData(['followup-rules'], data);
+      // Who can shepherd where follows the rules.
+      qc.invalidateQueries({ queryKey: ['eligible-shepherds'] });
+      qc.invalidateQueries({ queryKey: ['shepherds-not-offered'] });
+    },
   });
 }

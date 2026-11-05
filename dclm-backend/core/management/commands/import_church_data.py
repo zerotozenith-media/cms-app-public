@@ -6,7 +6,7 @@ Load the church's real records: the monthly reports and the people list.
     ... --yes
         loads it, all at once or not at all
 
-Decisions taken with Kay: amounts in the reports are SAR and are divided by
+Decisions taken with the church: amounts in the reports are SAR and are divided by
 10 to record BHD. Friday Worship numbers are in person, every other
 meeting's are online. Giving is Cash, one entry per fund per service.
 Expenses and testimonies are dated the last day of their month. Newcomers
@@ -147,7 +147,7 @@ class Command(BaseCommand):
         clash = [p["name"] for p in rows if p["phone"] in taken]
         if clash:
             raise CommandError(f"Already in the app, by phone: {', '.join(clash)}. Nothing was loaded.")
-        # Kay: every newcomer came through the Facebook advert, except those
+        # Every newcomer came through the Facebook advert, except those
         # whose Invited By names another person.
         fb, _ = NewcomerSource.objects.get_or_create(name="Facebook advert")
         invited = NewcomerSource.objects.filter(name__iexact="Invited by a member").first() or \
@@ -219,7 +219,7 @@ class Command(BaseCommand):
 
     # --------------------------------------------------------------- contacts
     def load_contacts(self, path, loc):
-        """Kay: people reached through the Facebook advert who have not visited
+        """People reached through the Facebook advert who have not visited
         yet are online contacts, under the Facebook advert campaign."""
         from enquiries.models import Campaign, Enquiry, EnquirySource
         from followup.models import Enrolment

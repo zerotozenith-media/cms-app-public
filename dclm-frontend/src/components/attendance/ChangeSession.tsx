@@ -6,7 +6,7 @@ import { HelpMark } from '../ui/HelpMark';
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 /**
- * Change a session's meeting or date (Kay, 5 November 2026). Monday Bible
+ * Change a session's meeting or date (5 November 2026). Monday Bible
  * Study was added on Wednesday 14 October and the only way to correct it
  * was to delete it with its numbers. Administrators only. The headcount,
  * names ticked and offering stay with the session.

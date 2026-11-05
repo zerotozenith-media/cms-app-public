@@ -117,7 +117,7 @@ class Figures(Church):
 
     def test_whole_church_includes_every_location(self):
         # Qatar's Friday on 17 July is added to Bahrain HQ's, one service
-        # of 44, not a second service of 18 (Kay, 5 November 2026).
+        # of 44, not a second service of 18 (5 November 2026).
         ctx = gather(month_list((2026, 7), (2026, 7)), None)
         self.assertEqual([s.total for s in ctx["fridays"]], [44, 15])
         self.assertEqual(ctx["friday_average"], 30)          # 59 / 2
@@ -176,7 +176,7 @@ class Zonal(Church):
         self.assertEqual(sorted(others), ["24 Jul, Friday House Caring Fellowship (Sisters)", "30 Jul, Not linked to a meeting"])
 
     def test_house_fellowships_have_their_own_table(self):
-        # Kay, 5 November 2026: fellowship sessions were left out of the
+        # 5 November 2026: fellowship sessions were left out of the
         # zonal report. One column per fellowship, gaps shown in words.
         from attendance.models import AttendanceSession
         brothers = Fellowship.objects.create(name="Brothers", meeting_type=self.hcf, location=self.bh)
@@ -196,7 +196,7 @@ class Zonal(Church):
 
     def test_all_locations_one_row_per_service(self):
         # Qatar's Friday is added to Bahrain HQ's on the same day, and its
-        # offering joins that Friday's giving (Kay, 5 November 2026).
+        # offering joins that Friday's giving (5 November 2026).
         _, t = self.tables(((2026, 7), (2026, 7)), None)
         rows = t["Weekly fellowship attendance, July 2026"]["rows"]
         self.assertEqual([r[0] for r in rows].count("17 Jul"), 1)
@@ -244,7 +244,7 @@ class OverseerPdf(Church):
         self.assertIn("Net shortfall (BHD)", t)
 
     def test_money_held_from_closed_month_ends(self):
-        """Month-end balances approved and closed appear in the report (Kay, 30 October 2026)."""
+        """Month-end balances approved and closed appear in the report (30 October 2026)."""
         from finance.monthend_models import MonthEnd
         MonthEnd.objects.create(location=self.bh, month=datetime.date(2026, 7, 1), status="closed",
                                 opening=Decimal("0"), giving=Decimal("1016.57"), expenses=Decimal("874.91"),

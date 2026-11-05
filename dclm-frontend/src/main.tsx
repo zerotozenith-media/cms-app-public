@@ -44,7 +44,7 @@ const queryClient: QueryClient = new QueryClient({
 registerServiceWorker();
 
 // After an update the old page files are gone: reload once to get the new
-// version rather than failing (Kay, 27 October 2026).
+// version rather than failing (27 October 2026).
 window.addEventListener('vite:preloadError', (e) => { if (reloadOnceForUpdate()) e.preventDefault(); });
 
 createRoot(document.getElementById('root')!).render(

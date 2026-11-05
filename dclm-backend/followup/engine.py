@@ -166,7 +166,7 @@ def day_on(enrolment, date):
 
 def missed(enrolment, today=None):
     """
-    Item 10 (Kay, 26 October 2026): planned messages from the last 14 days
+    Item 10 (26 October 2026): planned messages from the last 14 days
     that were never sent, or were skipped, and not dismissed. Oldest first.
     """
     import datetime

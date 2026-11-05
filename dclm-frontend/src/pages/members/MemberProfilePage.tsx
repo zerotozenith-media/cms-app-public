@@ -21,6 +21,7 @@ import { useLocationName } from '../../api/locations';
 
 import { useEligibleShepherds, useAddMemberTask } from '../../api/followup';
 import { canPair } from '../../lib/gender';
+import { NotOffered } from '../../components/members/NotOffered';
 import { HelpMark } from '../../components/ui/HelpMark';
 import { PersonTasks } from '../../components/accountability/PersonTasks';
 import { AwayModal } from '../../components/accountability/TaskModals';
@@ -296,7 +297,7 @@ export function MemberProfilePage() {
                   {member.assigned_to && !(shepherds ?? []).some((s: any) => s.id === member.assigned_to && canPair(member.gender, s.gender)) && (
                     <option value={member.assigned_to}>{member.assigned_to_name}</option>
                   )}
-                  {/* Men follow up men, women follow up women (Kay). */}
+                  {/* Men follow up men, women follow up women. */}
                   {(shepherds ?? []).filter((s: any) => canPair(member.gender, s.gender)).map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               ) : <b>{member.assigned_to_name || 'No shepherd'}</b>}
@@ -304,6 +305,7 @@ export function MemberProfilePage() {
             {!member.gender && member.assigned_to && (
               <span className="gender-warn">Gender not known. Check this shepherd is right, then set the gender.</span>
             )}
+            {canEdit && <NotOffered location={member.location} member={member.id} genders={[member.gender ?? '']} eligible={shepherds} />}
             {member.shepherd_problem && (
               <span className="gender-warn" role="status">
                 {member.shepherd_problem}. {canEdit ? 'Choose another shepherd.' : 'Someone who can change members can choose another shepherd.'}

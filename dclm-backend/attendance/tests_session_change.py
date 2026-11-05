@@ -1,4 +1,4 @@
-"""Wrong-day check and Change date or meeting (Kay, 5 November 2026)."""
+"""Wrong-day check and Change date or meeting (5 November 2026)."""
 import datetime
 from decimal import Decimal
 
@@ -96,3 +96,30 @@ class Change(Base):
     def test_only_administrators(self):
         self.client.force_authenticate(self.usher)
         self.assertEqual(self.change(date="2026-10-12").status_code, 403)
+
+
+class FellowshipDelete(Base):
+    def setUp(self):
+        super().setUp()
+        from attendance.models import Fellowship
+        self.hcf = MeetingType.objects.create(id="fri-house", name="Friday House Caring Fellowship", day="Friday",
+                                              frequency="weekly", detail_level="detailed")
+        self.fel = Fellowship.objects.create(name="Women / Sisters Meeting", meeting_type=self.hcf, location=self.bh)
+        self.empty = [AttendanceSession.objects.create(meeting_type=self.hcf, fellowship=self.fel, date=d, location=self.bh,
+                                                       mode="in-person") for d in (D(2026, 10, 2), D(2026, 10, 9))]
+
+    def test_empty_sessions_go_with_it(self):
+        r = self.client.delete(f"/api/fellowships/{self.fel.id}/")
+        self.assertEqual(r.status_code, 204, getattr(r, "data", None))
+        self.assertFalse(AttendanceSession.objects.filter(pk__in=[s.pk for s in self.empty]).exists())
+        self.assertIn("2 empty sessions removed", AuditLog.objects.filter(entity_type="Fellowship").latest("id").details)
+
+    def test_sessions_with_records_are_listed_to_move(self):
+        AttendanceSession.objects.create(meeting_type=self.hcf, fellowship=self.fel, date=D(2026, 10, 16), location=self.bh,
+                                         mode="in-person", women=9, status="filled")
+        r = self.client.delete(f"/api/fellowships/{self.fel.id}/")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("1 session with attendance", str(r.data))
+        self.assertIn("16 Oct 2026", str(r.data))
+        self.assertIn("Change date or meeting", str(r.data))
+        self.assertEqual(AttendanceSession.objects.filter(fellowship=self.fel).count(), 3)

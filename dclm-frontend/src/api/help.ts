@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from './client';
 
 /**
- * Help & Guide (Kay, 26 October 2026): the manual and Help pictures are
+ * Help & Guide (26 October 2026): the manual and Help pictures are
  * served to signed-in people only, so they are fetched with the person's
  * sign-in and shown from memory. The manual is fetched once per visit.
  */
@@ -28,12 +28,12 @@ export async function downloadManual(printed?: number): Promise<HelpMsg> {
     const url = await manualBlobUrl();
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'DCLM-user-manual-v11.17.pdf';
+    a.download = 'DCLM-user-manual-v11.18.pdf';
     document.body.appendChild(a);
     a.click();
     a.remove();
-    return { text: printed ? `The manual is saved as DCLM-user-manual-v11.17.pdf. Open it and go to page ${printed}.`
-      : 'The manual is saved as DCLM-user-manual-v11.17.pdf.', error: false };
+    return { text: printed ? `The manual is saved as DCLM-user-manual-v11.18.pdf. Open it and go to page ${printed}.`
+      : 'The manual is saved as DCLM-user-manual-v11.18.pdf.', error: false };
   } catch {
     return { text: 'The manual could not be downloaded. Check your connection and try again.', error: true };
   }

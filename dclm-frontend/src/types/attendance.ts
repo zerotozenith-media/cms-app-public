@@ -101,12 +101,12 @@ export interface AttendanceSession {
   location: string;
   mode: 'in-person' | 'online';
   status: 'pending' | 'filled' | 'did-not-hold';
-  /** Kay, 26 October 2026: Upcoming, Waiting for names, Names not taken,
+  /** 26 October 2026: Upcoming, Waiting for names, Names not taken,
    *  Done, Did not hold, worked out on the server. */
   state?: 'upcoming' | 'waiting-names' | 'waiting' | 'names-not-taken' | 'not-filled' | 'done' | 'did-not-hold';
   state_label?: string;
   not_held_reason?: string;
-  /** Names ticked after the absence check ran (Kay, 26 October 2026). */
+  /** Names ticked after the absence check ran (26 October 2026). */
   late_entry?: { check_ran: string; due_hours: number } | null;
   track_named: boolean;
   men: number;

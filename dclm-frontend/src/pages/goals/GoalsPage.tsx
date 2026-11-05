@@ -14,7 +14,7 @@ import { useFunds } from '../../api/finance';
 import { HelpMark } from '../../components/ui/HelpMark';
 import { refusal } from '../../api/accountability';
 
-/** Item 11 (Kay, 26 October 2026): what an automatic goal can measure. */
+/** Item 11 (26 October 2026): what an automatic goal can measure. */
 const MEASURES: { k: string; l: string; needs: 'meeting' | 'fund' | null; period: string }[] = [
   { k: 'monthly_average_attendance', l: 'Average attendance a month', needs: 'meeting', period: 'month' },
   { k: 'sessions_held', l: 'Sessions held', needs: 'meeting', period: 'month' },

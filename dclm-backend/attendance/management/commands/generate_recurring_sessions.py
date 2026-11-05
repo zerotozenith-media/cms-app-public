@@ -2,7 +2,7 @@
 Batch 0.2 approved decision: recurring session generation is fully
 automatic, with no staff action required. This command IS that automation.
 
-Item 20 (Kay, 26 October 2026): a session used to be made up to 6 days
+Item 20 (26 October 2026): a session used to be made up to 6 days
 ahead, at every location, and showed Pending, so next Friday looked the
 same as a service whose names were never taken. Now each meeting makes its
 session only at the locations that hold it (Admin, Meeting Types, Held at),

@@ -1,4 +1,4 @@
-"""Phone and computer alerts (Kay, October 2026)."""
+"""Phone and computer alerts (October 2026)."""
 import base64
 import datetime
 import json

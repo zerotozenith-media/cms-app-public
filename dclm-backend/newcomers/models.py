@@ -82,7 +82,7 @@ class Newcomer(models.Model):
     )
     invited_by_name = models.CharField(max_length=150, blank=True, default="")
 
-    # A known absence, as for members (Kay, 26 October 2026).
+    # A known absence, as for members (26 October 2026).
     away_from = models.DateField(null=True, blank=True)
     away_to = models.DateField(null=True, blank=True)
     away_reason = models.CharField(
@@ -149,7 +149,7 @@ class NewcomerTask(AccountableTask):
         help_text="Batch 0.3, Finding 3: independent of the newcomer's primary leader; "
                    "defaults to it if left blank at the application layer.",
     )
-    # A newcomer who misses a service gets a task like a member (Kay, 26
+    # A newcomer who misses a service gets a task like a member (26
     # October 2026), so the task says which service, as member tasks do.
     missed_session = models.ForeignKey(
         "attendance.AttendanceSession", on_delete=models.SET_NULL, null=True, blank=True,

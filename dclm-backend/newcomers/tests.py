@@ -332,7 +332,7 @@ class NewcomerIntakeSlipTestCase(APITestCase):
         self.assertIn("Have a salvation conversation", tasks)
 
     def test_every_first_visit_task_is_due_within_24_hours(self):
-        """Kay, 26 October 2026: first-visit tasks are due 24 hours from
+        """26 October 2026: first-visit tasks are due 24 hours from
         6:00 pm on the day the newcomer first came, like absence tasks.
         Before, a salvation conversation had 2 days and a visit 5."""
         self.auth(self.admin)
@@ -357,7 +357,7 @@ class NewcomerIntakeSlipTestCase(APITestCase):
         self.assertEqual(task.assigned_to_id, leader.id)
 
     def test_a_woman_cannot_be_given_to_a_man(self):
-        """Men follow up men, women follow up women (Kay, 10 October 2026)."""
+        """Men follow up men, women follow up women (10 October 2026)."""
         man = User.objects.create_user(email="man@test.com", password="x", role=self.role, gender="Male")
         self.auth(self.admin)
         resp = self.client.post("/api/newcomers/", self.base_payload(assigned_to=man.id))

@@ -1,6 +1,6 @@
 """
 The follow-up actions on a task, shared by member and newcomer tasks
-(Kay, 26 October 2026): record a result, cancel a task made in error, and
+(26 October 2026): record a result, cancel a task made in error, and
 change a due time. See core/task_actions.py for the rules.
 """
 from django.utils.dateparse import parse_datetime
@@ -127,7 +127,7 @@ class TaskActionsMixin:
     @action(detail=True, methods=["post"], url_path="give-reason")
     def give_reason(self, request, pk=None):
         """A reason and a new date for a late task. Each late task needs its
-        own reason, even for the same person (Kay, 26 October 2026)."""
+        own reason, even for the same person (26 October 2026)."""
         from .followup_review import give_reason
         task = self.get_object()
         nd = request.data.get("new_date")
@@ -215,7 +215,7 @@ def away_action(view, request, person, module):
 def block_until_reasons(user, task):
     """A shepherd gives a reason for each of their late tasks before
     recording anything else, because the Follow-up Coordinator reviews them
-    (Kay, 26 October 2026). Someone recording on another shepherd's task,
+    (26 October 2026). Someone recording on another shepherd's task,
     such as a Follow-up Coordinator, is not held up."""
     if task.assigned_to_id != user.id:
         return

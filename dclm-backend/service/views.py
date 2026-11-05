@@ -2,7 +2,7 @@
 Server addresses for the service ladder (F21).
 
 Everyone signed in sees the team at their location, with levels and
-points, as Kay chose. Only people who follow others up have a standing.
+points, as chosen. Only people who follow others up have a standing.
 """
 import datetime
 

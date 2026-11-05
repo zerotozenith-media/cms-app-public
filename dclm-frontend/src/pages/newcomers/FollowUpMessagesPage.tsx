@@ -86,7 +86,7 @@ export function FollowUpMessagesPage() {
 interface MissedRow extends Omit<TodayEntry, 'done' | 'plan' | 'belonging'> { date: string; skipped: boolean }
 
 /**
- * Item 10 (Kay, 26 October 2026): planned messages from the last 14 days
+ * Item 10 (26 October 2026): planned messages from the last 14 days
  * that were not sent, or were skipped. Send now opens WhatsApp with the
  * message and records it on that day's plan once confirmed. Dismiss takes
  * it off this list.
@@ -318,7 +318,7 @@ export function EditorModal({ title, start, onClose, onUse }: { title: string; s
   );
 }
 
-/** Kay: choose which newcomers start receiving messages. */
+/** Choose which newcomers start receiving messages. */
 export function StartPanel({ onClose, kind = 'newcomers' }: { onClose: () => void; kind?: 'newcomers' | 'contacts' }) {
   const qc = useQueryClient();
   const contacts = kind === 'contacts';

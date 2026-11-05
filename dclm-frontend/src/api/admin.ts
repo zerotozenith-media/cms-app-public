@@ -172,7 +172,7 @@ export function useAuditLog(params: AuditParams) {
   });
 }
 
-/** What the Audit Log filters offer (Kay, 5 November 2026). */
+/** What the Audit Log filters offer (5 November 2026). */
 export function useAuditChoices() {
   return useQuery({
     queryKey: ['audit-log-choices'],

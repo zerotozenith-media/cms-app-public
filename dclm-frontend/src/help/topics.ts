@@ -67,7 +67,7 @@ export const HELP_TOPICS: Record<string, HelpTopic> = {
     title: 'Manual vs auto-tracked goals',
     body: 'Auto-tracked goals calculate themselves from real data already in the system, so there is nothing to update. Manual goals are ones no data can measure, so someone types in the current number as it changes.',
   },
-  // Follow-up Rules, meetings and accounts (Kay, 26 October 2026).
+  // Follow-up Rules, meetings and accounts (26 October 2026).
   frClock: { title: 'Clock starts at', body: 'The time every follow-up clock starts on the day of a service. Example: 6:00 pm on Friday 30 October. When names are ticked after the absence check has run, the clock starts when the task is made, so a shepherd never starts out late because of a late entry.' },
   frDue: { title: 'Follow-up due after', body: "How long a shepherd has to reach the person and record the result. It applies to tasks for missed services and to a newcomer's first-visit task. Example: 24 hours from 6:00 pm on Friday is 6:00 pm on Saturday." },
   frReason: { title: 'Reason required after', body: 'When a task still open needs a reason from the shepherd. Each late task needs its own reason and a new date. The shepherd sees late tasks first and cannot record anything else until the reasons are given.' },
@@ -95,7 +95,7 @@ export const HELP_TOPICS: Record<string, HelpTopic> = {
   userSwitchOff: { title: 'Switch off', body: 'The person can no longer sign in, and their open follow-up tasks go to the Follow-up Coordinator. Their records and history stay. Switch them on again at any time.' },
   userReset: { title: 'Send password reset link', body: 'Emails the person a link to choose a new password. It works once, for one hour. You never see or set their password.' },
   userAddToRoll: { title: 'Add to member roll', body: 'Creates a member record from this account, using its name, gender and location, and links the two, so nobody is ever given themselves to shepherd.' },
-  // Follow-up screens (Kay, 26 October 2026).
+  // Follow-up screens (26 October 2026).
   faMyList: { title: 'My follow-up', body: 'Everyone you follow up, members and newcomers together, with late tasks first. Each missed service has its own task, and one visit closes them all.' },
   faPriority: { title: 'Priority', body: 'They have missed the same meeting 2 or more times in a row, so your Follow-up Coordinator has been alerted. Each missed service has its own task, and one visit closes them all.' },
   faOneVisit: { title: 'One visit closes all', body: 'One visit covers every open absence task for this person. Each task shows this visit as its result, so nothing is recorded twice.' },
@@ -116,7 +116,7 @@ export const HELP_TOPICS: Record<string, HelpTopic> = {
   faLocationMove: { title: 'Location', body: "Where they worship. Changing it moves their open tasks to that location's Follow-up Coordinator unless a shepherd there is chosen. Their history stays with them." },
   faStage: { title: 'Stage', body: 'New, Contacted and Attending: they get a task each time they miss a tracked service. Not Interested stops follow-up, and a note is required. Member moves them to the member roll.' },
   faLeader: { title: 'Leader', body: 'Expected at leadership meetings, so they are followed up when they miss one. Untick when they step down.' },
-  // Month-end balance (Kay, 30 October 2026).
+  // Month-end balance (30 October 2026).
   meBalance: { title: 'Month-end balance', body: 'Each month the money held is balanced: what the records say should be there against what is actually there, counted or on the bank statement. A difference is found or explained, a second person approves, and the month is closed so its figures never change afterwards.' },
   meOpening: { title: 'Opening balance', body: "The previous month's approved closing balance. For the start month it is the opening balance set in Admin, Config Lists, Money. Example: July 2026 opens at BHD 0.00, August opens at July's closing balance." },
   meExpected: { title: 'Expected closing balance', body: 'Opening balance, plus giving, less expenses, less remittance sent in the month. What the records say should be held on the last day of the month.' },
@@ -124,6 +124,8 @@ export const HELP_TOPICS: Record<string, HelpTopic> = {
   meCounted: { title: 'Money actually held', body: 'Count the cash on the last day of the month, or read the closing balance on the bank statement, and type it here. Example: 665.250.' },
   meCountedBy: { title: 'Counted by two people', body: 'Cash is counted by two people together, and both names are kept. General practice for church money, so nobody is ever left alone with an unchecked count.' },
   meDifference: { title: 'Difference', body: 'Money held less the expected closing balance. Look for a missing entry first: an expense not recorded, or giving recorded twice. If it cannot be found, explain it. Example: "BHD 5.00 bank charge on 31 October".' },
+  notOffered: { title: 'Why someone is not offered', body: 'A shepherd is offered only if Can shepherd others is ticked for them, their account covers this location (or All locations), and they are the same gender as the person: men follow up men, women follow up women. Each person left out is listed with the reason.' },
+  frAnywhere: { title: 'All-locations accounts shepherd anywhere', body: 'On: someone whose account covers All locations can be given people at every location, for example a Qatar leader taking a Bahrain HQ newcomer. Off: only at the location on their member record. Men follow up men and women follow up women either way.' },
   sessionChange: { title: 'Change date or meeting', body: 'For a session added with the wrong date or meeting, for example Monday Bible Study added on a Wednesday. Its headcount, names ticked and offering stay with it, and the change is kept in the Audit Log. Refused if that meeting already has a session on that day, if open follow-up tasks were made from it, or if its month is closed in Month-end balance.' },
   auditFilters: { title: 'Finding an entry', body: 'Type any words from the name, item or details, for example Monday Bible Study 14. Narrow it by type, person, action and dates. Dates and times are Bahrain time.' },
   meLock: { title: 'Why lock the month?', body: 'So the figures in the month-end report never change after they are approved. A month is closed once it is balanced and checked by a second person, and any later change is made by reopening it on purpose, with a reason kept in the Audit Log.' },

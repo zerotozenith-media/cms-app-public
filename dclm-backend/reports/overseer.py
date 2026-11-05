@@ -258,7 +258,7 @@ def build(ctx, texts, generated_by=None):
             + f", {ctx['label']}"), fig))
     story += by_month(cats, "by_category", "Total expenses", "Expenses by category" + (" and month" if many else "") + " (BHD)")
 
-    # Money held, from the month-end balances approved and closed (Kay, 30 October 2026).
+    # Money held, from the month-end balances approved and closed (30 October 2026).
     bal = ctx.get("balances") or []
     if bal:
         all_locs = ctx["scope"].location is None
@@ -386,7 +386,7 @@ def build(ctx, texts, generated_by=None):
 
 def _name(s):
     name = f"{s.meeting_type.name} ({s.fellowship.name})" if s.fellowship_id else s.meeting_type.name
-    # Held at several locations that day, added together (Kay, 5 November 2026).
+    # Held at several locations that day, added together (5 November 2026).
     places = getattr(s, "places", [])
     return f"{name}, {' and '.join(places)}" if len(places) > 1 else name
 

@@ -1,5 +1,5 @@
 """
-Recording what happened on a follow-up task (Kay, 26 October 2026), the
+Recording what happened on a follow-up task (26 October 2026), the
 same way for member and newcomer tasks:
 
   Reached               the four boxes are required; the visit closes every
@@ -279,7 +279,7 @@ def clear_away(person, user):
 def move_open_tasks(person, new_user_id):
     """
     A person's shepherd changed for good: their open tasks move with them
-    (Kay, 26 October 2026). A task handed to someone for that task only,
+    (26 October 2026). A task handed to someone for that task only,
     and the Follow-up Coordinator's own visit task, stay where they are.
     With nobody new, the tasks go to the Follow-up Coordinator.
     """

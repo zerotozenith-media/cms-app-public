@@ -11,7 +11,7 @@ interface Props {
   onCardClick: (id: number) => void;
   onDropToStage: (id: number, stage: EnquiryStage) => void;
   onSelectStage: (enquiry: Enquiry, stage: EnquiryStage) => void;
-  /** Kay: when set, each card has a tick box for assigning several at once. */
+  /** When set, each card has a tick box for assigning several at once. */
   selected?: Set<number>;
   onToggle?: (id: number) => void;
 }
@@ -77,7 +77,7 @@ export function EnquiryKanbanBoard({ enquiries, onCardClick, onDropToStage, onSe
                     {e.days_in_stage}d in stage
                   </Badge>
                 </div>
-                {/* Stays until someone sets the gender, even after assignment (Kay). */}
+                {/* Stays until someone sets the gender, even after assignment. */}
                 {!e.gender && e.stage !== 'attended' && e.stage !== 'not-pursuing' && (
                   <div className="kcard-gender"><GenderTag gender="" long /></div>
                 )}

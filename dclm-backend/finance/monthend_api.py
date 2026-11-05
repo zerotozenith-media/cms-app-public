@@ -1,5 +1,5 @@
 """
-Month-end balance API (Kay, 30 October 2026).
+Month-end balance API (30 October 2026).
 
   GET  /api/month-end/?location=&month=YYYY-MM   the month, its figures and every month's status
   POST /api/month-end/send/        Accounts: counted amount, two counters, note, photo

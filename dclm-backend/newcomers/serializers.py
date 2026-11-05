@@ -150,7 +150,7 @@ class NewcomerSerializer(serializers.ModelSerializer):
         return display_name(obj.assigned_to) if obj.assigned_to else None
 
     def validate(self, attrs):
-        """Men follow up men, women follow up women (Kay)."""
+        """Men follow up men, women follow up women."""
         attrs = super().validate(attrs)
         if attrs.get("assigned_to") is not None:
             from accounts.gender import can_pair, mismatch_message

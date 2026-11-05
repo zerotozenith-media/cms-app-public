@@ -16,6 +16,7 @@ import { AwayModal } from '../../components/accountability/TaskModals';
 import { dayText, refusal } from '../../api/accountability';
 import { useEligibleShepherds } from '../../api/followup';
 import { canPair } from '../../lib/gender';
+import { NotOffered } from '../../components/members/NotOffered';
 import { HelpMark } from '../../components/ui/HelpMark';
 
 const longDate = (d?: string | null) =>
@@ -58,7 +59,7 @@ export function NewcomerProfilePage() {
   const deleteNewcomer = useDeleteNewcomer();
   const changeStage = useChangeStage(newcomerId);
   const setMilestone = useSetMilestone(newcomerId);
-  // Go to Journey (Kay, 31 October 2026): Salvation is ticked there, and
+  // Go to Journey (31 October 2026): Salvation is ticked there, and
   // "record it on the profile" pointed at the page you were already on.
   const [tab, setTab] = useState('overview');
   function goToJourney() {
@@ -148,7 +149,7 @@ export function NewcomerProfilePage() {
     await deleteNewcomer.mutateAsync(newcomerId);
     navigate('/newcomers');
   }
-  // Kay, 26 October 2026: Not Interested needs a note, and a refusal says why.
+  // 26 October 2026: Not Interested needs a note, and a refusal says why.
   async function confirmNotInterested() {
     setStageError('');
     if (!niNote.trim()) { setStageError('Add a note saying why, so whoever reads the record later knows.'); return; }
@@ -408,6 +409,7 @@ export function NewcomerProfilePage() {
               ) : n.assigned_to_name ? <span>{n.assigned_to_name}</span> : <Badge color="amber">Unassigned</Badge>}
             </div>
             {shepherdError && <p className="form-error" role="alert">{shepherdError}</p>}
+            {canEdit && <NotOffered location={n.location} genders={[(n as any).gender ?? '']} eligible={shepherds} />}
             <div className="pf">
               <span>Away<HelpMark topic="faAway" /></span>
               <span>

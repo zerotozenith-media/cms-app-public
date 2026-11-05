@@ -1,4 +1,4 @@
-"""The data switch: clearing the demo records and loading the church's own (Kay)."""
+"""The data switch: clearing the demo records and loading the church's own."""
 import csv, io, os, tempfile
 from decimal import Decimal
 
@@ -110,7 +110,7 @@ class DataSwitchTestCase(Base):
 
 
 class BundledDataTestCase(Base):
-    """The church's records that travel with the update read as Kay approved."""
+    """The church's records that travel with the update read as the church approved."""
     def test_the_bundled_files_read_in_full(self):
         from core.importers.monthly_reports import parse
         from core.importers.people import read_people, read_simple
@@ -126,7 +126,7 @@ class BundledDataTestCase(Base):
 
 
 class AddMissingDataTestCase(Base):
-    """Kay, 6 October: the July GCK, September's Ministers' Renewal and the workers."""
+    """6 October: the July GCK, September's Ministers' Renewal and the workers."""
     def setUp(self):
         super().setUp()
         MeetingType.objects.get_or_create(id="gck", defaults={"name": "Global Crusade with Kumuyi (GCK)", "day": "", "frequency": "occasional", "detail_level": "detailed"})

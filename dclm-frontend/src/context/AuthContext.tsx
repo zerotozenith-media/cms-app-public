@@ -73,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function logout() {
     const refresh = tokenStorage.getRefresh();
     // A device signed out stops getting this person's alerts, so a shared
-    // phone never shows someone else's (Kay, October 2026). Never holds up
+    // phone never shows someone else's (October 2026). Never holds up
     // signing out.
     try {
       const { turnOff } = await import('../lib/push');

@@ -149,7 +149,7 @@ class CheckAbsencesCommandTestCase(TestCase):
             "Running the command multiple times must not create duplicate tasks for the same session.",
         )
 
-    # --- Tasks pile (Kay, 26 October 2026) ---
+    # --- Tasks pile (26 October 2026) ---
 
     def test_a_second_missed_service_gets_its_own_task_while_the_first_is_open(self):
         session1 = self._session(self.tracked_mt, date=self.service_date - datetime.timedelta(days=7), tick=True)

@@ -120,7 +120,7 @@ class AttendanceSessionSerializer(serializers.ModelSerializer):
     state = serializers.SerializerMethodField()
     state_label = serializers.SerializerMethodField()
     # Names ticked after the absence check ran: shown on the check-in
-    # screen with when the tasks will be due (Kay, 26 October 2026).
+    # screen with when the tasks will be due (26 October 2026).
     late_entry = serializers.SerializerMethodField()
     # O1: the offering as saved, so reopening the form shows it.
     offering = serializers.SerializerMethodField()
@@ -199,7 +199,7 @@ class AttendanceSessionSerializer(serializers.ModelSerializer):
                 attrs[f] = (attrs[f] or "").strip()
                 if attrs[f] and mt and mt.frequency != MeetingType.Frequency.OCCASIONAL:
                     raise serializers.ValidationError({f: f"{mt.name} meets every week, so it has no edition. Editions are for occasional meetings such as GCK."})
-        # A weekly meeting added on another day asks first (Kay, 5 November
+        # A weekly meeting added on another day asks first (5 November
         # 2026): Monday Bible Study was added on Wednesday 14 October by
         # mistake. A meeting that really moved that week is still allowed.
         if self.instance is None:
@@ -265,7 +265,7 @@ class RecordAttendanceSerializer(serializers.Serializer):
         help_text="Member IDs present. No location restriction, per Batch 0.2.",
     )
 
-    # Newcomers ticked on the session page (Kay, 31 October 2026). Left out
+    # Newcomers ticked on the session page (31 October 2026). Left out
     # by older pages, in which case newcomers' ticks are not touched.
     newcomer_ids = serializers.ListField(
         child=serializers.IntegerField(), required=False,

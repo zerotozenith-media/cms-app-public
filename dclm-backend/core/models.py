@@ -61,7 +61,7 @@ class AppSetting(models.Model):
 
 class FollowUpRules(models.Model):
     """
-    The follow-up rules Kay decided on 26 October 2026, kept as settings an
+    The follow-up rules decided on 26 October 2026, kept as settings an
     administrator covering every location can change in Admin, Follow-up
     Rules, so no number needs a developer. There is only ever one row;
     FollowUpRules.get() returns it, made with the decided values the first
@@ -91,6 +91,9 @@ class FollowUpRules(models.Model):
 
     # Shepherds and newcomers.
     shepherd_limit = models.PositiveSmallIntegerField(default=6)
+    # On (5 November 2026): an account covering All locations can shepherd
+    # people at any location. Off: only at its member record's location.
+    shepherd_anywhere = models.BooleanField(default=True)
     newcomer_stages = models.CharField(max_length=60, default="new,contacted,attending")
 
     # Reminders and alerts.
@@ -128,7 +131,7 @@ class FollowUpRules(models.Model):
 class FollowUpReview(models.Model):
     """
     One round of a late task on the Follow-up Coordinator's Review list
-    (Kay, 26 October 2026): the shepherd's reason and new date, then the
+    (26 October 2026): the shepherd's reason and new date, then the
     Follow-up Coordinator's choice. A task can have several rounds, for
     example when an accepted new date passes and it is late again. Every
     round is kept, so the record can be read later.

@@ -166,3 +166,15 @@ export function useAddMemberTask(memberId: number) {
     },
   });
 }
+
+/** Who a shepherd list leaves out, and why (5 November 2026). Gender is
+ *  checked on the page, which knows the person. */
+export function useNotOfferedShepherds(location?: string, member?: number, enabled = true) {
+  return useQuery({
+    queryKey: ['shepherds-not-offered', location ?? '', member ?? ''],
+    enabled,
+    queryFn: async () =>
+      (await apiClient.get<{ id: number; name: string; reason: string }[]>('/members/shepherds-not-offered/', {
+        params: { ...(location ? { location } : {}), ...(member ? { member } : {}) } })).data,
+  });
+}

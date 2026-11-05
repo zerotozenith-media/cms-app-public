@@ -160,7 +160,7 @@ class Command(BaseCommand):
         else:
             self.ok(f"{count} active account(s)")
         # Men follow up men, women follow up women: auto-assign gives a
-        # shepherd with no gender set nobody (Kay, 10 October 2026).
+        # shepherd with no gender set nobody (10 October 2026).
         from accounts.gender import shepherd_gender
         from accounts.names import display_name
         shepherds = list(User.objects.filter(is_active=True, can_shepherd=True).select_related("member"))
@@ -171,7 +171,7 @@ class Command(BaseCommand):
         elif shepherds:
             self.ok(f"every shepherd has a gender set ({len(shepherds)})")
         # Men shepherd men, women shepherd women, and nobody shepherds
-        # themselves (Kay, 17 October 2026). Older pairings were never
+        # themselves (17 October 2026). Older pairings were never
         # rechecked, so they are counted here.
         from members.models import Member
         from members.shepherd_rules import rule_breaks
@@ -251,7 +251,7 @@ class Command(BaseCommand):
                 self.ok(f"{label} are scheduled" if command.endswith("s") else f"{label} is scheduled")
 
     def check_alerts(self):
-        """Phone and computer alerts (Kay, October 2026)."""
+        """Phone and computer alerts (October 2026)."""
         try:
             import pywebpush  # noqa: F401
         except ImportError:
@@ -290,7 +290,7 @@ class Command(BaseCommand):
             self.ok(f"{tracked.count()} meeting(s) tracked for absence, all with start times")
 
     def check_followup_plan(self):
-        """The follow-up plan (Kay, 26 October 2026)."""
+        """The follow-up plan (26 October 2026)."""
         from django.utils import timezone
         from accounts.models import User
         from core.followup_clock import attendance_falling

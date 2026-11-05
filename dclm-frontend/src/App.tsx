@@ -9,7 +9,7 @@ import { TeamListPage } from './components/service/ServiceBadge';
 import { PageLoadBoundary } from './components/ui/PageLoadBoundary';
 
 
-// Opened only when needed, so signing in downloads less (Kay, 27 October 2026).
+// Opened only when needed, so signing in downloads less (27 October 2026).
 const FollowUpMessagesPage = lazyPage(() => import('./pages/newcomers/FollowUpMessagesPage'), 'FollowUpMessagesPage');
 const ForgotPasswordPage = lazyPage(() => import('./pages/ForgotPasswordPage'), 'ForgotPasswordPage');
 const ResetPasswordPage = lazyPage(() => import('./pages/ResetPasswordPage'), 'ResetPasswordPage');

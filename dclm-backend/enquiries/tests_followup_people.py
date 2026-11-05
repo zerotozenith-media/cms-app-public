@@ -1,4 +1,4 @@
-"""Kay, 10 October 2026: a named follow-up person for every online contact."""
+"""10 October 2026: a named follow-up person for every online contact."""
 from accounts.models import Role, RolePermission, User
 from core.tests_upgrade import Base
 from enquiries.models import Enquiry, EnquirySource

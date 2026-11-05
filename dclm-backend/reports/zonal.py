@@ -57,7 +57,7 @@ def _grouped(mf, kind, markers):
     house = _house_types()
     for s in mf["sessions"]:
         # House fellowships have their own table, even a session recorded
-        # with no fellowship chosen (Kay, 5 November 2026).
+        # with no fellowship chosen (5 November 2026).
         if test(s.meeting_type) and not s.fellowship_id and s.meeting_type_id not in house:
             per.setdefault(s.meeting_type, []).append((s.date, s))
     types = {s.meeting_type.id: s.meeting_type for s in mf["sessions"]}
@@ -79,7 +79,7 @@ def _house_types():
 
 def _house_table(mf, scope, name):
     """
-    House caring fellowship attendance (Kay, 5 November 2026): one row per
+    House caring fellowship attendance (5 November 2026): one row per
     date, one column per fellowship, so each group's attendance shows. A
     session not filled in, or that did not hold, says so, rather than the
     gap passing unnoticed.

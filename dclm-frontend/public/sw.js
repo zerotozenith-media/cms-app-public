@@ -1,4 +1,4 @@
-/* DCLM Bahrain alerts (Kay, October 2026).
+/* DCLM Bahrain alerts (October 2026).
  * Shows an alert when the server sends one, even with the system closed,
  * and opens the right page when it is tapped. Nothing else: no caching, so
  * the app always loads fresh. */

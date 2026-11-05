@@ -32,7 +32,7 @@ class Goal(models.Model):
         TESTIMONY_COUNT = "testimony_count", "Testimony count"
         MEMBER_CATEGORY_MOVES = "member_category_moves", "Members moved to a category"
         MILESTONE_COUNT = "milestone_count", "Milestone count"
-        # Item 11 (Kay, 26 October 2026): goals that update themselves.
+        # Item 11 (26 October 2026): goals that update themselves.
         SESSIONS_HELD = "sessions_held", "Sessions held"
         FUND_TOTAL = "fund_total", "Fund total"
         NET_GIVING = "net_giving", "Monthly giving less expenses"

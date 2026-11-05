@@ -346,7 +346,7 @@ class CampaignTestCase(APITestCase):
 
 
 class EnquiryEditDetails(EnquiryAPITestCase):
-    """The pencil on an enquiry (Kay, 31 October 2026)."""
+    """The pencil on an enquiry (31 October 2026)."""
     def test_details_can_be_corrected_and_are_audited(self):
         from accounts.models import AuditLog
         e = self._enquiry()

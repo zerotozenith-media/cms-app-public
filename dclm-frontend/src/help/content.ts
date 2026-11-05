@@ -1,5 +1,5 @@
 /**
- * Help & Guide (rewritten for version 11.14, Kay, 26 October 2026).
+ * Help & Guide (rewritten for version 11.14, 26 October 2026).
  *
  * Written by job, so a new usher reads "what you do on Friday" rather than
  * a description of a screen. Each guide is short, with numbered steps, and
@@ -56,7 +56,7 @@ export const HELP_SECTIONS: HelpSection[] = [
   { key: 'goals', label: 'Goals and reports', group: 'Reference' },
   { key: 'alerts', label: 'Alerts on your phone', group: 'Reference' },
   { key: 'admin', label: 'Accounts and roles', group: 'Reference' },
-  { key: 'new', label: 'Versions 11.14 to 11.17', group: "What's new", intro: 'What changed in versions 11.14 to 11.17, and where to read about it.' },
+  { key: 'new', label: 'Versions 11.14 to 11.18', group: "What's new", intro: 'What changed in versions 11.14 to 11.18, and where to read about it.' },
 ];
 
 const SH: HelpRole[] = ['Shepherd'];
@@ -348,7 +348,7 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
     { h: "Why is Follow up those not ticked refused?", say: '"This service is followed up automatically" or "Today\'s are followed up automatically."', why: 'Recent tracked services are followed up by the absence check.', fix: 'Just tick who came. Tasks for the others are made at the next check.', roles: ['Usher'], manual: 22 },
     { h: 'Why were no tasks made after the service?', why: 'Tasks are made only when names are ticked, and only for meetings that follow up absence and have a start time.', fix: 'Tick who came. An administrator can check the meeting\'s Settings for a start time.', roles: ALL, manual: 67 },
     // People
-    { h: 'Why is the shepherd I want not offered?', why: 'Men follow up men and women follow up women, at the person\'s location, and nobody shepherds themselves. Only accounts ticked Can shepherd others are offered.', fix: 'Check the person\'s gender, and the shepherd\'s gender and tick in Admin, Users.', roles: ALL, manual: 17 },
+    { h: 'Why is the shepherd I want not offered?', say: '"Not offered: their account covers Qatar only."', why: 'Men follow up men and women follow up women, and nobody shepherds themselves. Only accounts ticked Can shepherd others are offered, and only if their account covers the person\'s location or All locations. Under the shepherd box, Not offered lists each person left out and why.', fix: 'Do what the reason says: tick Can shepherd others or set the gender in Admin, Users & Roles, or change the account\'s location. Whether All-locations accounts shepherd everywhere is set in Admin, Follow-up Rules.', roles: ALL, manual: 85 },
     { h: 'Why is my shepherd choice refused?', say: '"Nobody can shepherd themselves." or "Men follow up men and women follow up women. Not saved, because of …"', why: 'The shepherd rules apply to every way of assigning.', fix: 'Untick the people named, or choose someone of the same gender.', roles: ALL, manual: 17 },
     { h: 'Why is this shepherd refused for these newcomers?', say: '"… serves … only. Not saved, because … is at another location."', why: 'A shepherd follows up people at their own location.', fix: 'Choose a shepherd at that location, or untick that person.', roles: ['Welcome team'], manual: 71 },
     { h: 'Why must I say why for Not Interested?', say: '"Say why, for example "Moved back home"."', why: 'Not Interested stops follow-up, so the reason is kept.', fix: 'Type a short reason.', roles: ['Welcome team'], manual: 37 },
@@ -516,6 +516,8 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
   ],
 
   admin: [
+    { h: 'Who can shepherd where', roles: AD, p: 'An account ticked Can shepherd others shepherds at the location its account covers. An account covering All locations shepherds at every location while All-locations accounts can shepherd at any location is On in Admin, Follow-up Rules. Off, it shepherds only at the location on its member record. Example: a Qatar leader covering All locations can take a Bahrain HQ newcomer when it is On.', manual: 85 },
+    { h: 'Removing a fellowship', roles: AD, p: 'In Admin, Meeting Types & Households, Fellowships, press the bin. Its empty sessions are removed with it. If any session has attendance, names, an offering or follow-up tasks, nothing is removed and those sessions are listed: open each and press Change date or meeting to move it, or delete it if it was a mistake.', manual: 87 },
     { h: 'Finding something in the Audit Log', roles: AD, steps: [
       'Open Admin, then Audit Log.',
       'Type words from the name, item or details, for example Monday Bible Study 14.',
@@ -530,6 +532,7 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
   ],
 
   new: [
+    { h: '11.18: Shepherds anywhere, and why someone is not offered', roles: ALL, p: 'All-locations accounts can shepherd at any location, set in Admin, Follow-up Rules. Every shepherd box lists who is not offered and why. Removing a fellowship removes its empty sessions too.', links: [{ to: 'admin', t: 'Accounts and roles' }], manual: 85 },
     { h: '11.17: Reports, sessions and the Audit Log', roles: ALL, p: 'All locations reports add the same meeting on the same day into one row, the zonal report shows house caring fellowships, New session asks before a meeting on the wrong day, administrators can change a session\'s date or meeting, the Audit Log has search and filters, and sign-in says when the server cannot be reached.', links: [{ to: 'usher', t: 'I record attendance' }, { to: 'runchurch', t: 'I run the church' }], manual: 81 },
     { h: '11.16: Finding people and ticking newcomers', roles: ALL, p: 'Search on Newcomers and Online Enquiries, a pencil to correct an enquiry, Go to Journey for Salvation, and newcomers with Everyone, Members, Newcomers and Not ticked on check-in and the session page.', links: [{ to: 'welcome', t: 'I welcome newcomers' }, { to: 'usher', t: 'I record attendance' }], manual: 76 },
     { h: '11.15: Month-end balance', roles: [...FN, ...APPR, 'Administrator'], p: 'Balance the money held each month, send it for approval, and a second person closes it. Closed months cannot change, and the report shows the money held at each month end.', links: [{ to: 'giving', t: 'I handle giving' }], manual: 72 },

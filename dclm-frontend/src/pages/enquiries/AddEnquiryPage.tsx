@@ -25,7 +25,7 @@ export function AddEnquiryPage() {
   const canSeeOutreach = hasPermission('outreach', 'view');
   const createEnquiry = useCreateEnquiry();
   const { data: sources } = useEnquirySources();
-  // Only people who may follow up contacts, as everywhere else (Kay).
+  // Only people who may follow up contacts, as everywhere else.
   const { data: people = [] } = useFollowUpPeople();
   // Only fetched when the role may see it; a 403 otherwise is expected.
   // Only roles with outreach access may read campaigns (it was asked of everyone and refused).

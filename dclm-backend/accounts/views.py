@@ -356,7 +356,7 @@ class UserViewSet(viewsets.ModelViewSet):
             log_audit(self.request.user, "Changed account", "User", instance.email, "; ".join(changes),
                       instance=instance)
         # Someone switched off or no longer shepherding hands their open
-        # tasks on, never leaving them with nobody (Kay, 26 October 2026).
+        # tasks on, never leaving them with nobody (26 October 2026).
         if (before["is_active"] and not instance.is_active) or (before["can_shepherd"] and not instance.can_shepherd):
             from core.task_actions import release_tasks
             release_tasks(instance)
@@ -477,7 +477,7 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
         return qs
 
     def get_queryset(self):
-        # Filters (Kay, 5 November 2026): the log could only be paged
+        # Filters (5 November 2026): the log could only be paged
         # through, eight entries at a time.
         qs = self._scoped()
         p = self.request.query_params

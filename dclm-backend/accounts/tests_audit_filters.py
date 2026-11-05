@@ -1,4 +1,4 @@
-"""Audit Log search and filters (Kay, 5 November 2026)."""
+"""Audit Log search and filters (5 November 2026)."""
 import datetime
 
 from django.utils import timezone

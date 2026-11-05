@@ -1,5 +1,5 @@
 """
-Phone and computer alerts (Kay, October 2026): web push, so they arrive even
+Phone and computer alerts (October 2026): web push, so they arrive even
 when the system is closed. Each person turns them on once per device, and
 chooses which kinds they want.
 """
@@ -79,7 +79,7 @@ class PushKeys(models.Model):
 
 class Notice(models.Model):
     """
-    An alert kept in the app as well as sent to the phone (Kay, 26 October
+    An alert kept in the app as well as sent to the phone (26 October
     2026), so somebody without phone alerts still sees it, and nothing
     depends on a phone being on.
     """

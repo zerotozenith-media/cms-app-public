@@ -1,4 +1,4 @@
-"""The Finance Approver role and the Approve month-end permission (Kay, 30
+"""The Finance Approver role and the Approve month-end permission (30
 October 2026). The person who approves a month is never the person who
 prepared it. Administrators get the permission too; any role can be given
 it in Admin, Roles & Permissions."""

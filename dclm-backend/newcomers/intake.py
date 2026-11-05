@@ -40,7 +40,7 @@ def create_auto_tasks(newcomer):
     assign_on_registration(newcomer)
 
     # Every first-visit task is due 24 hours from 6:00 pm on the day the
-    # newcomer first came (Kay, 26 October 2026), like an absence task.
+    # newcomer first came (26 October 2026), like an absence task.
     # Before, a visit had 5 days and a salvation conversation 2. Entered on
     # a later day, the clock starts when the newcomer is entered.
     from core.accountable import TaskKind

@@ -45,6 +45,7 @@ export function MeetingTypesHouseholdsTab() {
   const [newLocation, setNewLocation] = useState('');
   const mainLocation = (locations ?? []).find((l: any) => l.is_core)?.id ?? locations?.[0]?.id ?? '';
   const [fellowshipError, setFellowshipError] = useState('');
+  const [fellowshipDone, setFellowshipDone] = useState('');
   const { data: settings } = useAppSettings();
   const updateSetting = useUpdateAppSetting();
   const { data: meetingTypes } = useMeetingTypes();
@@ -337,8 +338,9 @@ export function MeetingTypesHouseholdsTab() {
                   {canRemoveFellowship && (
                   <button className="icon-btn" title="Remove" aria-label={`Remove ${f.name}`}
                     onClick={async () => {
-                      setFellowshipError('');
-                      try { await deleteFellowship.mutateAsync(f.id); }
+                      setFellowshipError(''); setFellowshipDone('');
+                      if (!confirm(`Remove ${f.name}? Its empty sessions are removed with it. If any session has attendance, names or an offering, nothing is removed and those sessions are listed to move first.`)) return;
+                      try { await deleteFellowship.mutateAsync(f.id); setFellowshipDone(`${f.name} was removed, with its empty sessions.`); }
                       catch (err: any) {
                         setFellowshipError(err?.response?.data?.detail
                           ?? 'That fellowship could not be removed.');
@@ -351,7 +353,8 @@ export function MeetingTypesHouseholdsTab() {
             ))}
           </tbody>
         </table>
-        {fellowshipError && <p className="form-error">{fellowshipError}</p>}
+        {fellowshipError && <p className="form-error" role="alert">{fellowshipError}</p>}
+        {fellowshipDone && <p className="fr-done" role="status">{fellowshipDone}</p>}
         {canAddFellowship && <>
         <div className="form-row" style={{ marginTop: 12 }}>
           <div className="field">

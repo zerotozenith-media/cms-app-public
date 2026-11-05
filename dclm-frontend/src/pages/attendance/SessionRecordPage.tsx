@@ -76,7 +76,7 @@ export function SessionRecordPage() {
   const [search, setSearch] = useState('');
   const [searchResults, setSearchResults] = useState<Member[]>([]);
   const [memberCount, setMemberCount] = useState(0);
-  // Newcomers in named attendance (Kay, 31 October 2026).
+  // Newcomers in named attendance (31 October 2026).
   const [newcomerIds, setNewcomerIds] = useState<Set<number>>(new Set());
   const [who, setWho] = useState<Who>('everyone');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);

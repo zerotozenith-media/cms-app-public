@@ -3,7 +3,7 @@ import logoBadge from '../../assets/logo-badge.png';
 /**
  * The frame shared by sign-in, "reset your password" and "choose a new
  * password": the church's logo, name and Jude 3 on the left on a computer
- * (on top on a phone), the form on the right. Kay approved this design,
+ * (on top on a phone), the form on the right. The church approved this design,
  * with the logo's own red for accents and blue for buttons.
  */
 export function AuthLayout({ children }: { children: React.ReactNode }) {

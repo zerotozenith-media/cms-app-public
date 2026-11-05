@@ -1,5 +1,5 @@
 """
-Month-end balance rules (Kay, 30 October 2026). See monthend_models.py.
+Month-end balance rules (30 October 2026). See monthend_models.py.
 
 Every refusal says why and what to do, in words a church treasurer uses.
 """

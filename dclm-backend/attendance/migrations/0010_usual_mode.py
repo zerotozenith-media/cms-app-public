@@ -5,7 +5,7 @@ from django.utils import timezone
 
 
 def set_usual_modes(apps, schema_editor):
-    """Kay: every meeting has people joining online, and only the Friday
+    """Every meeting has people joining online, and only the Friday
     Worship Service also meets in person. Upcoming sessions not yet filled in
     follow their meeting. Sessions already recorded keep their mode."""
     MeetingType = apps.get_model("attendance", "MeetingType")

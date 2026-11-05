@@ -1,5 +1,5 @@
 /**
- * Phone and computer alerts (Kay, October 2026): web push through the
+ * Phone and computer alerts (October 2026): web push through the
  * service worker in /sw.js. Everything here is safe to call on a browser
  * that cannot do alerts; it simply reports that.
  */

@@ -1,5 +1,5 @@
 """
-Late tasks, reasons and the Follow-up Coordinator's Review list (Kay, 26
+Late tasks, reasons and the Follow-up Coordinator's Review list (26
 October 2026). With the decided values:
 
   due        24 hours after the clock start (6:00 pm on the service day)
@@ -262,7 +262,7 @@ def task_row(task, now, r):
 def my_followup(user, shepherd_id=None):
     """
     One list of a shepherd's open tasks, members and newcomers together,
-    grouped under each person (Kay, 26 October 2026), late tasks first.
+    grouped under each person (26 October 2026), late tasks first.
     """
     from members.models import Member
     from newcomers.models import Newcomer

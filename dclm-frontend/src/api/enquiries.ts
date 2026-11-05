@@ -148,7 +148,7 @@ export function useDeleteEnquiryTask() {
   });
 }
 
-// ---------------------------------------------- follow-up people (Kay, Oct 2026)
+// ---------------------------------------------- follow-up people (Oct 2026)
 export interface FollowUpPerson { id: number; name: string; contacts: number; gender: string }
 export interface ContactAutoAssign {
   people: { id: number; name: string; gender: string; now: number; after: number }[];

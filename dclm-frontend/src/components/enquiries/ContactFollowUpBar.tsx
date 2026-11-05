@@ -8,7 +8,7 @@ import { GenderTag } from '../ui/GenderTag';
 import { canPair, GROUP } from '../../lib/gender';
 
 /**
- * Kay, October 2026: a named follow-up person for every online contact.
+ * October 2026: a named follow-up person for every online contact.
  * Filter by person, tick several and assign them, auto-assign evenly, and
  * start messages for contacts. Only contacts still being followed up count.
  */
@@ -36,7 +36,7 @@ export function ContactFollowUpBar({ all, filter, setFilter, me, canEdit, select
   const [assignTo, setAssignTo] = useState('');
   const [msg, setMsg] = useState('');
   const bulk = useBulkAssignContacts();
-  // Men follow up men, women follow up women (Kay). When every ticked
+  // Men follow up men, women follow up women. When every ticked
   // contact is the same known gender, only matching people are offered.
   const pickedGenders = new Set(all.filter((e) => selected.has(e.id) && e.gender).map((e) => e.gender));
   const offer = pickedGenders.size === 1 ? people.filter((p) => canPair([...pickedGenders][0], p.gender)) : people;

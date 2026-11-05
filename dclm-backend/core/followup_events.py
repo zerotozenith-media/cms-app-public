@@ -1,5 +1,5 @@
 """
-What happens after follow-up tasks are made or change (Kay, 26 October
+What happens after follow-up tasks are made or change (26 October
 2026):
 
   - a task with no shepherd goes to the Follow-up Coordinator, never left

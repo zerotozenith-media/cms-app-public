@@ -1,4 +1,4 @@
-"""Kay, 10 October 2026: men follow up men, women follow up women.
+"""10 October 2026: men follow up men, women follow up women.
 A person whose gender is not known may go to anyone, with a warning."""
 from accounts.models import Role, RolePermission, User
 from core.tests_upgrade import Base

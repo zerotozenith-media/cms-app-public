@@ -72,7 +72,7 @@ def arrival(kind, obj, by=None):
 def notify(user_ids, title, body, url="/", tag=None, kind="followup"):
     """
     Keep an alert in the app for each person, and send it to their phones
-    if they have phone alerts on (Kay, 26 October 2026). Kept even when
+    if they have phone alerts on (26 October 2026). Kept even when
     the phone is off, so nothing depends on a phone.
     """
     from .models import Notice

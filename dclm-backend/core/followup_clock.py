@@ -1,5 +1,5 @@
 """
-The follow-up clock (Kay, 26 October 2026). Runs with the absence check,
+The follow-up clock (26 October 2026). Runs with the absence check,
 twice an hour, and sends each of these once:
 
   1. 3 hours after a tracked service starts with no names ticked, a reminder

@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from django.urls import path
 from .views import (
     HouseholdViewSet, MemberViewSet, MemberCategoryHistoryViewSet, MemberFollowUpTaskViewSet,
-    ShepherdAssignmentView, BulkAssignShepherdView, EligibleShepherdsView,
+    ShepherdAssignmentView, BulkAssignShepherdView, EligibleShepherdsView, NotOfferedShepherdsView,
 )
 
 router = DefaultRouter()
@@ -19,4 +19,5 @@ urlpatterns = [
     path("members/assign-shepherds/", ShepherdAssignmentView.as_view(), name="assign-shepherds"),
     path("members/bulk-assign-shepherd/", BulkAssignShepherdView.as_view(), name="bulk-assign-shepherd"),
     path("members/eligible-shepherds/", EligibleShepherdsView.as_view(), name="eligible-shepherds"),
+    path("members/shepherds-not-offered/", NotOfferedShepherdsView.as_view(), name="shepherds-not-offered"),
 ] + router.urls

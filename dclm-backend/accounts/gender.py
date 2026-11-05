@@ -1,5 +1,5 @@
 """
-Gender matching (Kay, 10 October 2026): men follow up men, and women
+Gender matching (10 October 2026): men follow up men, and women
 follow up women.
 
   1. A person whose gender is known only goes to a shepherd of the same

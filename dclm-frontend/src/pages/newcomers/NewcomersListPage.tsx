@@ -11,6 +11,7 @@ import { useLocationName } from '../../api/locations';
 import { useAuth } from '../../context/AuthContext';
 import { useEligibleShepherds } from '../../api/followup';
 import { canPair } from '../../lib/gender';
+import { NotOffered } from '../../components/members/NotOffered';
 import { apiClient } from '../../api/client';
 import { refusal } from '../../api/accountability';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -43,7 +44,7 @@ export function NewcomersListPage() {
   const [view, setView] = useState<'board' | 'table'>('board');
   const [page, setPage] = useState(1);
   const pageSize = 12;
-  // Item 13 (Kay): tick several and give them one shepherd.
+  // Item 13: tick several and give them one shepherd.
   const qc = useQueryClient();
   const [picked, setPicked] = useState<Set<number>>(new Set());
   const [bulkTo, setBulkTo] = useState('');
@@ -215,6 +216,7 @@ export function NewcomersListPage() {
                   <button className="btn sm" disabled={!bulkTo || bulk.isPending} onClick={() => bulk.mutate()}>Assign</button>
                   <button className="btn sm ghost" onClick={() => { setPicked(new Set()); setBulkMsg(null); }}>Clear</button>
                   <span className="muted" style={{ fontSize: '.8rem' }}>Only shepherds who may take all {picked.size} are offered: men for men, women for women.</span>
+                  <NotOffered genders={chosen.map((n) => (n as any).gender ?? '')} eligible={eligible} />
                 </div>
               );
             })()}

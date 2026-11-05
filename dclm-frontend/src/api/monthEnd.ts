@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
 
 /**
- * Month-end balance (Kay, 30 October 2026): balance the money held each
+ * Month-end balance (30 October 2026): balance the money held each
  * month, send it for approval, and close it. See finance/monthend_api.py.
  */
 export interface MonthEndFigures {

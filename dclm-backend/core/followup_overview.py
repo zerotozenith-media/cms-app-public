@@ -1,5 +1,5 @@
 """
-The Follow-up Review page's figures (Kay, 26 October 2026): the five
+The Follow-up Review page's figures (26 October 2026): the five
 measures against the targets in Follow-up Rules, and one row per shepherd.
 
   On time        tasks due in the month with a result by their due time
