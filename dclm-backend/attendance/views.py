@@ -437,6 +437,66 @@ class AttendanceSessionViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSe
         log_audit(request.user, "Marked Did not hold", "Attendance Session", name, reason, instance=session)
         return Response(AttendanceSessionSerializer(session).data)
 
+    @action(detail=True, methods=["post"], url_path="change")
+    def change(self, request, pk=None):
+        """
+        Change a session's meeting or date (Kay, 5 November 2026), keeping
+        its headcount, names ticked and offering. Monday Bible Study was
+        added on Wednesday 14 October and the only way out was to delete it.
+        Administrators only, with the same checks as adding a session.
+        """
+        import datetime
+        from .serializers import other_day_refusal
+        require(request.user, ("admin", "can_edit"))
+        session = self.get_object()
+        mt = MeetingType.objects.filter(pk=request.data.get("meeting_type") or session.meeting_type_id).first()
+        if not mt:
+            return Response({"meeting_type": "Choose a meeting from the list."}, status=400)
+        try:
+            new_date = datetime.date.fromisoformat(str(request.data.get("date") or session.date))
+        except ValueError:
+            return Response({"date": "Enter the date the meeting was held."}, status=400)
+        old_name, old_date = session.meeting_type.name, session.date
+        if mt.pk == session.meeting_type_id and new_date == session.date:
+            return Response({"detail": "Nothing changed. Choose a different meeting or date."}, status=400)
+        has_record = (session.status == AttendanceSession.Status.FILLED or session.attendees.exists()
+                      or session.giving.exists())
+        if new_date > timezone.localdate() and has_record:
+            return Response({"date": f"{new_date:%-d %B} has not come yet, and this session already has attendance "
+                                     f"or an offering recorded. Choose the date it was held."}, status=400)
+        other_day_refusal(mt, new_date, request.data)
+        # A fellowship stays only if it belongs to the new meeting.
+        fellowship = session.fellowship if session.fellowship and session.fellowship.meeting_type_id == mt.pk else None
+        twin = AttendanceSession.objects.filter(meeting_type=mt, date=new_date, location=session.location,
+                                                fellowship=fellowship).exclude(pk=session.pk).first()
+        if twin:
+            return Response({"detail": f"{mt.name} at {session.location.name} on {new_date:%A %-d %B} already exists. "
+                                       f"Record these numbers there and delete this one, so the service is not "
+                                       f"counted twice.", "existing_id": twin.id}, status=400)
+        open_tasks = (session.generated_followups.filter(done=False).count()
+                      + session.newcomer_followups.filter(done=False).count())
+        if open_tasks:
+            return Response({"detail": f"{open_tasks} open follow-up task{'s were' if open_tasks != 1 else ' was'} made "
+                                       f"from this session for people not ticked. Changing its meeting or date would "
+                                       f"leave them about the wrong service. Ask a Follow-up Coordinator to cancel "
+                                       f"them first, with the reason."}, status=400)
+        giving = list(session.giving.all())
+        if giving:
+            from finance.monthend import refuse_if_locked
+            refuse_if_locked(session.location, old_date, "a session with an offering")
+            refuse_if_locked(session.location, new_date, "a session with an offering")
+        with transaction.atomic():
+            session.meeting_type, session.date, session.fellowship = mt, new_date, fellowship
+            session.save(update_fields=["meeting_type", "date", "fellowship"])
+            # The offering moves with its service.
+            moved = session.giving.filter(date=old_date).update(date=new_date)
+            log_audit(request.user, "Changed", "Attendance Session", f"{mt.name} · {new_date}",
+                      f"Was {old_name}, {old_date:%a %-d %b %Y}. Now {mt.name}, {new_date:%a %-d %b %Y}."
+                      + (f" {moved} offering entr{'ies' if moved != 1 else 'y'} moved to the new date." if moved else ""),
+                      instance=session)
+        session = self.get_queryset().get(pk=session.pk)
+        return Response(AttendanceSessionSerializer(session).data)
+
     @action(detail=True, methods=["get"], url_path="newcomer-roster")
     def newcomer_roster(self, request, pk=None):
         """

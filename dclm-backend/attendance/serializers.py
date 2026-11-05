@@ -88,6 +88,22 @@ class AttendanceSessionMemberSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "checked_in_at"]
 
 
+def other_day_refusal(mt, d, data):
+    """Refuses a weekly meeting on a day it does not meet, unless the
+    person has confirmed with allow_other_day."""
+    if not mt or not d or mt.frequency != MeetingType.Frequency.WEEKLY:
+        return
+    from .management.commands.generate_recurring_sessions import WEEKDAY_MAP
+    wd = WEEKDAY_MAP.get((mt.day or "").strip().lower())
+    allowed = str((data or {}).get("allow_other_day", "")).lower() in ("true", "1", "yes")
+    if wd is None or d.weekday() == wd or allowed:
+        return
+    raise serializers.ValidationError({
+        "detail": f"{mt.name} meets on {mt.day}s. {d:%-d %B} is a {d:%A}. Add it on this day only if the "
+                  f"meeting really moved that week. Otherwise choose the right meeting or date.",
+        "other_day": True})
+
+
 class AttendanceSessionSerializer(serializers.ModelSerializer):
     total = serializers.ReadOnlyField()
     online_total = serializers.ReadOnlyField()
@@ -183,6 +199,11 @@ class AttendanceSessionSerializer(serializers.ModelSerializer):
                 attrs[f] = (attrs[f] or "").strip()
                 if attrs[f] and mt and mt.frequency != MeetingType.Frequency.OCCASIONAL:
                     raise serializers.ValidationError({f: f"{mt.name} meets every week, so it has no edition. Editions are for occasional meetings such as GCK."})
+        # A weekly meeting added on another day asks first (Kay, 5 November
+        # 2026): Monday Bible Study was added on Wednesday 14 October by
+        # mistake. A meeting that really moved that week is still allowed.
+        if self.instance is None:
+            other_day_refusal(attrs.get("meeting_type"), attrs.get("date"), self.initial_data)
         # Server-side enforcement of the detailed/simple rule (Batch 0.2):
         # a "simple" meeting only ever has Men/Women , reject youth/children
         # counts rather than silently accepting and ignoring them.

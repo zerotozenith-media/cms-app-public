@@ -24,13 +24,15 @@ export const HELP_PAGES: { path: RegExp; help: PageHelp }[] = [
   { path: /^\/attendance\/new/, help: { title: 'New session', manual: 23, steps: [
     'Use this only for one-off meetings. Weekly sessions are made for you.',
     'Choose the meeting, date and location, then press Create.',
-  ], links: [{ t: "Why can't I add this session?", s: 'why', h: "Why can't I add this session?" }] } },
+    'A weekly meeting on a day it does not meet asks first.',
+  ], links: [{ t: "Why can't I add this session?", s: 'why', h: "Why can't I add this session?" }, { t: 'Why does it ask before adding?', s: 'why', h: 'Why does New session ask before adding this meeting?' }] } },
   { path: /^\/attendance\/\d+/, help: { title: 'Recording a service', manual: 21, steps: [
     'Type the headcount for each group, and new comers and converts.',
     'Type the offering for each fund.',
     'Press Save session.',
     'To tick names here, tick Track named attendance. Newcomers are listed too.',
-  ], links: [{ t: 'Why is Save session greyed out?', s: 'why', h: 'Why is Save session greyed out?' }, { t: 'Ticking names on the session page', s: 'usher', h: 'Ticking names on the session page' }, { t: 'Recording the headcount and offering', s: 'usher', h: 'Recording the headcount and offering' }] } },
+    'Wrong date or meeting? An administrator presses Change date or meeting.',
+  ], links: [{ t: 'Why is Save session greyed out?', s: 'why', h: 'Why is Save session greyed out?' }, { t: 'Ticking names on the session page', s: 'usher', h: 'Ticking names on the session page' }, { t: "Correcting a session's date or meeting", s: 'attendance', h: "Correcting a session's date or meeting" }, { t: 'Recording the headcount and offering', s: 'usher', h: 'Recording the headcount and offering' }] } },
   { path: /^\/attendance/, help: { title: 'Attendance', manual: 21, steps: [
     "Press Check in on today's row to tick names as people arrive.",
     "Press the row to record the headcount and offering.",
@@ -73,12 +75,13 @@ export const HELP_PAGES: { path: RegExp; help: PageHelp }[] = [
   { path: /^\/enquiries/, help: { title: 'Online enquiries', manual: 39, steps: ['Find a contact by name, phone, email or handle.', 'Press the pencil on a contact to correct their details.', 'Give each contact a follow-up person, and add them as a newcomer when they come.'], links: [{ t: 'Finding and correcting a contact', s: 'enquiries', h: 'Finding and correcting a contact' }, { t: 'Online enquiries', s: 'enquiries' }] } },
   { path: /^\/finance/, help: { title: 'Giving & Finance', manual: 42, steps: ['Record giving and expenses on the day, in the forms.', 'The Remittance tab records each month\'s remittance.', 'The Month-end balance tab balances, approves and closes each month.'], links: [{ t: 'Balancing the month', s: 'giving', h: 'Balancing the month' }, { t: "Why can't I add, change or delete this?", s: 'why', h: "Why can't I add, change or delete this giving or expense?" }, { t: "Why can't I change this giving entry?", s: 'why', h: "Why can't I change this giving entry?" }] } },
   { path: /^\/goals/, help: { title: 'Goals', manual: 46, steps: ['Type the figure for goals typed by hand.', 'Add goal, Automatically, makes a goal that updates itself.'], links: [{ t: 'Two kinds of goals', s: 'goals', h: 'Two kinds of goals' }, { t: 'Why is a goal refused?', s: 'why', h: 'Why is a goal refused?' }] } },
-  { path: /^\/reports/, help: { title: 'Reports', manual: 48, steps: ['Choose the report and months, then press Generate.'], links: [{ t: 'Why is the report refused?', s: 'why', h: 'Why is the report refused?' }] } },
+  { path: /^\/reports/, help: { title: 'Reports', manual: 48, steps: ['Choose the report and months, then press Generate.', 'All locations adds the same meeting on the same day into one row.'], links: [{ t: 'All locations in a report', s: 'goals', h: 'All locations in a report' }, { t: 'Why is the report refused?', s: 'why', h: 'Why is the report refused?' }] } },
   { path: /^\/admin/, help: { title: 'Admin', manual: 51, steps: [
     'Users & Roles: Edit an account, its role, shepherd and Follow-up Coordinator ticks.',
     'Meeting Types: Settings sets start times and when sessions are made.',
     'Follow-up Rules: every follow-up time and number.',
-  ], links: [{ t: 'Follow-up Rules', s: 'runchurch', h: 'Follow-up Rules' }, { t: 'Editing an account', s: 'runchurch', h: 'Editing an account' }, { t: "Why can't I give this role?", s: 'why', h: "Why can't I give this role?" }] } },
+    'Audit Log: search and filter every change.',
+  ], links: [{ t: 'Finding something in the Audit Log', s: 'admin', h: 'Finding something in the Audit Log' }, { t: 'Follow-up Rules', s: 'runchurch', h: 'Follow-up Rules' }, { t: 'Editing an account', s: 'runchurch', h: 'Editing an account' }, { t: "Why can't I give this role?", s: 'why', h: "Why can't I give this role?" }] } },
   { path: /^\/profile/, help: { title: 'My profile', manual: 7, steps: ['Correct your details, add a photo or change your password.', 'Turn on alerts for this device.'], links: [{ t: 'Turning on alerts', s: 'alerts', h: 'Turning on alerts' }] } },
   { path: /^\/help/, help: { title: 'Help & Guide', steps: ['Pick your job on the left, or search for a word from what you are doing.'], links: [{ t: "Why can't I...?", s: 'why' }] } },
   { path: /^\/$/, help: { title: 'Dashboard', manual: 12, steps: ['The cards show this month at a glance. Tap one to open its page.', 'The bell lists what needs your attention.'], links: [{ t: 'The bell', s: 'start', h: 'The bell' }] } },

@@ -1388,3 +1388,18 @@ td.td-actions .icon-btn + .icon-btn,.row-actions .icon-btn + .icon-btn,td.td-act
 .named-list .checkin-group{margin-top:6px}
 .nc-stage-tag{display:inline-block;font-size:.7rem;font-weight:700;background:var(--amber-bg,#FFF3D6);color:#7a5200;border-radius:8px;padding:1px 7px;vertical-align:middle}
 .checkin-more{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-top:12px;font-size:.82rem}
+
+/* v11.17: Audit Log filters, change session, other-day confirm */
+.audit-search{width:100%;margin:4px 0 8px}
+.audit-filters{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr) minmax(150px,1.15fr) minmax(150px,1.15fr);gap:8px;margin-bottom:4px;align-items:end}
+.audit-filters .field{margin-bottom:6px;min-width:0}
+.audit-filters select,.audit-filters input{width:100%;min-width:0;height:42px;min-height:42px;box-sizing:border-box}
+@media (max-width:1180px){.audit-filters{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.audit-filters input[type=date]{padding-left:10px;padding-right:8px}
+@media (max-width:620px){.audit-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.change-session-link{display:flex;align-items:center;gap:4px;margin:-6px 0 10px;flex-wrap:wrap}
+.change-session-link .fr-done{flex-basis:100%;margin:0 0 4px}
+.change-session{margin:0 0 14px}
+.other-day-actions{margin:-4px 0 12px}
+
+.form-error .linkish{min-height:0;padding:0;display:inline}

@@ -26,16 +26,19 @@ export function NewSessionPage() {
   const [editionPlace, setEditionPlace] = useState('');
   const [error, setError] = useState('');
   const [existing, setExisting] = useState<number | null>(null);
+  // A weekly meeting on another day asks first (Kay, 5 November 2026).
+  const [otherDay, setOtherDay] = useState(false);
 
   if (meetingTypes && !meetingType && meetingTypes.length) { setMeetingType(meetingTypes[0].id); setMode(meetingTypes[0].usual_mode ?? 'online'); }
   if (locations && !location && locations.length) setLocation(locations[0].id);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(e: React.FormEvent | null, allowOtherDay = false) {
+    e?.preventDefault();
     setError('');
     try {
       const created = await createSession.mutateAsync({
         meeting_type: meetingType, date, location, mode,
+        ...(allowOtherDay ? { allow_other_day: true } : {}),
         ...(isFellowship && fellowship !== '' ? { fellowship } : {}),
         ...(isOccasional ? { edition_name: editionName, edition_place: editionPlace } : {}),
       });
@@ -44,12 +47,17 @@ export function NewSessionPage() {
       const d = err?.response?.data ?? {};
       // O4: a session that already exists is named, with a way to open it.
       setExisting(d.existing_id ? Number(([] as any[]).concat(d.existing_id)[0]) : null);
+      setOtherDay(!!d.other_day);
       const first = d.detail ?? Object.values(d)[0];
       setError(first ? String(([] as any[]).concat(first)[0]) : 'The session could not be created. Try again.');
     }
   }
 
   const isOccasional = meetingTypes?.find((m) => m.id === meetingType)?.frequency === 'occasional';
+  const chosen = meetingTypes?.find((m) => m.id === meetingType);
+  const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const picked = date ? DAYS[new Date(`${date}T00:00:00`).getDay()] : '';
+  const wrongDay = !!(chosen && chosen.frequency === 'weekly' && chosen.day && DAYS.includes(chosen.day) && picked && picked !== chosen.day);
 
   if (!meetingTypes || !locations) return null;
 
@@ -64,7 +72,7 @@ export function NewSessionPage() {
         <form onSubmit={handleSubmit}>
           <div className="field">
             <label htmlFor="session-meeting">Meeting</label>
-            <select id="session-meeting" value={meetingType} onChange={(e) => { setMeetingType(e.target.value); setMode(meetingTypes.find((m) => m.id === e.target.value)?.usual_mode ?? 'online'); }}>
+            <select id="session-meeting" value={meetingType} onChange={(e) => { setMeetingType(e.target.value); setOtherDay(false); setError(''); setMode(meetingTypes.find((m) => m.id === e.target.value)?.usual_mode ?? 'online'); }}>
               {meetingTypes.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           </div>
@@ -97,7 +105,8 @@ export function NewSessionPage() {
 
             <div className="field">
               <label htmlFor="session-date">Date</label>
-              <input id="session-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+              <input id="session-date" type="date" value={date} onChange={(e) => { setDate(e.target.value); setOtherDay(false); setError(''); }} required />
+              {wrongDay && <div className="gender-warn" role="note">{chosen!.name} meets on {chosen!.day}s. This date is a {picked}.</div>}
             </div>
             <div className="field">
               <label htmlFor="session-location">Location</label>
@@ -115,6 +124,13 @@ export function NewSessionPage() {
             </select>
           </div>
           {error && <p className="form-error" role="alert">{error}{existing && <> <a className="linkish" onClick={() => navigate(`/attendance/${existing}`)}>Open it</a></>}</p>}
+          {otherDay && (
+            <div className="other-day-actions">
+              <button type="button" className="btn sm outline" disabled={createSession.isPending} onClick={() => handleSubmit(null, true)}>
+                Add it anyway, the meeting moved that week
+              </button>
+            </div>
+          )}
           <Button type="submit" disabled={createSession.isPending}>
             {createSession.isPending ? 'Creating…' : 'Create session'}
           </Button>

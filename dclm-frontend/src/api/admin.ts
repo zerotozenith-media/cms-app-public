@@ -160,11 +160,23 @@ export function useDeleteLocation() {
 }
 
 // --- Audit Log & Login Attempts (read-only) ---
-interface AuditParams { entity_type?: string; ordering?: string; page?: number; page_size?: number; search?: string; }
+interface AuditParams {
+  entity_type?: string; action?: string; who?: string; search?: string;
+  date_from?: string; date_to?: string; ordering?: string; page?: number; page_size?: number;
+}
 export function useAuditLog(params: AuditParams) {
   return useQuery({
     queryKey: ['audit-log', params],
     queryFn: async () => (await apiClient.get<PaginatedResponse<AuditLogEntry>>('/audit-log/', { params })).data,
+    placeholderData: (prev) => prev,
+  });
+}
+
+/** What the Audit Log filters offer (Kay, 5 November 2026). */
+export function useAuditChoices() {
+  return useQuery({
+    queryKey: ['audit-log-choices'],
+    queryFn: async () => (await apiClient.get<{ entity_types: string[]; actions: string[]; people: string[] }>('/audit-log/choices/')).data,
   });
 }
 

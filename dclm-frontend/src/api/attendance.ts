@@ -96,6 +96,9 @@ export function useCreateSession() {
       meeting_type: string; date: string; location: string; mode: string;
       /** Only for a house fellowship, since several meet the same evening. */
       fellowship?: number;
+      edition_name?: string; edition_place?: string;
+      /** Confirms a weekly meeting on a day it does not usually meet. */
+      allow_other_day?: boolean;
     }) => {
       const resp = await apiClient.post<AttendanceSession>('/attendance-sessions/', payload);
       return resp.data;
@@ -317,5 +320,15 @@ export function useFollowUpAbsent(sessionId: number) {
       qc.invalidateQueries({ queryKey: ['absent-preview', sessionId] });
       qc.invalidateQueries({ queryKey: ['member-followup-tasks'] });
     },
+  });
+}
+
+/** Change a session's meeting or date (administrators, Kay, 5 November 2026). */
+export function useChangeSession(sessionId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: { meeting_type: string; date: string; allow_other_day?: boolean }) =>
+      (await apiClient.post<AttendanceSession>(`/attendance-sessions/${sessionId}/change/`, body)).data,
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['session', sessionId] }); qc.invalidateQueries({ queryKey: ['sessions'] }); qc.invalidateQueries({ queryKey: ['recent-sessions'] }); qc.invalidateQueries({ queryKey: ['attendance-stats'] }); },
   });
 }

@@ -109,11 +109,51 @@ class Scope:
         return f"{self.location.name} only" if self.location else "All locations"
 
 
+COUNTS = ("men", "women", "youth_boys", "youth_girls", "children_boys", "children_girls",
+          "online_men", "online_women", "online_youth_boys", "online_youth_girls",
+          "online_children_boys", "online_children_girls", "new_comers", "new_converts")
+
+
+class Service:
+    """
+    One meeting on one day, for the report. With All locations chosen,
+    the same meeting held at two locations on the same day is one service
+    with their figures added (Kay, 5 November 2026): Qatar's Friday was a
+    second row beside Bahrain HQ's, counted as a second service, and so
+    halved the averages. A house fellowship stays its own service, as each
+    fellowship is a different group.
+    """
+    def __init__(self, sessions):
+        first = sessions[0]
+        self.sessions = sessions
+        self.id = first.id
+        self.ids = {x.id for x in sessions}
+        self.date = first.date
+        self.meeting_type, self.meeting_type_id = first.meeting_type, first.meeting_type_id
+        self.fellowship, self.fellowship_id = first.fellowship, first.fellowship_id
+        self.location_ids = {x.location_id for x in sessions}
+        self.location_id = first.location_id if len(self.location_ids) == 1 else None
+        self.places = sorted({x.location.name for x in sessions})
+        self.edition_name = next((x.edition_name for x in sessions if x.edition_name), "")
+        self.edition_place = next((x.edition_place for x in sessions if x.edition_place), "")
+        for f in COUNTS:
+            setattr(self, f, sum(getattr(x, f) for x in sessions))
+
+    @property
+    def total(self):
+        return sum(getattr(self, f) for f in COUNTS[:12])
+
+
 def sessions_in(scope, start, end):
     from attendance.models import AttendanceSession
-    return list(scope(AttendanceSession.objects.filter(status="filled", date__gte=start, date__lte=end))
+    rows = list(scope(AttendanceSession.objects.filter(status="filled", date__gte=start, date__lte=end))
                 .select_related("meeting_type", "location", "fellowship")
                 .prefetch_related("giving__fund").order_by("date", "meeting_type__name", "id"))
+    merged = OrderedDict()
+    for s in rows:
+        key = (s.date, s.meeting_type_id, s.fellowship_id, s.edition_name.strip(), s.edition_place.strip())
+        merged.setdefault(key, []).append(s)
+    return [Service(group) for group in merged.values()]
 
 
 def session_name(s):

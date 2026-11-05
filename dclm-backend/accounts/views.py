@@ -464,20 +464,44 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = AuditLog.objects.select_related("user")
     serializer_class = AuditLogSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ["user_name_snapshot", "entity_name", "details"]
+    search_fields = ["user_name_snapshot", "entity_name", "details", "entity_type", "action"]
     ordering_fields = ["timestamp"]
 
-    def get_queryset(self):
+    def _scoped(self):
         qs = super().get_queryset()
         # A location-limited account sees what that location's people did,
         # not every location's names and actions.
         actor = self.request.user
         if not actor.is_superuser and actor.location_id:
             qs = qs.filter(user__location_id=actor.location_id)
-        entity_type = self.request.query_params.get("entity_type")
-        if entity_type:
-            qs = qs.filter(entity_type=entity_type)
         return qs
+
+    def get_queryset(self):
+        # Filters (Kay, 5 November 2026): the log could only be paged
+        # through, eight entries at a time.
+        qs = self._scoped()
+        p = self.request.query_params
+        if p.get("entity_type"):
+            qs = qs.filter(entity_type=p["entity_type"])
+        if p.get("action"):
+            qs = qs.filter(action=p["action"])
+        if p.get("who"):
+            qs = qs.filter(user_name_snapshot=p["who"])
+        # Dates are Bahrain dates (TIME_ZONE), so 14 October means the
+        # whole of 14 October in Bahrain.
+        if p.get("date_from"):
+            qs = qs.filter(timestamp__date__gte=p["date_from"])
+        if p.get("date_to"):
+            qs = qs.filter(timestamp__date__lte=p["date_to"])
+        return qs
+
+    @action(detail=False, methods=["get"])
+    def choices(self, request):
+        """What the filters offer: the types, actions and people in the log."""
+        qs = self._scoped()
+        distinct = lambda f: sorted(v for v in qs.order_by().values_list(f, flat=True).distinct() if v)
+        return Response({"entity_types": distinct("entity_type"), "actions": distinct("action"),
+                         "people": distinct("user_name_snapshot")})
 
 
 class LoginAttemptViewSet(viewsets.ReadOnlyModelViewSet):

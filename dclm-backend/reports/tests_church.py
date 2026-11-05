@@ -116,8 +116,12 @@ class Figures(Church):
         self.assertEqual(ctx["newcomer_visits"], 6)
 
     def test_whole_church_includes_every_location(self):
+        # Qatar's Friday on 17 July is added to Bahrain HQ's, one service
+        # of 44, not a second service of 18 (Kay, 5 November 2026).
         ctx = gather(month_list((2026, 7), (2026, 7)), None)
-        self.assertEqual(len(ctx["fridays"]), 3)
+        self.assertEqual([s.total for s in ctx["fridays"]], [44, 15])
+        self.assertEqual(ctx["friday_average"], 30)          # 59 / 2
+        self.assertEqual(ctx["fridays"][0].places, ["Bahrain HQ", "Qatar"])
         self.assertEqual(ctx["income"], Decimal("1116.570"))
 
     def test_money_by_month_fund_and_category(self):
@@ -171,6 +175,36 @@ class Zonal(Church):
         others = [r[0] for r in g["rows"] if "," in r[0]]
         self.assertEqual(sorted(others), ["24 Jul, Friday House Caring Fellowship (Sisters)", "30 Jul, Not linked to a meeting"])
 
+    def test_house_fellowships_have_their_own_table(self):
+        # Kay, 5 November 2026: fellowship sessions were left out of the
+        # zonal report. One column per fellowship, gaps shown in words.
+        from attendance.models import AttendanceSession
+        brothers = Fellowship.objects.create(name="Brothers", meeting_type=self.hcf, location=self.bh)
+        AttendanceSession.objects.create(meeting_type=self.hcf, fellowship=brothers, date=D(2026, 7, 24),
+                                         location=self.bh, mode="in-person")                       # not filled in
+        AttendanceSession.objects.create(meeting_type=self.hcf, fellowship=brothers, date=D(2026, 7, 31),
+                                         location=self.bh, mode="in-person", status="did-not-hold")
+        AttendanceSession.objects.create(meeting_type=self.hcf, date=D(2026, 7, 31), location=self.bh,
+                                         mode="in-person", status="filled", men=1, women=1)      # no fellowship chosen
+        _, t = self.tables(((2026, 7), (2026, 7)), self.bh)
+        h = t["House caring fellowship attendance, July 2026"]
+        self.assertEqual(h["header"], ["Date", "Brothers", "Sisters", "No fellowship chosen", "Total"])
+        self.assertEqual(h["rows"], [["24 Jul", "Not filled in", "6", "-", "6"],
+                                     ["31 Jul", "Did not hold", "-", "2", "2"],
+                                     ["Average", "-", "6", "2", "4"]])
+        self.assertNotIn(["Friday House Caring Fellowship"], t["Weekly fellowship attendance, July 2026"]["rows"])
+
+    def test_all_locations_one_row_per_service(self):
+        # Qatar's Friday is added to Bahrain HQ's on the same day, and its
+        # offering joins that Friday's giving (Kay, 5 November 2026).
+        _, t = self.tables(((2026, 7), (2026, 7)), None)
+        rows = t["Weekly fellowship attendance, July 2026"]["rows"]
+        self.assertEqual([r[0] for r in rows].count("17 Jul"), 1)
+        self.assertIn(["17 Jul", "23", "15", "1", "1", "1", "3", "4", "44"], rows)
+        self.assertIn(["Friday Worship Service", "2", "30", "44", "15"], t["Attendance summary, July 2026"]["rows"])
+        g = t["Giving by service, July 2026 (BHD)"]["rows"]
+        self.assertIn(["17 Jul", "0.00", "950.00", "132.07", "1,082.07"], g)
+
     def test_workers_special_and_financial_summary(self):
         _, t = self.tables(((2026, 7), (2026, 7)), self.bh)
         self.assertEqual(t["Workers' and leaders' meetings, July 2026"]["rows"], [["Saturday Workers Meeting"], ["18 Jul", "5", "3", "8"]])
@@ -195,7 +229,7 @@ class Zonal(Church):
         wb = load_workbook(io.BytesIO(build_xlsx(ctx)))
         self.assertEqual(wb.sheetnames, ["July 2026", "August 2026", "Summary"])
         values = [c.value for row in wb["Summary"].iter_rows() for c in row]
-        self.assertIn("Table 13. Monthly totals, July to August 2026.", values)
+        self.assertIn("Table 14. Monthly totals, July to August 2026.", values)
         self.assertIn(1065.71, values)
 
 

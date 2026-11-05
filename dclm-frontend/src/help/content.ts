@@ -56,7 +56,7 @@ export const HELP_SECTIONS: HelpSection[] = [
   { key: 'goals', label: 'Goals and reports', group: 'Reference' },
   { key: 'alerts', label: 'Alerts on your phone', group: 'Reference' },
   { key: 'admin', label: 'Accounts and roles', group: 'Reference' },
-  { key: 'new', label: 'Versions 11.16, 11.15 and 11.14', group: "What's new", intro: 'What changed in versions 11.16, 11.15 and 11.14, and where to read about it.' },
+  { key: 'new', label: 'Versions 11.14 to 11.17', group: "What's new", intro: 'What changed in versions 11.14 to 11.17, and where to read about it.' },
 ];
 
 const SH: HelpRole[] = ['Shepherd'];
@@ -405,6 +405,9 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
     { h: "Why can't I save this contact's details?", say: '"Keep at least one way to reach them: phone, email or social handle."', why: 'A contact nobody can reach cannot be followed up.', fix: 'Leave at least one of phone, email or social handle filled in.', roles: ['Welcome team', 'Administrator'], manual: 77 },
     { h: 'Why is a newcomer not on the check-in list?', why: 'Check-in lists newcomers still being followed up at the session\'s location: stages New, Contacted and Attending. Members are listed as members, and Not Interested are left out.', fix: 'Check the person\'s stage and location on their profile. Press Newcomers on the check-in page to see only newcomers.', roles: ALL, manual: 77 },
     { h: "Why can't I record Salvation with the pencil?", why: 'The pencil edits contact details. Milestones have their own place, with the date they were ticked.', fix: 'Press Go to Journey, then tick Salvation under Spiritual milestones.', roles: ALL, manual: 76 },
+    { h: 'Why does New session ask before adding this meeting?', say: '"Monday Bible Study meets on Mondays. 14 October is a Wednesday."', why: 'Weekly meetings are made on their own day. A session on another day is usually the wrong meeting or date, and puts the service under the wrong meeting in reports.', fix: 'Choose the right meeting or date. If the meeting really moved that week, press Add it anyway.', roles: ['Usher', 'Administrator'], manual: 81 },
+    { h: "Why can't I change this session's date or meeting?", why: 'Changing it is refused when that meeting already has a session on that day, when open follow-up tasks were made from it, or when its month is closed in Month-end balance. Only administrators can change it.', fix: 'Do what the message says: open the other session and record the numbers there, ask a Follow-up Coordinator to cancel the tasks, or ask for the month to be reopened.', roles: AD, manual: 82 },
+    { h: 'Why does sign-in say it cannot reach the server?', say: '"Cannot reach the server, so you could not be signed in. Your password was not checked."', why: 'The app could not get an answer from the server, so your password was never checked.', fix: 'Check your internet connection and try again. If it keeps happening, tell your administrator.', roles: ALL, manual: 84 },
     { h: 'A box at the bottom says Not saved', why: 'The server refused the change, and the message says why in its own words.', fix: 'Do what it says. If it is not clear, search this Help for a word from the message.', roles: ALL },
   ],
 
@@ -440,6 +443,12 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
   ],
 
   attendance: [
+    { h: 'Adding a meeting on another day', roles: ['Usher', 'Administrator'], p: 'New session asks first when a weekly meeting is added on a day it does not meet, for example Monday Bible Study on a Wednesday. Choose the right meeting or date, or press Add it anyway if the meeting really moved that week.', manual: 81 },
+    { h: 'Correcting a session\'s date or meeting', roles: AD, steps: [
+      'Open the session in Attendance.',
+      'Press Change date or meeting under its name.',
+      'Choose the right meeting and date, then press Save change.',
+    ], note: 'The headcount, names ticked and offering stay with it, and the change is kept in the Audit Log. It is refused if that meeting already has a session on that day, if open follow-up tasks were made from it, or if its month is closed.', manual: 82 },
     { h: 'Where sessions come from', roles: ALL, p: 'Each weekly meeting\'s session is made at 2:07 am on its day, at every location it is held, unless set to be made earlier in the meeting\'s Settings. A house fellowship meeting gets one session per fellowship. Use New session only for one-off meetings.', manual: 69 },
     { h: 'Two ways attendance is recorded', roles: ALL, p: 'The headcount is the official figure. Ticking names records exactly who came, and is what drives follow-up and newcomers\' progress to membership. Both are kept.', manual: 22 },
     { h: 'Occasional meetings', roles: ALL, p: 'For GCK, Ministerial Renewal and other occasional meetings, a new session asks for the Edition name and where it is held.', manual: 23 },
@@ -492,6 +501,8 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
     { h: 'Two kinds of goals', roles: ALL, p: 'Typed by hand: someone types the current figure. Automatically: it updates itself from the records, such as average attendance at a meeting and location, sessions held, people checked in by name, a fund total, or giving less expenses.', manual: 46 },
     { h: 'Reading progress', roles: ALL, p: 'A bar is green at 90% of target or more, blue from 60% to 90%, and red below 60%.', manual: 46 },
     { h: 'Reports', roles: AD, p: 'The overseer and zonal reports pull attendance, giving, newcomers, goals and testimonies together for the months chosen.', manual: 48 },
+    { h: 'All locations in a report', roles: AD, p: 'With All locations chosen, the same meeting held at two locations on the same day is one row, with their numbers added. Example: Friday Worship on 2 October, 45 at Bahrain HQ and 10 in Qatar, shows as 55, and counts as one Friday in the averages. Choose one location to see it alone.', manual: 81 },
+    { h: 'House caring fellowships in the zonal report', roles: AD, p: 'The zonal report has a table of house caring fellowship attendance: one row per Friday, one column per fellowship, a total and an average. A fellowship not filled in, or that did not hold, says so. A session recorded with no fellowship chosen has its own column.', manual: 81 },
   ],
 
   alerts: [
@@ -505,6 +516,12 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
   ],
 
   admin: [
+    { h: 'Finding something in the Audit Log', roles: AD, steps: [
+      'Open Admin, then Audit Log.',
+      'Type words from the name, item or details, for example Monday Bible Study 14.',
+      'Narrow it with Type, Person, Action, From and To. Times are Bahrain time.',
+      'Press Clear filters to see everything again.',
+    ], manual: 83 },
     { h: 'Users and roles', roles: ADL, p: 'Each person has an account and a role. The role decides what they see and change. Give the narrowest role that lets them do their job. A Location Coordinator manages accounts at their own location only.', manual: 51 },
     { h: 'The Follow-up Coordinator role', roles: AD, p: 'For people who do only follow-up coordination: view members, newcomers, attendance and reports, and use Follow-up review. No giving and no Admin.', manual: 64 },
     { h: 'Follow-up review in Roles & Permissions', roles: AD, p: 'The Review list, reasons, handing tasks on and the shepherd table. An account with the Follow-up Coordinator tick gets it whatever its role. Changing the Administrator role asks you to confirm.', manual: 51 },
@@ -513,6 +530,7 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
   ],
 
   new: [
+    { h: '11.17: Reports, sessions and the Audit Log', roles: ALL, p: 'All locations reports add the same meeting on the same day into one row, the zonal report shows house caring fellowships, New session asks before a meeting on the wrong day, administrators can change a session\'s date or meeting, the Audit Log has search and filters, and sign-in says when the server cannot be reached.', links: [{ to: 'usher', t: 'I record attendance' }, { to: 'runchurch', t: 'I run the church' }], manual: 81 },
     { h: '11.16: Finding people and ticking newcomers', roles: ALL, p: 'Search on Newcomers and Online Enquiries, a pencil to correct an enquiry, Go to Journey for Salvation, and newcomers with Everyone, Members, Newcomers and Not ticked on check-in and the session page.', links: [{ to: 'welcome', t: 'I welcome newcomers' }, { to: 'usher', t: 'I record attendance' }], manual: 76 },
     { h: '11.15: Month-end balance', roles: [...FN, ...APPR, 'Administrator'], p: 'Balance the money held each month, send it for approval, and a second person closes it. Closed months cannot change, and the report shows the money held at each month end.', links: [{ to: 'giving', t: 'I handle giving' }], manual: 72 },
     { h: '11.15: Faster loading', roles: ALL, p: 'Each page downloads only when first opened, so the app opens faster on phones.' },

@@ -4,6 +4,7 @@ import { Fragment, useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSession, useDeleteSession, useRecordSession, useMeetingTypes, useNewcomerRoster } from '../../api/attendance';
 import { WhoChips, NEWCOMER_STAGE, PAGE, type Who } from '../../components/attendance/WhoChips';
+import { ChangeSession } from '../../components/attendance/ChangeSession';
 import { apiClient } from '../../api/client';
 import type { Member, PaginatedResponse } from '../../types/members';
 import { Badge } from '../../components/ui/Badge';
@@ -231,6 +232,10 @@ export function SessionRecordPage() {
           )}
         </div>
 
+        {hasPermission('admin', 'edit') && (
+          <ChangeSession key={session.id} session={session} meetingTypes={meetingTypes}
+            onOpen={(id) => navigate(`/attendance/${id}`)} />
+        )}
         {!canEdit && (
           <p className="form-note">You can view this session. Changing it needs permission to edit attendance.</p>
         )}

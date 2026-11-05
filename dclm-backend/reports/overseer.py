@@ -385,7 +385,10 @@ def build(ctx, texts, generated_by=None):
 
 
 def _name(s):
-    return f"{s.meeting_type.name} ({s.fellowship.name})" if s.fellowship_id else s.meeting_type.name
+    name = f"{s.meeting_type.name} ({s.fellowship.name})" if s.fellowship_id else s.meeting_type.name
+    # Held at several locations that day, added together (Kay, 5 November 2026).
+    places = getattr(s, "places", [])
+    return f"{name}, {' and '.join(places)}" if len(places) > 1 else name
 
 
 def render(months, location, texts, user=None):

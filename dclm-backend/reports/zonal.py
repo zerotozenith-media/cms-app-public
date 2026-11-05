@@ -54,8 +54,11 @@ def _grouped(mf, kind, markers):
     services or workers' meetings, fellowship meetings left out."""
     test = is_weekly_service if kind == "services" else is_workers
     per = OrderedDict()
+    house = _house_types()
     for s in mf["sessions"]:
-        if test(s.meeting_type) and not s.fellowship_id:
+        # House fellowships have their own table, even a session recorded
+        # with no fellowship chosen (Kay, 5 November 2026).
+        if test(s.meeting_type) and not s.fellowship_id and s.meeting_type_id not in house:
             per.setdefault(s.meeting_type, []).append((s.date, s))
     types = {s.meeting_type.id: s.meeting_type for s in mf["sessions"]}
     for mid, dates in markers.items():
@@ -66,6 +69,57 @@ def _grouped(mf, kind, markers):
         if mt and test(mt):
             per.setdefault(mt, []).extend((d, text) for d, text in dates.items())
     return [(mt, sorted(rows, key=lambda r: r[0])) for mt, rows in sorted(per.items(), key=lambda x: _order(x[0]))]
+
+
+def _house_types():
+    """Meetings held as house fellowships: those with fellowships set up."""
+    from attendance.models import Fellowship
+    return set(Fellowship.objects.exclude(meeting_type__isnull=True).values_list("meeting_type_id", flat=True))
+
+
+def _house_table(mf, scope, name):
+    """
+    House caring fellowship attendance (Kay, 5 November 2026): one row per
+    date, one column per fellowship, so each group's attendance shows. A
+    session not filled in, or that did not hold, says so, rather than the
+    gap passing unnoticed.
+    """
+    from attendance.models import AttendanceSession
+    house = _house_types()
+    if not house:
+        return None
+    filled = [s for s in mf["sessions"] if s.meeting_type_id in house]
+    today = datetime.date.today()
+    open_ = list(scope(AttendanceSession.objects.filter(
+        meeting_type_id__in=house, date__gte=mf["start"], date__lte=min(mf["end"], today)).exclude(status="filled"))
+        .select_related("fellowship"))
+    if not filled and not open_:
+        return None
+    NONE = "No fellowship chosen"
+    col = lambda f: f.name if f else NONE
+    cols = sorted({col(s.fellowship) for s in filled} | {col(s.fellowship) for s in open_},
+                  key=lambda c: (c == NONE, c))
+    cells = defaultdict(dict)
+    for s in open_:
+        word = "Did not hold" if s.status == "did-not-hold" else "Not filled in"
+        cells[s.date].setdefault(col(s.fellowship), word)
+    for s in filled:
+        cells[s.date][col(s.fellowship)] = s.total
+    rows, per_col, row_totals = [], defaultdict(list), []
+    for d in sorted(cells):
+        nums = [cells[d].get(c) for c in cols]
+        got = [v for v in nums if isinstance(v, int)]
+        for c, v in zip(cols, nums):
+            if isinstance(v, int):
+                per_col[c].append(v)
+        if got:
+            row_totals.append(sum(got))
+        rows.append([day(d)] + [str(v) if v is not None else "-" for v in nums] + [str(sum(got)) if got else "-"])
+    avg = lambda xs: str(whole(sum(xs) / len(xs))) if xs else "-"
+    rows.append(["Average"] + [avg(per_col[c]) for c in cols] + [avg(row_totals)])
+    first = 0.14
+    return dict(title=f"House caring fellowship attendance, {name}", header=["Date"] + cols + ["Total"], rows=rows,
+                widths=[first] + [(1 - first) / (len(cols) + 1)] * (len(cols) + 1), bands=set(), totals={len(rows) - 1})
 
 
 def _remitted(scope, y, m):
@@ -128,6 +182,10 @@ def plan(ctx):
         else:
             tables.append(dict(note=f"No weekly services were recorded in {name}."))
 
+        hcf_table = _house_table(mf, scope, name)
+        if hcf_table:
+            tables.append(hcf_table)
+
         # giving by service
         service_sessions = [s for _, items in services for _, s in items if not isinstance(s, str)]
         by_session = defaultdict(lambda: defaultdict(lambda: ZERO))
@@ -135,10 +193,12 @@ def plan(ctx):
         friday_first = sorted(service_sessions, key=lambda s: (s.date, s.meeting_type_id != FRIDAY))
         for gv in mf["giving"]:
             target = None
-            if gv.session_id and any(s.id == gv.session_id for s in service_sessions):
-                target = gv.session_id
+            # A service may hold several locations' sessions (All locations).
+            linked = next((s for s in service_sessions if gv.session_id in s.ids), None) if gv.session_id else None
+            if linked:
+                target = linked.id
             elif not gv.session_id:
-                same = [s for s in friday_first if s.date == gv.date and s.location_id == gv.location_id]
+                same = [s for s in friday_first if s.date == gv.date and gv.location_id in s.location_ids]
                 target = same[0].id if same else None
             if target:
                 by_session[target][gv.fund.name] += gv.amount

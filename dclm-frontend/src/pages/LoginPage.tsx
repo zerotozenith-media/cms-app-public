@@ -36,7 +36,14 @@ export function LoginPage() {
     } catch (err: any) {
       const data = err?.response?.data;
       setWarning(Boolean(data?.warning));
-      if (err?.response?.status === 429) {
+      if (!err?.response) {
+        // No answer from the server is not a wrong password (Kay, 5 November
+        // 2026): during the server move everyone was told their password
+        // was wrong.
+        setError('Cannot reach the server, so you could not be signed in. Your password was not checked. Check your internet connection and try again. If it keeps happening, tell your administrator.');
+      } else if (err?.response?.status >= 500) {
+        setError('The server had a problem, so you could not be signed in. Your password was not checked. Try again in a moment. If it keeps happening, tell your administrator.');
+      } else if (err?.response?.status === 429) {
         // The server says how long to wait.
         setError(data?.detail ?? 'Too many attempts. Please wait a few minutes and try again.');
       } else {
