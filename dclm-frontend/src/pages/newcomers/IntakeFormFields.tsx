@@ -154,8 +154,8 @@ export function IntakeFormFields({ values, onChange, idPrefix = 'intake', public
         </label>
         <label htmlFor={fid('keep-in-touch')} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '.85rem' }}>
           <input id={fid('keep-in-touch')} type="checkbox" checked={values.keep_in_touch} onChange={(e) => set('keep_in_touch', e.target.checked)} style={{ width: 16, height: 16 }} />
-          Keep in touch with me with a short word of encouragement
-          <HelpMark topic="fuKeepInTouch" />
+          {publicForm ? 'Send me an occasional word of encouragement' : 'Keep in touch with an occasional word of encouragement'}
+          <HelpMark topic={publicForm ? 'fuKeepInTouchPublic' : 'fuKeepInTouch'} />
         </label>
       </div>
 

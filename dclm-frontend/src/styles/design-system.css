@@ -280,23 +280,23 @@
   .completed-log{background:var(--sky-2);border-radius:8px;padding:8px 10px;margin-top:8px;font-size:.82rem}
   .completed-log-notes{margin-top:6px}
   .completed-log-label{display:block;font-size:.68rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:1px}
-  .followup-guide{background:var(--sky);border-left:4px solid var(--blue);border-radius:8px;padding:10px 14px;margin-bottom:14px}
+  .followup-guide{border-top:1px solid var(--line);padding:14px 0 0;margin:18px 0 12px}
   .followup-guide-title{display:flex;align-items:center;gap:7px;font-size:.82rem;font-weight:800;color:var(--blue-deep);margin-bottom:4px}
   .followup-guide-note{font-size:.78rem;line-height:1.5;color:var(--ink)}
   .req{color:var(--red);font-weight:800}
   .field-hint{font-size:.74rem;color:var(--muted);margin-top:3px}
-  .form-error{background:#FDECEE;border-left:4px solid var(--red);color:#9B1C26;border-radius:8px;padding:9px 12px;font-size:.8rem;margin-bottom:10px}
+  .form-error{background:#FDECEE;color:#9B1C26;border-radius:8px;padding:9px 12px;font-size:.8rem;margin-bottom:10px}
 
   /* ---- Shepherd assignment ---- */
   .bulk-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--sky);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:.85rem}
-  .assign-preview{background:var(--sky-2);border:1px solid var(--line);border-left:4px solid var(--blue);border-radius:10px;padding:14px;margin-bottom:14px;font-size:.85rem}
+  .assign-preview{background:var(--sky-2);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px;font-size:.85rem}
   .assign-preview-title{display:flex;align-items:center;gap:7px;font-weight:800;color:var(--blue-deep);font-size:.9rem;margin-bottom:4px}
 
   /* ---- Inline help and guide ---- */
   .help-mark-wrap{position:relative;display:inline-flex;vertical-align:middle}
   .help-mark{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;border:1px solid var(--blue);background:#fff;color:var(--blue);font-size:.66rem;font-weight:800;cursor:pointer;padding:0;margin-left:5px;line-height:1;flex:none}
   .help-mark:hover{background:var(--blue);color:#fff}
-  .help-pop{position:absolute;top:calc(100% + 8px);left:0;z-index:40;display:block;width:290px;max-width:78vw;background:#fff;border:1px solid var(--line);border-left:4px solid var(--blue);border-radius:10px;padding:11px 13px;box-shadow:0 6px 20px rgba(6,17,35,.14);white-space:normal;text-align:left;font-weight:400}
+  .help-pop{position:absolute;top:calc(100% + 8px);left:0;z-index:40;display:block;width:290px;max-width:78vw;background:#fff;border:1px solid var(--line);border-radius:10px;padding:11px 13px;box-shadow:0 6px 20px rgba(6,17,35,.14);white-space:normal;text-align:left;font-weight:400}
   .help-pop.align-right{left:auto;right:0}
   .help-pop-title{display:block;font-weight:800;color:var(--blue-deep);font-size:.85rem;margin-bottom:4px}
   .help-pop-body{display:block;font-size:.8rem;line-height:1.55;color:var(--ink)}
@@ -313,7 +313,7 @@
   .help-steps{margin:8px 0 0;padding-left:20px;font-size:.86rem;line-height:1.7;color:var(--ink)}
   .help-steps li{margin-bottom:5px;padding-left:3px}
   .help-steps li::marker{font-weight:800;color:var(--blue)}
-  .help-note{background:var(--sky);border-left:3px solid var(--blue);border-radius:7px;padding:8px 11px;margin-top:9px;font-size:.81rem;line-height:1.6;color:var(--ink)}
+  .help-note{background:var(--sky);border-radius:7px;padding:8px 11px;margin-top:9px;font-size:.81rem;line-height:1.6;color:var(--ink)}
   .help-links{display:flex;flex-direction:column;gap:6px;margin-top:10px}
   .help-link{text-align:left;background:var(--sky-2);border:1px solid var(--line);border-radius:9px;padding:.6rem .8rem;font-weight:700;font-size:.86rem;color:var(--blue-deep);cursor:pointer}
   .help-link:hover{background:var(--sky);border-color:var(--blue)}
@@ -573,8 +573,8 @@
 .goalgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:13px}
 .goalrow{display:flex;align-items:center;gap:10px;min-width:0}
 .goal-name{font-size:.84rem}
-.quote{border-left:3px solid var(--line);padding:2px 0 2px 12px;margin-bottom:11px}
-.quote.accent{border-left-color:var(--blue)}
+.quote{background:var(--sky-2);border-radius:8px;padding:8px 12px;margin-bottom:11px}
+.quote.accent{background:var(--sky)}
 .quote p{margin:0 0 3px;font-size:.85rem;line-height:1.6}
 .quote .muted{font-size:.78rem}
 .hbar-row{display:flex;align-items:center;gap:10px;margin-bottom:9px}
@@ -618,8 +618,8 @@
 }
 
 /* A list opened already filtered says so, and can be cleared. */
-.filter-note{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--sky);
-  border-left:3px solid var(--blue);padding:8px 12px;font-size:.83rem;margin:10px 0}
+.filter-note{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--sky);border-radius:8px;
+  padding:8px 12px;font-size:.83rem;margin:10px 0}
 .filter-note .btn{margin-left:auto}
 
 /* A grid item sizes to its content by default, so the donut and its
@@ -690,7 +690,7 @@
 .why-edited .muted{font-size:.74rem}
 
 /* A plain explanation beside a form, such as why it cannot be saved yet. */
-.form-note{background:var(--sky);border-left:3px solid var(--blue);padding:9px 12px;
+.form-note{background:var(--sky);border-radius:8px;padding:9px 12px;
   font-size:.85rem;color:var(--ink);margin:12px 0}
 
 /* A fieldset used only to switch a whole form to read only. */
@@ -1190,7 +1190,7 @@ td.td-actions .icon-btn + .icon-btn,.row-actions .icon-btn + .icon-btn,td.td-act
 .alerts-kind b{display:block;font-size:.88rem}
 .alerts-kind .muted{display:block;font-size:.8rem;margin-top:2px}
 .alerts-foot{font-size:.8rem;margin-top:10px}
-.alert-banner{display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid var(--line);border-left:4px solid #F2B630;border-radius:14px;padding:14px 16px;margin-bottom:16px}
+.alert-banner{display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:16px}
 .alert-banner-icon{width:40px;height:40px;border-radius:12px;background:var(--blue-deep);display:grid;place-items:center;flex:none}
 .alert-banner-text{flex:1 1 220px;display:flex;flex-direction:column;gap:3px;font-size:.88rem;min-width:0}
 .alert-banner-acts{display:flex;gap:8px;flex-wrap:wrap}
@@ -1198,7 +1198,7 @@ td.td-actions .icon-btn + .icon-btn,.row-actions .icon-btn + .icon-btn,td.td-act
 /* Reports: generate an overseer or zonal report */
 .report-card{max-width:720px;margin-left:auto;margin-right:auto}
 .report-kinds{flex-wrap:wrap}
-.report-title{background:#EEF4FB;border-left:4px solid #1F4E79;border-radius:8px;padding:10px 14px;margin:4px 0 14px}
+.report-title{background:#EEF4FB;border-radius:8px;padding:10px 14px;margin:4px 0 14px}
 .report-title span{display:block;font-size:.8rem;color:var(--muted)}
 .report-title b{color:#1F4E79}
 .report-filled{list-style:none;margin:6px 0 10px;padding:10px 14px;background:#F4F8FE;border-radius:10px}
@@ -1310,9 +1310,9 @@ td.td-actions .icon-btn + .icon-btn,.row-actions .icon-btn + .icon-btn,td.td-act
 .help-top-btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
 .help-roles{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 7px}
 .help-role{font-size:.72rem;font-weight:700;color:var(--blue-deep);background:var(--sky);border:1px solid #B9CFF0;border-radius:999px;padding:2px 9px}
-.help-say{background:#FFF7E8;border-left:3px solid var(--amber);border-radius:7px;padding:8px 11px;margin:4px 0 8px;font-size:.84rem;line-height:1.55;color:var(--ink)}
+.help-say{background:#FFF7E8;border-radius:7px;padding:8px 11px;margin:4px 0 8px;font-size:.84rem;line-height:1.55;color:var(--ink)}
 .help-say-l{display:block;font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#7A5300;margin-bottom:2px}
-.help-fix{background:#EAF6EE;border-left:3px solid #2E8B57;border-radius:7px;padding:8px 11px;margin-top:8px;font-size:.84rem;line-height:1.55;color:var(--ink)}
+.help-fix{background:#EAF6EE;border-radius:7px;padding:8px 11px;margin-top:8px;font-size:.84rem;line-height:1.55;color:var(--ink)}
 .help-manual{display:inline-flex;align-items:center;gap:6px;margin-top:10px;min-height:40px;padding:0 12px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--blue);font:inherit;font-size:.82rem;font-weight:700;cursor:pointer}
 .help-manual:hover{background:var(--sky);border-color:var(--blue)}
 .help-img{display:block;position:relative;margin-top:10px;padding:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--sky-2);cursor:zoom-in;max-width:560px;width:100%}
@@ -1328,7 +1328,7 @@ td.td-actions .icon-btn + .icon-btn,.row-actions .icon-btn + .icon-btn,td.td-act
 @keyframes help-flash{0%{background:#FFF3C4}100%{background:transparent}}
 @media (prefers-reduced-motion:reduce){.help-flash{animation:none}}
 @media (max-width:600px){.help-top-btns .btn{flex:1 1 100%}}
-.help-ok{background:#EAF6EE;border-left:3px solid #2E8B57;border-radius:7px;padding:8px 11px;font-size:.84rem;line-height:1.5;color:var(--ink)}
+.help-ok{background:#EAF6EE;border-radius:7px;padding:8px 11px;font-size:.84rem;line-height:1.5;color:var(--ink)}
 .tb-help-menu .help-ok{margin:4px 10px}
 .help-contacts-h{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:8px 0 2px}
 .help-img{min-height:60px}
@@ -1362,8 +1362,8 @@ td.td-actions .icon-btn + .icon-btn,.row-actions .icon-btn + .icon-btn,td.td-act
 .me-form,.me-actions{max-width:680px;margin-top:14px}
 .me-two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .me-notice{max-width:680px;margin:10px 0;font-size:.86rem}
-.me-warn{border-left:4px solid var(--amber)}
-.me-ok{border-left:4px solid var(--green)}
+
+
 .me-gap{font-size:.82rem;margin-top:10px}
 .me-actions .btn{margin:0 10px 8px 0}
 .me-reopen{border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:8px;background:var(--sky-2)}
@@ -1372,7 +1372,7 @@ td.td-actions .icon-btn + .icon-btn,.row-actions .icon-btn + .icon-btn,td.td-act
 .me-label{display:inline-flex;align-items:center;flex-wrap:wrap;gap:2px 0}
 
 /* v11.16: Go to Journey note in the newcomer edit form, search boxes, check-in filters */
-.edit-journey-note{background:#EEF4FF;border-left:4px solid var(--blue);border-radius:6px;padding:9px 10px;font-size:.84rem;margin:4px 0 12px}
+.edit-journey-note{background:#EEF4FF;border-radius:6px;padding:9px 10px;font-size:.84rem;margin:4px 0 12px}
 .rc-go{display:flex;margin:2px 0 0;min-height:36px;padding:4px 0}
 .nc-search{width:100%;margin-top:12px}
 .enq-search .search{width:100%;margin-top:6px}
@@ -1405,7 +1405,14 @@ td.td-actions .icon-btn + .icon-btn,.row-actions .icon-btn + .icon-btn,td.td-act
 .form-error .linkish{min-height:0;padding:0;display:inline}
 
 /* v11.18: who is not offered as a shepherd, and why */
-.not-offered{background:#FFF6E0;border-left:4px solid #c98a00;border-radius:6px;padding:6px 10px;margin:6px 0 10px;font-size:.8rem;flex-basis:100%}
+.not-offered{background:#FFF6E0;border-radius:6px;padding:6px 10px;margin:6px 0 10px;font-size:.8rem;flex-basis:100%}
 .not-offered summary{font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;min-height:32px}
 .not-offered ul{margin:4px 0 2px;padding-left:16px}
 .not-offered li{margin:2px 0}
+
+/* 7 November 2026: no coloured stripe down the left of any box. Section
+   notes are plain headings with a line above, like a paper form, and
+   messages keep a soft tint. */
+.followup-guide-title{font-size:.9rem}
+.followup-guide-note{color:var(--muted)}
+.form-card > .followup-guide:first-child{border-top:0;padding-top:0;margin-top:0}

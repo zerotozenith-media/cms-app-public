@@ -22,7 +22,9 @@ export const HELP_TOPICS: Record<string, HelpTopic> = {
   fuBelonging: { title: 'Belonging', body: 'They have visited three times, so they now receive messages about belonging: house fellowship, serving and membership.' },
   fuSteps: { title: 'In-person steps', body: 'The discipler\'s steps alongside the messages for a new convert. Tick each one when done.' },
   fuMissed: { title: 'Missed messages', body: 'A planned message whose day passed without it being sent, or that was skipped. Send it now and it is recorded on that day of their plan, so the plan carries on in order. Dismiss when it no longer fits, for example a welcome sent in person.' },
-  fuKeepInTouch: { title: 'Keep in touch', body: 'Ticked, they receive a short word of encouragement from the person following them up. They can ask to stop at any time.' },
+  fuKeepInTouch: { title: 'Keep in touch', body: 'If ticked, the person following them up may send them short messages of encouragement. They can ask us to stop at any time.' },
+  // What the visitor reads on the public form (6 November 2026).
+  fuKeepInTouchPublic: { title: 'A word of encouragement', body: "We may send you a short message now and then. Tell us any time if you'd like us to stop." },
   shepherd: {
     title: 'Assigned shepherd',
     body: 'The worker responsible for checking on this person if they miss a service. When an absence is detected, the follow-up task goes to them automatically. Someone with no shepherd still gets a task: it goes to the Follow-up Coordinator until a shepherd is chosen. Men shepherd men, women shepherd women, and nobody shepherds themselves.',
