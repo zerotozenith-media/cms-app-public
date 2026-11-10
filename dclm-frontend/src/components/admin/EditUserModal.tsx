@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAddToRoll, useMemberChoices, useRoles, useSendReset, useUpdateUser } from '../../api/admin';
+import { useAddToRoll, useMemberChoices, useResetTwoStep, useRoles, useSendReset, useUpdateUser } from '../../api/admin';
 import { useMyLocations } from '../../api/locations';
 import { useAuth } from '../../context/AuthContext';
 import { HelpMark } from '../ui/HelpMark';
@@ -26,6 +26,7 @@ export function EditUserModal({ user, onClose }: { user: AdminUser; onClose: () 
   const { data: memberChoices } = useMemberChoices();
   const update = useUpdateUser();
   const reset = useSendReset();
+  const resetTwoStep = useResetTwoStep();
   const addToRoll = useAddToRoll();
 
   const [firstName, setFirstName] = useState(user.first_name);
@@ -70,6 +71,11 @@ export function EditUserModal({ user, onClose }: { user: AdminUser; onClose: () 
     setErr(''); setNote('');
     try { setNote((await reset.mutateAsync(user.id)).detail); }
     catch (e) { setErr(firstMessage(e, 'The link could not be sent. Try again.')); }
+  }
+  async function onResetTwoStep() {
+    setErr(''); setNote('');
+    try { setNote((await resetTwoStep.mutateAsync(user.id)).detail); }
+    catch (e) { setErr(firstMessage(e, 'Two-step sign-in could not be reset. Try again.')); }
   }
   async function onAddToRoll() {
     setErr(''); setNote('');
@@ -158,6 +164,10 @@ export function EditUserModal({ user, onClose }: { user: AdminUser; onClose: () 
           <button className="btn sm outline" onClick={sendReset} disabled={reset.isPending || !user.is_active}>
             Send password reset link
           </button><HelpMark topic="userReset" />
+          {!isMe && user.two_step_on && <>
+            <button className="btn sm outline" onClick={onResetTwoStep} disabled={resetTwoStep.isPending}>Reset two-step sign-in</button>
+            <HelpMark topic="userResetTwoStep" />
+          </>}
           {!isMe && <button className="btn sm ghost" onClick={switchOnOff} disabled={update.isPending}>
             {user.is_active ? 'Switch off' : 'Switch on'}
           </button>}

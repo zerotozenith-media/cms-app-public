@@ -98,3 +98,55 @@ def readiness(newcomer, today=None):
         "min_percent": MIN_PERCENT,
         "window_months": WINDOW_MONTHS,
     }
+
+
+def readiness_counts(newcomers, today=None):
+    """{"on_track", "ready", "pipeline"} for many newcomers at once, with a
+    fixed number of queries (Dashboard redesign, 10 November 2026: "On track
+    for membership"). The same rule as readiness() above:
+
+    - Ready to propose: all three conditions met.
+    - On track: Salvation recorded and at least MIN_PERCENT of Friday
+      Worship so far, but under WINDOW_MONTHS since First came.
+    """
+    from collections import defaultdict
+    from attendance.models import AttendanceSession, AttendanceSessionMember
+    from .models import NewcomerMilestone
+
+    today = today or timezone.localdate()
+    people = list(newcomers.values("id", "location_id", "created_at"))
+    ids = [p["id"] for p in people]
+    if not ids:
+        return {"on_track": 0, "ready": 0, "pipeline": 0}
+    dates = defaultdict(set)
+    for nid, d in (AttendanceSessionMember.objects
+                   .filter(newcomer_id__in=ids, session__meeting_type_id=MAIN_SERVICE_ID, session__date__lte=today)
+                   .values_list("newcomer_id", "session__date")):
+        dates[nid].add(d)
+    held_by_loc = defaultdict(list)
+    for loc, d in (AttendanceSession.objects.filter(meeting_type_id=MAIN_SERVICE_ID, date__lte=today)
+                   .values_list("location_id", "date").distinct()):
+        held_by_loc[loc].append(d)
+    all_held = sorted({d for ds in held_by_loc.values() for d in ds})
+    saved = set(NewcomerMilestone.objects.filter(newcomer_id__in=ids, milestone_type__name=SALVATION,
+                                                 achieved_date__isnull=False).values_list("newcomer_id", flat=True))
+    on = ready = 0
+    for p in people:
+        mine = dates.get(p["id"], set())
+        first_attended = min(mine) if mine else None
+        if first_attended:
+            pool = held_by_loc.get(p["location_id"], []) if p["location_id"] else all_held
+            held = len({d for d in pool if first_attended <= d <= today} | mine)
+            percent = round(len(mine) / held * 100) if held else 0
+        else:
+            percent = 0
+        first_came = p["created_at"]
+        if first_attended and (first_came is None or first_attended < first_came):
+            first_came = first_attended
+        months = _months_between(first_came, today) if first_came else 0
+        if p["id"] in saved and percent >= MIN_PERCENT:
+            if months >= WINDOW_MONTHS:
+                ready += 1
+            else:
+                on += 1
+    return {"on_track": on, "ready": ready, "pipeline": len(people)}

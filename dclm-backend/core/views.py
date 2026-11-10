@@ -128,10 +128,17 @@ class AppSettingsView(APIView):
         "auto_assign_newcomers": True,   # key -> default when unset
     }
 
+    def _all(self):
+        from core import settings_store
+        from accounts.models import Role
+        out = {k: AppSetting.get_bool(k, default) for k, default in self.BOOL_KEYS.items()}
+        out.update(settings_store.all_values())
+        out["two_step_roles"] = [{"id": r.id, "name": r.name, "two_step": r.two_step}
+                                 for r in Role.objects.order_by("name")]
+        return out
+
     def get(self, request):
-        return Response({
-            k: AppSetting.get_bool(k, default) for k, default in self.BOOL_KEYS.items()
-        })
+        return Response(self._all())
 
     def patch(self, request):
         # Changing a church-wide switch needs Admin edit permission and an
@@ -144,26 +151,56 @@ class AppSettingsView(APIView):
                 {"detail": "Only administrators can change church settings."}, status=403,
             )
 
-        unknown = set(request.data) - set(self.BOOL_KEYS)
+        from core import settings_store
+        from accounts.models import Role
+        typed = set(settings_store.DEFINITIONS)
+        unknown = set(request.data) - set(self.BOOL_KEYS) - typed - {"two_step_roles"}
         if unknown:
             return Response(
                 {"detail": f"Unknown setting(s): {', '.join(sorted(unknown))}."}, status=400,
             )
+        # Check everything first, so a mistake in one saves nothing.
+        errors, clean = {}, {}
+        for key in request.data:
+            value = request.data[key]
+            if key in self.BOOL_KEYS:
+                if not isinstance(value, bool):
+                    errors[key] = "Must be true or false."
+            elif key in typed:
+                try:
+                    clean[key] = settings_store.clean(key, value)
+                except ValueError as e:
+                    errors[key] = str(e)
+        roles = request.data.get("two_step_roles")
+        if roles is not None:
+            ok = {"required", "choose", "off"}
+            if not isinstance(roles, dict) or any(v not in ok for v in roles.values()):
+                errors["two_step_roles"] = "Choose Required, Person chooses or Off for each role."
+            elif not Role.objects.filter(id__in=[int(k) for k in roles]).count() == len(roles):
+                errors["two_step_roles"] = "One of the roles no longer exists. Reload the page and try again."
+        if errors:
+            return Response(errors, status=400)
 
         for key in request.data:
             value = request.data[key]
-            if not isinstance(value, bool):
-                return Response({key: "Must be true or false."}, status=400)
-            AppSetting.set_bool(key, value)
-            log_audit(
-                request.user,
-                "Enabled setting" if value else "Disabled setting",
-                "Setting", key, "",
-            )
-
-        return Response({
-            k: AppSetting.get_bool(k, default) for k, default in self.BOOL_KEYS.items()
-        })
+            if key in self.BOOL_KEYS:
+                AppSetting.set_bool(key, value)
+                log_audit(request.user, "Enabled setting" if value else "Disabled setting", "Setting", key, "")
+            elif key in typed:
+                before = settings_store.get(key)
+                settings_store.set_value(key, clean[key])
+                label = settings_store.DEFINITIONS[key][2]
+                log_audit(request.user, "Updated", "Setting", label, f"{before} changed to {clean[key]}")
+        if roles:
+            names = {"required": "Required", "choose": "Person chooses", "off": "Off"}
+            for r in Role.objects.filter(id__in=[int(k) for k in roles]):
+                new = roles[str(r.id)]
+                if r.two_step != new:
+                    log_audit(request.user, "Updated", "Setting", f"Two-step sign-in, {r.name}",
+                              f"{names[r.two_step]} changed to {names[new]}")
+                    r.two_step = new
+                    r.save(update_fields=["two_step"])
+        return Response(self._all())
 
 
 class FollowUpRulesSerializer(serializers.ModelSerializer):

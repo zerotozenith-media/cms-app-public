@@ -8,7 +8,7 @@ from django.urls import path, include
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from core.views import health_check
-from accounts.views import LoginView, LogoutView
+from accounts.views import LoginView, LogoutView, MyTwoStepView, TwoStepView
 from accounts.password_reset import PasswordResetRequestView, PasswordResetConfirmView
 from accounts.profile import MeView, MyPhotoView, MyPasswordView
 from core.outstanding import NotificationSummaryView
@@ -22,6 +22,8 @@ urlpatterns = [
     path("api/auth/password-reset/", PasswordResetRequestView.as_view(), name="password-reset"),
     path("api/auth/password-reset/confirm/", PasswordResetConfirmView.as_view(), name="password-reset-confirm"),
     path("api/auth/me/", MeView.as_view(), name="me"),
+    path("api/auth/two-step/", TwoStepView.as_view(), name="two-step"),
+    path("api/auth/me/two-step/", MyTwoStepView.as_view(), name="my-two-step"),
     path("api/auth/me/photo/", MyPhotoView.as_view(), name="my-photo"),
     path("api/auth/me/password/", MyPasswordView.as_view(), name="my-password"),
     path("api/notifications/", NotificationSummaryView.as_view(), name="notifications"),

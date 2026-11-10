@@ -6,6 +6,7 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Skeleton } from '../components/ui/Skeleton';
 import { AlertsCard } from '../components/profile/AlertsCard';
+import { TwoStepCard } from '../components/profile/TwoStepCard';
 
 interface Profile {
   first_name: string; last_name: string; name: string; email: string; phone: string;
@@ -124,6 +125,8 @@ export function MyProfilePage() {
       </Card>
 
       <AlertsCard />
+
+      <TwoStepCard />
 
       <Card style={{ marginTop: 16 }}>
         <h3>Change password</h3>

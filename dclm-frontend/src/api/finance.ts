@@ -40,7 +40,7 @@ export function useGivingList(params: GivingListParams) {
 interface ExpenseListParams {
   date_from?: string;
   date_to?: string;
-  category?: string; ordering?: string; page?: number; page_size?: number;
+  category?: string; receipt?: string; ordering?: string; page?: number; page_size?: number;
 }
 export function useExpenseList(params: ExpenseListParams) {
   return useQuery({
@@ -55,6 +55,7 @@ function invalidateFinance(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: ['finance-summary'] });
   queryClient.invalidateQueries({ queryKey: ['projects'] });
   queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+  queryClient.invalidateQueries({ queryKey: ['dashboard2'] });
 }
 
 export function useCreateGiving() {

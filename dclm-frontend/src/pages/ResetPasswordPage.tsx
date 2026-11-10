@@ -4,6 +4,7 @@ import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
 import { AuthIcon, AuthLayout } from '../components/auth/AuthLayout';
+import { TwoStepPanel, type TwoStepChallenge } from '../components/auth/TwoStepPanel';
 
 /** F18: choose a new password from the emailed link, then go straight in. */
 export function ResetPasswordPage() {
@@ -11,6 +12,7 @@ export function ResetPasswordPage() {
   const uid = params.get('uid') ?? '';
   const token = params.get('token') ?? '';
   const { startSession } = useAuth();
+  const [challenge, setChallenge] = useState<TwoStepChallenge | null>(null);
   const navigate = useNavigate();
   const [state, setState] = useState<'checking' | 'ready' | 'bad'>('checking');
   const [email, setEmail] = useState('');
@@ -38,6 +40,8 @@ export function ResetPasswordPage() {
     setBusy(true);
     try {
       const r = await apiClient.post('/auth/password-reset/confirm/', { uid, token, password, password_again: again });
+      // A new password never skips two-step sign-in.
+      if (r.data.two_step) { setChallenge(r.data); return; }
       startSession(r.data);
       navigate('/', { replace: true });
     } catch (err: any) {
@@ -60,6 +64,14 @@ export function ResetPasswordPage() {
         <p className="auth-sub">Reset links work once and for one hour. Ask for a new one and use it straight away.</p>
         <Link to="/forgot-password" className="btn" style={{ display: 'block', justifyContent: 'center' }}>Send a new link</Link>
         <div style={{ marginTop: 16 }}><Link className="auth-link" to="/login">← Back to sign in</Link></div>
+      </AuthLayout>
+    );
+  }
+  if (challenge) {
+    return (
+      <AuthLayout>
+        <TwoStepPanel challenge={challenge} onBack={() => navigate('/login', { replace: true })}
+          onSignedIn={(data) => { startSession(data); navigate('/', { replace: true }); }} />
       </AuthLayout>
     );
   }

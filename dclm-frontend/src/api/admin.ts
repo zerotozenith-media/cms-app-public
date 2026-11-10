@@ -53,6 +53,15 @@ export function useSendReset() {
   });
 }
 
+/** Two-step sign-in: for someone who lost their phone and their backup codes. */
+export function useResetTwoStep() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => (await apiClient.post<{ detail: string }>(`/users/${id}/reset-two-step/`)).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
+  });
+}
+
 /** Item 12: put an account on the member roll and link it. */
 export function useAddToRoll() {
   const qc = useQueryClient();

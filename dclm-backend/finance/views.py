@@ -138,6 +138,10 @@ class ExpenseViewSet(LocationScopedQuerySetMixin, viewsets.ModelViewSet):
         if date_to:
             qs = qs.filter(date__lte=date_to)
         project = self.request.query_params.get("project")
+        # Dashboard redesign: "expenses with no receipt" opens this list.
+        if self.request.query_params.get("receipt") == "missing":
+            from django.db.models import Q
+            qs = qs.filter(Q(receipt_file="") | Q(receipt_file__isnull=True))
         category = self.request.query_params.get("category")
         if project:
             qs = qs.filter(project_id=project)

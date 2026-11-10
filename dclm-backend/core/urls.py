@@ -5,11 +5,14 @@ from rest_framework.routers import DefaultRouter
 
 from .views import LocationViewSet, AppSettingsView, FollowUpRulesView
 from .dashboard import DashboardSummaryView
+from .dashboard2 import DashboardExportView, DashboardView
 
 router = DefaultRouter()
 router.register("locations", LocationViewSet, basename="location")
 
 urlpatterns = router.urls + [
+    path("dashboard/", DashboardView.as_view(), name="dashboard"),
+    path("dashboard/export/", DashboardExportView.as_view(), name="dashboard-export"),
     path("dashboard/summary/", DashboardSummaryView.as_view(), name="dashboard-summary"),
     path("settings/", AppSettingsView.as_view(), name="app-settings"),
     path("followup-rules/", FollowUpRulesView.as_view(), name="followup-rules"),

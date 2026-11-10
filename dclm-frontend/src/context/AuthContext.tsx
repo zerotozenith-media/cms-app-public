@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { rememberedDevice, type TwoStepChallenge } from '../components/auth/TwoStepPanel';
 import { apiClient, tokenStorage } from '../api/client';
 import type { AuthUser, LoginResponse, RolePermission } from '../types/auth';
 
@@ -8,7 +9,8 @@ interface AuthContextValue {
   user: AuthUser | null;
   permissions: RolePermission[];
   isLoading: boolean;
-  login: (email: string, password: string, extra?: { website?: string; form_loaded_at?: string }) => Promise<void>;
+  /** Returns the second step when two-step sign-in is needed, otherwise signs in and returns null. */
+  login: (email: string, password: string, extra?: { website?: string; form_loaded_at?: string }) => Promise<TwoStepChallenge | null>;
   startSession: (data: LoginResponse & { user: AuthUser & { role_permissions: RolePermission[] } }) => void;
   updateUser: (changes: Partial<AuthUser>) => void;
   logout: () => Promise<void>;
@@ -39,11 +41,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function login(email: string, password: string, extra?: { website?: string; form_loaded_at?: string }) {
-    const resp = await apiClient.post<LoginResponse & { user: AuthUser & { role_permissions: RolePermission[] } }>(
+    const resp = await apiClient.post<(LoginResponse & { user: AuthUser & { role_permissions: RolePermission[] } }) | TwoStepChallenge>(
       '/auth/login/',
-      { email, password, ...extra },
+      { email, password, ...extra, device: rememberedDevice() },
     );
+    if ('two_step' in resp.data) return resp.data;
     startSession(resp.data);
+    return null;
   }
 
   // One way to start a session, used by sign-in and by the password reset,

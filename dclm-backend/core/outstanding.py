@@ -9,6 +9,9 @@ Each item is counted only for people whose role can open that list, and
 limited to the location they are viewing. Overdue items are red, items that
 are only waiting are amber.
 """
+import datetime
+
+from django.db import models
 from django.utils import timezone
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -99,6 +102,22 @@ def outstanding(user):
             items.append({"key": "sessions", "count": n, "level": "waiting",
                           "label": f"{n} {_plural(n, 'session', 'sessions')} not filled in",
                           "link": "/attendance?status=pending"})
+    # Dashboard redesign (10 November 2026): expenses of last month and this
+    # month with no receipt attached, over the amount in Admin, Settings.
+    if user_has(user, "finance", "can_edit"):
+        from finance.models import Expense
+        from core import settings_store
+        start = (today.replace(day=1) - datetime.timedelta(days=1)).replace(day=1)
+        over = settings_store.get("receipt_flag_over")
+        qs = Expense.objects.filter(date__gte=start, date__lte=today, amount__gt=over).filter(
+            models.Q(receipt_file="") | models.Q(receipt_file__isnull=True))
+        if loc:
+            qs = qs.filter(location_id=loc)
+        n = qs.count()
+        if n:
+            items.append({"key": "no-receipt", "count": n, "level": "waiting",
+                          "label": f"{n} {_plural(n, 'expense', 'expenses')} with no receipt over BHD {over:,.2f}",
+                          "link": "/finance?receipt=missing"})
     # F19: follow-up messages still to send today.
     if user_has(user, "newcomers", "can_view"):
         from followup.views import due_today

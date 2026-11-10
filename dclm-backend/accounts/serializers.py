@@ -37,6 +37,7 @@ class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False, allow_blank=False)
     role_name = serializers.CharField(source="role.name", read_only=True, default=None)
     location_name = serializers.CharField(source="location.name", read_only=True, default=None)
+    two_step_on = serializers.SerializerMethodField()
     full_name = serializers.SerializerMethodField()
     coordinates_location_name = serializers.SerializerMethodField()
 
@@ -67,11 +68,15 @@ class UserSerializer(serializers.ModelSerializer):
             "role", "role_name", "location", "location_name", "member",
             "is_active", "last_login", "can_shepherd", "gender",
             "is_followup_coordinator", "coordinates_location", "coordinates_location_name",
+            "two_step_on",
         ]
-        read_only_fields = ["id", "last_login"]
+        read_only_fields = ["id", "last_login", "two_step_on"]
 
     def get_full_name(self, obj):
         return display_name(obj)
+
+    def get_two_step_on(self, obj):
+        return bool(obj.two_step_secret)
 
     def validate_member(self, member):
         """One member record belongs to one account."""

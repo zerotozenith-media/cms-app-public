@@ -24,7 +24,14 @@ class UserManager(BaseUserManager):
 
 
 class Role(models.Model):
+    class TwoStep(models.TextChoices):
+        REQUIRED = "required", "Required"
+        CHOOSE = "choose", "Person chooses"
+        OFF = "off", "Off"
+
     name = models.CharField(max_length=100, unique=True)
+    # Two-step sign-in for this role (10 November 2026), set in Admin, Settings.
+    two_step = models.CharField(max_length=10, choices=TwoStep.choices, default=TwoStep.OFF)
 
     class Meta:
         ordering = ["name"]
@@ -103,6 +110,16 @@ class User(AbstractUser):
     coordinates_location = models.ForeignKey(
         "core.Location", on_delete=models.PROTECT, null=True, blank=True, related_name="followup_coordinators",
         help_text="The location this account coordinates follow-up for. Blank = All locations.")
+
+    # Two-step sign-in (10 November 2026). The secret is kept encrypted with
+    # the app's secret key and the backup codes hashed like passwords
+    # (accounts/two_step.py). last_step stops one number being used twice.
+    two_step_secret = models.CharField(max_length=255, blank=True, default="")
+    two_step_on_since = models.DateTimeField(null=True, blank=True)
+    two_step_last_step = models.BigIntegerField(default=0)
+    two_step_backup = models.JSONField(default=list, blank=True)
+    # Raised when two-step is reset or turned off, so remembered devices stop working.
+    two_step_version = models.PositiveIntegerField(default=0)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []

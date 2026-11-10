@@ -56,7 +56,7 @@ export const HELP_SECTIONS: HelpSection[] = [
   { key: 'goals', label: 'Goals and reports', group: 'Reference' },
   { key: 'alerts', label: 'Alerts on your phone', group: 'Reference' },
   { key: 'admin', label: 'Accounts and roles', group: 'Reference' },
-  { key: 'new', label: 'Versions 11.14 to 11.18', group: "What's new", intro: 'What changed in versions 11.14 to 11.18, and where to read about it.' },
+  { key: 'new', label: 'Versions 11.14 to 11.20', group: "What's new", intro: 'What changed in versions 11.14 to 11.20, and where to read about it.' },
 ];
 
 const SH: HelpRole[] = ['Shepherd'];
@@ -77,6 +77,15 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
         { to: 'welcome', t: 'I welcome and register newcomers' },
         { to: 'why', t: "The app said no and I don't know why" },
       ] },
+    { h: 'The dashboard', roles: ALL, steps: [
+      'At the top: the date, the location shown, the period buttons and your quick action buttons. On a phone, slide the buttons sideways to see them all.',
+      'Needs your attention: the total, the two most urgent items, and View all for the full list. Press an item to open it.',
+      'The cards: the main figures for the period, each compared with an earlier period. Tap a card to open its page.',
+      'The charts: giving and expenses by month, giving by fund, attendance by month, newcomers by month and goals. A month with nothing recorded is a shaded gap marked Not recorded, never 0.',
+      'Then follow-ups due, house fellowships, testimonies, new members and enquiries, and the summary table for you, with Export to Excel or PDF.',
+    ], note: 'What you see follows your role. Accounts sees money and month-end, with a table by month. A shepherd with the Follow-up role sees their own follow-ups and no money.', manual: 12 },
+    { h: 'Choosing the period', roles: ALL, p: 'The dashboard opens on This month (set in Admin, Settings). Press Quarter, Year to date or Last year, or More for Last month, a whole year or a range of months. Year to date, Quarter and Last year follow the financial year in Admin, Settings: with December, Year to date runs from 1 January.', manual: 88 },
+    { h: 'What the cards are compared with', roles: ALL, p: 'The same days a year earlier, once there are records for them. Until then, the period just before, of the same length: 1 to 10 November is compared with 1 to 10 October, and October with September. When the earlier days are before the month the records start (July 2026), the card says there is no earlier figure, so an empty month is never shown as a fall.', manual: 88 },
     { h: 'Help for the page you are on', roles: ALL, p: 'Press the ? at the top of any page for the steps for that page, the answers to what it may refuse, and the manual page. Anywhere you see a small ? next to a label, tap it for a plain explanation of that one thing.', manual: 6 },
     { h: 'What your role decides', roles: ALL, p: 'Your menu shows only what your role allows, so it may be shorter than someone else\'s. That is normal, not a fault. If something you need is missing, an administrator can check your role.', manual: 5 },
     { h: 'Your account', roles: ALL, p: 'Tap your round badge at the top right for your name, role and location, My profile and Sign out. In My profile you can add a photo, correct your name, phone and email, change your password, and turn on alerts for your phone.', manual: 7 },
@@ -230,6 +239,8 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
   ],
 
   giving: [
+    { h: 'Expenses with no receipt', roles: [...FN, 'Administrator'], p: 'Expenses of last month and this month with no receipt attached, over the amount in Admin, Settings (BHD 25 at first), are listed under Needs your attention. Press it to open the expenses with the No receipt filter, then press the pencil on each to attach its receipt.', manual: 88 },
+    { h: 'The Accounts dashboard', roles: [...FN, ...APPR], p: 'Cash in hand at each location, giving, expenses, net and month-end, the charts by month and by fund, the top expense categories, and a table by month for each location: cash at the start, giving, expenses, money sent to the region, net, cash in hand and the month-end status. Export it to Excel or PDF.', manual: 90 },
     { h: 'Recording giving', roles: ['Finance'], steps: [
       'Open Giving & Finance.',
       'Set the date it was given, the amount, the fund and how it was given.',
@@ -259,6 +270,13 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
   ],
 
   runchurch: [
+    { h: 'Admin, Settings', roles: AD, steps: [
+      'Open Admin, then Settings.',
+      'Financial year ends in: sets Year to date, Quarter and Last year. Records start: the first month with real records, July 2026.',
+      'Flag expenses with no receipt over: the amount in BHD for Needs your attention. The dashboard opens on: the period shown first.',
+      'Two-step sign-in: Required, Person chooses or Off for each role, and how many days a browser is remembered.',
+      'Press Save settings. Every change is in the Audit Log.',
+    ], note: 'Only an administrator covering All locations can change them. Others see them to read.', manual: 92 },
     { h: 'Follow-up Rules', roles: AD, img: 'rules', steps: [
       'Open Admin, then Follow-up Rules.',
       'Change any time or number: when the clock starts, when tasks are due, reasons, the Review list, repeated absences, the shepherd limit, newcomer stages, reminders and targets.',
@@ -315,6 +333,16 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
   ],
 
   why: [
+    // Dashboard and two-step sign-in (11.20)
+    { h: 'Why is there no change shown on a card?', say: '"No earlier figure to compare"', why: 'The earlier days it would be compared with are before the month the records start, so there is nothing real to compare with.', fix: 'Choose This month, Last month or Quarter, which are compared with the period just before.', roles: ALL, manual: 88 },
+    { h: "Why can't I export the dashboard table?", say: '"This dashboard has no table to export."', why: 'A Follow-up dashboard shows your own follow-ups and has no summary table.', fix: 'Nothing to do. The figures you need are on My follow-up.', roles: SH, manual: 91 },
+    { h: 'Why did the PDF not download?', say: '"The PDF could not be made."', why: 'Something went wrong while drawing it. Nothing was changed.', fix: 'Try again, or choose Excel instead and tell an administrator.', roles: ALL, manual: 91 },
+    { h: 'Why is my number not accepted?', say: '"The number is not right. Type the 6-digit number the app shows now, or one of your backup codes."', why: 'The number changes every 30 seconds, and each one works once. A phone clock set by hand can be out.', fix: 'Type the number shown now. Set your phone to set its clock automatically. After 5 wrong tries, sign-in pauses for 15 minutes.', roles: ALL, manual: 95 },
+    { h: 'Why must I sign in again?', say: '"This sign-in has expired or was already used. Sign in again with your password."', why: 'The step after the password lasts 10 minutes.', fix: 'Press Sign in again and type your password, then the number.', roles: ALL, manual: 93 },
+    { h: "Why can't I turn off two-step sign-in?", say: '"Two-step sign-in cannot be turned off for your role."', why: 'An Administrator has made it Required for your role, to keep church records safe.', fix: 'Lost your phone? Ask another Administrator to reset it, then set it up again.', roles: ALL, manual: 93 },
+    { h: "Why can't I turn on two-step sign-in?", say: '"Two-step sign-in is not offered for your role."', why: 'An Administrator has set it to Off for your role in Admin, Settings.', fix: 'Ask an Administrator if you would like it.', roles: ALL, manual: 92 },
+    { h: "Why can't I reset my own two-step sign-in?", say: '"You cannot reset your own two-step sign-in."', why: 'Otherwise anyone with your password could remove the second step.', fix: 'Ask another Administrator to reset it for you.', roles: AD, manual: 93 },
+    { h: 'Why is my setting refused?', say: '"Remember a device for: type a number from 0 to 90."', why: 'Each setting has a sensible range, and nothing is saved until every value is right.', fix: 'Correct the value shown in red and press Save settings again.', roles: AD, manual: 92 },
     // Follow-up
     { h: "Why can't I record a result?", say: '"2 of your late tasks need a reason first. Give a reason and a new date for each, then record this result."', why: 'Your Follow-up Coordinator reviews every late task, so each needs a reason before anything else is recorded.', fix: 'On My follow-up press Give reasons in the red box, send them, then record the result.', roles: SH, manual: 62 },
     { h: "Why can't I give a reason?", say: '"This task is not late yet, so no reason is needed."', why: 'Reasons are only for late tasks.', fix: 'Record the result instead.', roles: SH, manual: 62 },
@@ -516,6 +544,13 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
   ],
 
   admin: [
+    { h: 'Two-step sign-in', roles: ALL, steps: [
+      'Install a free authenticator app on your phone, for example Microsoft Authenticator or Google Authenticator.',
+      'It is Off for every role until an Administrator turns it on in Admin, Settings. When your role requires it, the app asks you to set it up after your password. If your role lets you choose, open My profile and press Turn on.',
+      'Scan the code with the app and type the 6-digit number it shows.',
+      'Keep the 10 backup codes somewhere safe. Each works once instead of the number, for example if you lose your phone.',
+      'From then on, type the number after your password. Tick the box to be asked again only after 30 days on your own device.',
+    ], note: 'It starts Off for every role. An Administrator covering All locations can set any role to Required or Person chooses in Admin, Settings. Lost your phone and your codes? Another Administrator presses Reset two-step sign-in on your account in Admin, Users.', manual: 93 },
     { h: 'Who can shepherd where', roles: AD, p: 'An account ticked Can shepherd others shepherds at the location its account covers. An account covering All locations shepherds at every location while All-locations accounts can shepherd at any location is On in Admin, Follow-up Rules. Off, it shepherds only at the location on its member record. Example: a Qatar leader covering All locations can take a Bahrain HQ newcomer when it is On.', manual: 85 },
     { h: 'Removing a fellowship', roles: AD, p: 'In Admin, Meeting Types & Households, Fellowships, press the bin. Its empty sessions are removed with it. If any session has attendance, names, an offering or follow-up tasks, nothing is removed and those sessions are listed: open each and press Change date or meeting to move it, or delete it if it was a mistake.', manual: 87 },
     { h: 'Finding something in the Audit Log', roles: AD, steps: [
@@ -532,6 +567,7 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
   ],
 
   new: [
+    { h: '11.20: The new dashboard and two-step sign-in', roles: ALL, p: 'The dashboard has the same design as DCLM Canada: period buttons, one line for what needs attention, cards compared with an earlier period, charts by month with gaps where nothing was recorded, On track for membership, and a table for your role with Export. Admin, Settings holds the financial year, when records start, the receipt amount and two-step sign-in, which stays Off until an Administrator turns it on for a role.', links: [{ to: 'start', t: 'Start here' }, { to: 'admin', t: 'Accounts and roles' }], manual: 88 },
     { h: '11.18: Shepherds anywhere, and why someone is not offered', roles: ALL, p: 'All-locations accounts can shepherd at any location, set in Admin, Follow-up Rules. Every shepherd box lists who is not offered and why. Removing a fellowship removes its empty sessions too.', links: [{ to: 'admin', t: 'Accounts and roles' }], manual: 85 },
     { h: '11.17: Reports, sessions and the Audit Log', roles: ALL, p: 'All locations reports add the same meeting on the same day into one row, the zonal report shows house caring fellowships, New session asks before a meeting on the wrong day, administrators can change a session\'s date or meeting, the Audit Log has search and filters, and sign-in says when the server cannot be reached.', links: [{ to: 'usher', t: 'I record attendance' }, { to: 'runchurch', t: 'I run the church' }], manual: 81 },
     { h: '11.16: Finding people and ticking newcomers', roles: ALL, p: 'Search on Newcomers and Online Enquiries, a pencil to correct an enquiry, Go to Journey for Salvation, and newcomers with Everyone, Members, Newcomers and Not ticked on check-in and the session page.', links: [{ to: 'welcome', t: 'I welcome newcomers' }, { to: 'usher', t: 'I record attendance' }], manual: 76 },

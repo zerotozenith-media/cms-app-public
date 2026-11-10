@@ -72,12 +72,15 @@ export function FinancePage() {
 
   // --- Expense list state ---
   const [expenseCategory, setExpenseCategory] = useState('all');
+  // "Expenses with no receipt" on the dashboard opens the list with this filter.
+  const [expenseReceipt, setExpenseReceipt] = useState(params.get('receipt') === 'missing' ? 'missing' : 'all');
   const [expenseSort, setExpenseSort] = useState('-date');
   const [expenseRange, setExpenseRange] = useState<DateRangeKey>('all');
   const [expensePage, setExpensePage] = useState(1);
   const expensePageSize = 6;
   const { data: expenseList } = useExpenseList({
     category: expenseCategory !== 'all' ? expenseCategory : undefined,
+    receipt: expenseReceipt === 'missing' ? 'missing' : undefined,
     date_from: rangeBounds(expenseRange)?.[0],
     date_to: rangeBounds(expenseRange)?.[1],
     ordering: expenseSort, page: expensePage, page_size: expensePageSize,
@@ -448,6 +451,10 @@ export function FinancePage() {
             <select className="selectbox" value={expenseCategory} onChange={(e) => { setExpenseCategory(e.target.value); setExpensePage(1); }}>
               <option value="all">All categories</option>
               {(categories ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <select className="selectbox" aria-label="Receipt" value={expenseReceipt} onChange={(e) => { setExpenseReceipt(e.target.value); setExpensePage(1); }}>
+              <option value="all">With or without a receipt</option>
+              <option value="missing">No receipt</option>
             </select>
             <select className="selectbox" value={expenseSort} onChange={(e) => setExpenseSort(e.target.value)}>
               <option value="-date">Sort: Newest first</option>

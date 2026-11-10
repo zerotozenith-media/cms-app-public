@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
 import { AuthLayout } from '../components/auth/AuthLayout';
+import { TwoStepPanel, type TwoStepChallenge } from '../components/auth/TwoStepPanel';
 
 /**
  * A real login form , deliberately NOT the demo's "click your account"
@@ -13,7 +14,8 @@ import { AuthLayout } from '../components/auth/AuthLayout';
  * server-side checks, not carry the mock pattern forward.
  */
 export function LoginPage() {
-  const { login } = useAuth();
+  const { login, startSession } = useAuth();
+  const [challenge, setChallenge] = useState<TwoStepChallenge | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState('');
@@ -24,15 +26,20 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const formLoadedAt = useRef(new Date().toISOString());
 
+  function goOn() {
+    const from = (location.state as { from?: string })?.from || '/';
+    navigate(from, { replace: true });
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setWarning(false);
     setSubmitting(true);
     try {
-      await login(email, password, { website, form_loaded_at: formLoadedAt.current });
-      const from = (location.state as { from?: string })?.from || '/';
-      navigate(from, { replace: true });
+      const step = await login(email, password, { website, form_loaded_at: formLoadedAt.current });
+      if (step) { setChallenge(step); return; }
+      goOn();
     } catch (err: any) {
       const data = err?.response?.data;
       setWarning(Boolean(data?.warning));
@@ -53,6 +60,15 @@ export function LoginPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (challenge) {
+    return (
+      <AuthLayout>
+        <TwoStepPanel challenge={challenge} onBack={() => { setChallenge(null); setPassword(''); }}
+          onSignedIn={(data) => { startSession(data); goOn(); }} />
+      </AuthLayout>
+    );
   }
 
   return (

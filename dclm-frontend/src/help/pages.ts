@@ -82,9 +82,9 @@ export const HELP_PAGES: { path: RegExp; help: PageHelp }[] = [
     'Follow-up Rules: every follow-up time and number.',
     'Audit Log: search and filter every change.',
   ], links: [{ t: 'Finding something in the Audit Log', s: 'admin', h: 'Finding something in the Audit Log' }, { t: 'Follow-up Rules', s: 'runchurch', h: 'Follow-up Rules' }, { t: 'Editing an account', s: 'runchurch', h: 'Editing an account' }, { t: "Why can't I give this role?", s: 'why', h: "Why can't I give this role?" }] } },
-  { path: /^\/profile/, help: { title: 'My profile', manual: 7, steps: ['Correct your details, add a photo or change your password.', 'Turn on alerts for this device.'], links: [{ t: 'Turning on alerts', s: 'alerts', h: 'Turning on alerts' }] } },
+  { path: /^\/profile/, help: { title: 'My profile', manual: 7, steps: ['Correct your details, add a photo or change your password.', 'Turn on alerts for this device.', 'Turn on two-step sign-in, or make new backup codes.'], links: [{ t: 'Turning on alerts', s: 'alerts', h: 'Turning on alerts' }] } },
   { path: /^\/help/, help: { title: 'Help & Guide', steps: ['Pick your job on the left, or search for a word from what you are doing.'], links: [{ t: "Why can't I...?", s: 'why' }] } },
-  { path: /^\/$/, help: { title: 'Dashboard', manual: 12, steps: ['The cards show this month at a glance. Tap one to open its page.', 'The bell lists what needs your attention.'], links: [{ t: 'The bell', s: 'start', h: 'The bell' }] } },
+  { path: /^\/$/, help: { title: 'Dashboard', manual: 12, steps: ['Choose the period at the top. Each card compares it with an earlier period.', 'Needs your attention lists what to do. Press an item to open it.', 'Tap a card, a row or a chart\'s figures for more.', 'Export the table at the bottom to Excel or PDF.'], links: [{ t: 'The dashboard', s: 'start', h: 'The dashboard' }, { t: 'What the cards are compared with', s: 'start', h: 'What the cards are compared with' }] } },
 ];
 
 export function helpForPath(pathname: string): PageHelp | null {

@@ -10,8 +10,9 @@ import { AuditLogTab } from './AuditLogTab';
 import { MessageBankTab } from './MessageBankTab';
 import { AlertsTab } from './AlertsTab';
 import { FollowUpRulesTab } from './FollowUpRulesTab';
+import { SettingsTab } from './SettingsTab';
 
-type Tab = 'users' | 'meetings' | 'rules' | 'config' | 'bank' | 'audit' | 'alerts';
+type Tab = 'users' | 'meetings' | 'rules' | 'config' | 'bank' | 'audit' | 'alerts' | 'settings';
 
 export function AdminPage() {
   const [tab, setTab] = useState<Tab>('users');
@@ -39,6 +40,7 @@ export function AdminPage() {
           <button className={`tab${tab === 'bank' ? ' active' : ''}`} onClick={() => setTab('bank')}>Message Bank</button>
           <button className={`tab${tab === 'audit' ? ' active' : ''}`} onClick={() => setTab('audit')}>Audit Log</button>
           <button className={`tab${tab === 'alerts' ? ' active' : ''}`} onClick={() => setTab('alerts')}>Alerts</button>
+          <button className={`tab${tab === 'settings' ? ' active' : ''}`} onClick={() => setTab('settings')}>Settings</button>
         </div>
       </div>
       {tab === 'users' && <UsersRolesTab />}
@@ -48,6 +50,7 @@ export function AdminPage() {
       {tab === 'bank' && <MessageBankTab />}
       {tab === 'audit' && <AuditLogTab />}
       {tab === 'alerts' && <AlertsTab />}
+      {tab === 'settings' && <SettingsTab />}
     </>
   );
 }

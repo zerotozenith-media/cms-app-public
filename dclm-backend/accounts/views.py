@@ -37,16 +37,9 @@ MIN_SUBMIT_SECONDS = 1.5
 
 def get_client_ip(request):
     forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
-    ip = forwarded.split(",")[0].strip() if forwarded else request.META.get("REMOTE_ADDR", "0.0.0.0")
-
-    # Azure's proxy can pass "ip:port" for IPv4 clients rather than a bare
-    # IP. ip_address is a Postgres inet column and rejects the port, so
-    # strip it here. Only strip when there's exactly one colon — IPv6
-    # addresses have several and must be left alone.
-    if ip.count(":") == 1:
-        ip = ip.split(":")[0]
-
-    return ip
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR", "0.0.0.0")
 
 
 class LoginView(APIView):
@@ -137,11 +130,137 @@ class LoginView(APIView):
             email_attempted=email, ip_address=ip, successful=True,
             reason=LoginAttempt.Reason.SUCCESS,
         )
-        log_audit(user, "Logged in", "User", display_name(user), f"from {ip}", instance=user)
-        user.last_login = timezone.now()
-        user.save(update_fields=["last_login"])
+        # Two-step sign-in (10 November 2026): the password was right, and
+        # the second step comes next when the role needs it.
+        step = second_step(user, request.data.get("device"))
+        if step:
+            return Response(step)
+        return Response(finish_sign_in(user, ip))
 
-        return Response(signed_in_payload(user))
+
+def finish_sign_in(user, ip, how=""):
+    log_audit(user, "Logged in", "User", display_name(user), f"from {ip}{how}", instance=user)
+    user.last_login = timezone.now()
+    user.save(update_fields=["last_login"])
+    return signed_in_payload(user)
+
+
+def second_step(user, device=None):
+    """None when no second step is needed, otherwise what the sign-in page
+    shows next: type the number ("code") or set it up ("setup")."""
+    from . import two_step as ts
+    from core import settings_store
+    need = ts.needed_at_sign_in(user)
+    if need == "code" and ts.device_ok(user, device):
+        return None
+    days = settings_store.get("two_step_remember_days")
+    if need == "code":
+        return {"two_step": "code", "ticket": ts.ticket(user, "code"), "remember_days": days}
+    if need == "setup":
+        secret = ts.new_secret()
+        return {"two_step": "setup", "ticket": ts.ticket(user, "setup", secret), "secret": ts.grouped(secret),
+                "otpauth": ts.otpauth(user, secret), "remember_days": days}
+    return None
+
+
+WRONG_CODE = ("The number is not right. Type the 6-digit number the app shows now, or one of your backup codes. "
+              "If it keeps failing, check that your phone sets its clock automatically.")
+
+
+class TwoStepView(APIView):
+    """The second step of signing in: the number from the app, or setting
+    the app up for a role that requires it."""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        from . import two_step as ts
+        user, stage, secret = ts.read_ticket(request.data.get("ticket"))
+        if not user:
+            return Response({"detail": "This sign-in has expired or was already used. Sign in again with your password.",
+                             "expired": True}, status=400)
+        ip = get_client_ip(request)
+        window_start = timezone.now() - timezone.timedelta(minutes=RATE_LIMIT_WINDOW_MINUTES)
+        if LoginAttempt.objects.filter(email_attempted=user.email, successful=False,
+                                       timestamp__gte=window_start).count() >= MAX_FAILED_PER_ACCOUNT:
+            return Response(LOCKED_ERROR, status=status.HTTP_429_TOO_MANY_REQUESTS)
+        code = request.data.get("code") or ""
+        backup = None
+        if stage == "setup":
+            backup = ts.turn_on(user, secret, code)
+            ok = backup is not None
+        else:
+            ok = ts.check(user, code)
+        if not ok:
+            LoginAttempt.objects.create(email_attempted=user.email, ip_address=ip, successful=False,
+                                        reason=LoginAttempt.Reason.INVALID_CREDENTIALS)
+            return Response({"detail": WRONG_CODE}, status=400)
+        user.refresh_from_db()
+        if backup:
+            log_audit(user, "Turned on", "Two-step sign-in", display_name(user), "at sign-in", instance=user)
+        data = finish_sign_in(user, ip, " with two-step sign-in")
+        if backup:
+            data["backup_codes"] = backup
+        if request.data.get("remember"):
+            data["device"] = ts.device_token(user)
+        data["backup_left"] = len(user.two_step_backup)
+        return Response(data)
+
+
+class MyTwoStepView(APIView):
+    """Two-step sign-in on My profile: turn it on (when the role lets the
+    person choose, or to set it up again), turn it off, or make new backup
+    codes."""
+
+    def get(self, request):
+        from . import two_step as ts
+        u = request.user
+        return Response({"mode": ts.mode(u), "on": ts.is_on(u),
+                         "on_since": u.two_step_on_since.isoformat() if u.two_step_on_since else None,
+                         "backup_left": len(u.two_step_backup)})
+
+    def post(self, request):
+        from . import two_step as ts
+        u = request.user
+        action = request.data.get("action")
+        m = ts.mode(u)
+        if action == "start":
+            if m == "off":
+                return Response({"detail": "Two-step sign-in is not offered for your role.",
+                                 "why": "An Administrator has set it to Off for your role in Admin, Settings."}, status=400)
+            if ts.is_on(u):
+                return Response({"detail": "Two-step sign-in is already on."}, status=400)
+            secret = ts.new_secret()
+            return Response({"ticket": ts.ticket(u, "setup", secret), "secret": ts.grouped(secret),
+                             "otpauth": ts.otpauth(u, secret)})
+        if action == "confirm":
+            user, stage, secret = ts.read_ticket(request.data.get("ticket"))
+            if not user or user.pk != u.pk or stage != "setup":
+                return Response({"detail": "This set-up has expired. Press Turn on again for a new code to scan."}, status=400)
+            codes = ts.turn_on(u, secret, request.data.get("code") or "")
+            if codes is None:
+                return Response({"detail": WRONG_CODE}, status=400)
+            log_audit(u, "Turned on", "Two-step sign-in", display_name(u), "from My profile", instance=u)
+            return Response({"backup_codes": codes})
+        if action in ("off", "new_codes"):
+            if not ts.is_on(u):
+                return Response({"detail": "Two-step sign-in is not on."}, status=400)
+            if action == "off" and m == "required":
+                return Response({"detail": "Two-step sign-in cannot be turned off for your role.",
+                                 "why": "An Administrator has made it Required for your role, to keep church records safe.",
+                                 "fix": "Lost your phone? Ask another Administrator to reset it, then set it up again."}, status=400)
+            if not ts.check(u, request.data.get("code") or ""):
+                return Response({"detail": WRONG_CODE}, status=400)
+            if action == "off":
+                ts.turn_off(u)
+                log_audit(u, "Turned off", "Two-step sign-in", display_name(u), "from My profile", instance=u)
+                return Response({"on": False})
+            u.refresh_from_db()
+            plain, hashed = ts.new_backup_codes()
+            u.two_step_backup = hashed
+            u.save(update_fields=["two_step_backup"])
+            log_audit(u, "Made new backup codes", "Two-step sign-in", display_name(u), "", instance=u)
+            return Response({"backup_codes": plain})
+        return Response({"detail": "Choose start, confirm, off or new_codes."}, status=400)
 
 
 def signed_in_payload(user):
@@ -376,6 +495,28 @@ class UserViewSet(viewsets.ModelViewSet):
         log_audit(request.user, "Sent password reset link", "User", user.email)
         return Response({"detail": f"A link to choose a new password was sent to {user.email}. It works once, "
                                    f"for one hour."})
+
+    @action(detail=True, methods=["post"], url_path="reset-two-step")
+    def reset_two_step(self, request, pk=None):
+        """For someone who lost their phone and their backup codes (10
+        November 2026). They set it up again at their next sign-in."""
+        from rest_framework.exceptions import ValidationError
+        from .permissions import require
+        from . import two_step as ts
+        require(request.user, ("admin", "can_edit"))
+        user = self.get_object()
+        self._check_within_reach({}, user)
+        if user.pk == request.user.pk:
+            raise ValidationError({"detail": "You cannot reset your own two-step sign-in.",
+                                   "why": "Otherwise anyone with your password could remove the second step.",
+                                   "fix": "Ask another Administrator to reset it for you."})
+        if not ts.is_on(user):
+            raise ValidationError({"detail": f"{user.email} has no two-step sign-in to reset."})
+        ts.turn_off(user)
+        log_audit(request.user, "Reset two-step sign-in", "User", user.email)
+        return Response({"detail": f"Two-step sign-in was reset for {user.email}. "
+                                   + ("They set it up again at their next sign-in." if ts.mode(user) == "required"
+                                      else "They can turn it on again in My profile.")})
 
     @action(detail=True, methods=["post"], url_path="add-to-roll")
     def add_to_roll(self, request, pk=None):

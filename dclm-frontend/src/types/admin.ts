@@ -26,6 +26,8 @@ export interface AdminUser {
   location_name: string | null;
   member: number | null;
   is_active: boolean;
+  /** Two-step sign-in is set up (10 November 2026). */
+  two_step_on?: boolean;
   can_shepherd?: boolean;
   gender?: '' | 'Male' | 'Female';
   last_login: string | null;

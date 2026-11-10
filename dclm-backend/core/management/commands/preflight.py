@@ -55,6 +55,7 @@ class Command(BaseCommand):
         self.check_email()
         self.check_alerts()
         self.check_backups()
+        self.check_two_step()
 
         self.stdout.write("")
         if self.problems:
@@ -467,3 +468,21 @@ class Command(BaseCommand):
                 "no database backup is scheduled",
                 "The database holds everything. See deploy/crontab.example.",
             )
+
+    def check_two_step(self):
+        """Two-step sign-in (10 November 2026): which roles need it, and who
+        still has to set it up at their next sign-in."""
+        from accounts.models import Role, User
+        required = list(Role.objects.filter(two_step="required").values_list("name", flat=True))
+        if not required:
+            self.ok("two-step sign-in is not required for any role")
+            return
+        waiting = User.objects.filter(is_active=True, role__two_step="required", two_step_secret="").count()
+        total = User.objects.filter(is_active=True, role__two_step="required").count()
+        self.ok(f"two-step sign-in required for: {', '.join(required)}")
+        if waiting:
+            self.warn(f"{waiting} of {total} account(s) will set up two-step sign-in at their next sign-in",
+                      "They need an authenticator app on their phone, for example Microsoft Authenticator or "
+                      "Google Authenticator. Admin, Settings changes which roles need it.")
+        else:
+            self.ok(f"all {total} account(s) that need two-step sign-in have set it up")

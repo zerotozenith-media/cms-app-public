@@ -132,5 +132,9 @@ class PasswordResetConfirmView(APIView):
         user.set_password(password)
         user.save(update_fields=["password"])
         log_audit(user, "Reset password", "User", display_name(user), "by email link", instance=user)
-        from accounts.views import signed_in_payload
-        return Response(signed_in_payload(user))
+        # A new password never skips two-step sign-in (10 November 2026).
+        from accounts.views import finish_sign_in, get_client_ip, second_step
+        step = second_step(user)
+        if step:
+            return Response(step)
+        return Response(finish_sign_in(user, get_client_ip(request), " after a password reset"))
