@@ -21,6 +21,8 @@ export interface TaskRow {
   missed_meeting_name: string;
   missed_date: string | null;
   missed_in_row: number;
+  /** Further misses added to this open task (13 November 2026). */
+  missed_also?: { date: string; meeting: string }[];
   due_at: string | null;
   due_date: string;
   is_late: boolean;
@@ -195,6 +197,28 @@ export function useReviewList(location: string | null) {
   return useQuery({
     queryKey: ['followup-review', location],
     queryFn: async () => (await apiClient.get<{ results: TaskRow[] }>('/followup/review/', { params: location ? { location } : {} })).data.results,
+  });
+}
+
+export interface LapsedRow {
+  kind: PersonType; id: number; name: string; location: string; since: string; meeting: string; run: number;
+  shepherd: string; link: string; left_label: string;
+}
+
+/** People who are Lapsed (13 November 2026), for the Review page. */
+export function useLapsed(location: string | null) {
+  return useQuery({
+    queryKey: ['followup-lapsed', location],
+    queryFn: async () => (await apiClient.get<{ results: LapsedRow[] }>('/followup/lapsed/', { params: location ? { location } : {} })).data.results,
+  });
+}
+
+export function useLapsedDecide() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: { kind: PersonType; id: number; choice: 'again' | 'left'; note?: string }) =>
+      (await apiClient.post('/followup/lapsed/decide/', body)).data,
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['followup-lapsed'] }); refreshAll(qc); },
   });
 }
 

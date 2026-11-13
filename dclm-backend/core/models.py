@@ -96,6 +96,13 @@ class FollowUpRules(models.Model):
     shepherd_anywhere = models.BooleanField(default=True)
     newcomer_stages = models.CharField(max_length=60, default="new,contacted,attending")
 
+    # Fewer tasks (13 November 2026). On: a further miss joins the
+    # person's open absence task instead of making another one.
+    one_open_task = models.BooleanField(default=True)
+    # This many misses in a row of the same meeting makes the person
+    # Lapsed: no more tasks, and the Follow-up Coordinator decides. 0 is off.
+    lapsed_after_misses = models.PositiveSmallIntegerField(default=3)
+
     # Reminders and alerts.
     check_hours_after_start = models.PositiveSmallIntegerField(default=3)
     remind_administrators = models.BooleanField(default=True)

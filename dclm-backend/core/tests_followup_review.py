@@ -28,6 +28,10 @@ H = datetime.timedelta(hours=1)
 
 class Base(APITestCase):
     def setUp(self):
+        # These tests cover the rules from 26 October 2026, which still
+        # apply with One open task per person off and Lapsed off.
+        from core.models import FollowUpRules
+        FollowUpRules.objects.update_or_create(pk=1, defaults={"one_open_task": False, "lapsed_after_misses": 0})
         self.bh = Location.objects.create(id="bahrain", name="Bahrain HQ", is_core=True)
         self.qa = Location.objects.create(id="others", name="Qatar")
         self.admin_role, _ = Role.objects.get_or_create(name="Administrator")

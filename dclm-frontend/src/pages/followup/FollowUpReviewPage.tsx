@@ -1,8 +1,8 @@
 import { Fragment, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  dayText, refusal, useDecide, useEligible, useFollowUpAccess, useReviewList, useReviewOverview, useShepherdPeople, whenText,
-  type TaskRow,
+  dayText, refusal, useDecide, useEligible, useFollowUpAccess, useLapsed, useLapsedDecide, useReviewList, useReviewOverview,
+  useShepherdPeople, whenText, type LapsedRow, type TaskRow,
 } from '../../api/accountability';
 import { useLocations } from '../../api/locations';
 import { CancelTaskModal, ChangeDueForm, taskTitle } from '../../components/accountability/TaskModals';
@@ -104,6 +104,52 @@ function ReviewItem({ t }: { t: TaskRow }) {
   );
 }
 
+/** Someone Lapsed (13 November 2026): follow up again, or mark as left. */
+function LapsedItem({ p }: { p: LapsedRow }) {
+  const decide = useLapsedDecide();
+  const [choice, setChoice] = useState<'' | 'again' | 'left'>('');
+  const [note, setNote] = useState('');
+  const [err, setErr] = useState('');
+  async function confirm() {
+    if (!choice) return;
+    setErr('');
+    try { await decide.mutateAsync({ kind: p.kind, id: p.id, choice, note }); }
+    catch (e) { setErr(refusal(e, 'The decision could not be saved.')); }
+  }
+  return (
+    <div className="card fu-card fa-person">
+      <div className="fa-person-head"><Link to={p.link} className="fa-name">{p.name}</Link><span className="badge gray">{p.kind === 'member' ? 'Member' : 'Newcomer'}</span></div>
+      <div style={{ fontSize: '.86rem', margin: '4px 0' }}>Lapsed since {dayText(p.since)}, after missing {p.meeting} {p.run > 0 ? `${p.run} times` : 'several times'} in a row</div>
+      <div className="muted" style={{ fontSize: '.8rem' }}>Shepherd: {p.shepherd || 'none'}{p.location ? `. ${p.location}` : ''}</div>
+      <div className="fa-choices">
+        <button className={`btn sm${choice === 'again' ? '' : ' outline'}`} onClick={() => { setChoice(choice === 'again' ? '' : 'again'); setErr(''); }}>Follow up again</button>
+        <button className={`btn sm${choice === 'left' ? '' : ' outline'}`} onClick={() => { setChoice(choice === 'left' ? '' : 'left'); setErr(''); }}>{p.left_label}</button>
+      </div>
+      {choice && (
+        <>
+          <p className="muted fr-note" style={{ marginTop: 8 }}>
+            {choice === 'again'
+              ? 'Their next missed service makes a task for their shepherd again. Misses before today no longer count.'
+              : p.kind === 'member'
+                ? 'Their status changes to Left the church and any open tasks close. You can change it back on their record.'
+                : 'Their stage changes to Not Interested and any open tasks close. You can change it back on their record.'}
+          </p>
+          <div className="field" style={{ marginTop: 6 }}>
+            <label htmlFor={`ln-${p.kind}-${p.id}`}>Note (optional)</label>
+            <input id={`ln-${p.kind}-${p.id}`} value={note} onChange={(e) => setNote(e.target.value)}
+              placeholder={choice === 'again' ? 'For example: plans to come back' : 'For example: joined another church'} />
+          </div>
+          <div className="form-actions-row" style={{ marginTop: 8 }}>
+            <button className="btn sm" onClick={confirm} disabled={decide.isPending}>Confirm</button>
+            <button className="btn sm ghost" onClick={() => setChoice('')}>Cancel</button>
+          </div>
+        </>
+      )}
+      {err && <p className="form-error" role="alert">{err}</p>}
+    </div>
+  );
+}
+
 function ShepherdRows({ id, location }: { id: number; location: string | null }) {
   const { data } = useShepherdPeople(id, location);
   if (!data) return <Skeleton shape="rows" rows={2} />;
@@ -129,7 +175,7 @@ function ShepherdRows({ id, location }: { id: number; location: string | null })
 export function FollowUpReviewPage() {
   const { data: access } = useFollowUpAccess();
   const { data: locations } = useLocations();
-  const [tab, setTab] = useState<'overview' | 'review'>('review');
+  const [tab, setTab] = useState<'overview' | 'review' | 'lapsed'>('review');
   const [location, setLocation] = useState<string>('');
   const months = monthsBack(12);
   const [month, setMonth] = useState(months[0].v);
@@ -137,6 +183,7 @@ export function FollowUpReviewPage() {
   const loc = access?.coverage ?? (location || null);
   const { data: ov, error: ovErr } = useReviewOverview(loc, month);
   const { data: review, isLoading } = useReviewList(loc);
+  const { data: lapsed, isLoading: lapsedLoading } = useLapsed(loc);
 
   if (access && !access.can_review) {
     return <div className="card"><div className="empty">The Follow-up Review page is for Follow-up Coordinators and administrators. Ask an administrator to tick Follow-up Coordinator on your account in Admin, Users.</div></div>;
@@ -149,6 +196,7 @@ export function FollowUpReviewPage() {
         <div className="tabs">
           <button className={`tab${tab === 'overview' ? ' active' : ''}`} onClick={() => setTab('overview')}>Overview</button>
           <button className={`tab${tab === 'review' ? ' active' : ''}`} onClick={() => setTab('review')}>Review list{review ? ` (${review.length})` : ''}</button>
+          <button className={`tab${tab === 'lapsed' ? ' active' : ''}`} onClick={() => setTab('lapsed')}>Lapsed{lapsed ? ` (${lapsed.length})` : ''}</button>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {access && !access.coverage ? (
@@ -170,6 +218,15 @@ export function FollowUpReviewPage() {
         {review && review.length === 0 && <div className="card"><div className="empty">Nothing on the Review list. Every late task has been decided.</div></div>}
         {(review ?? []).map((t) => <ReviewItem key={`${t.type}-${t.id}`} t={t} />)}
         {review && review.length > 0 && <p className="muted" style={{ fontSize: '.78rem' }}>A decision not made by its date goes to the administrators with an alert.<HelpMark topic="faReviewList" /></p>}
+      </>}
+
+      {tab === 'lapsed' && <>
+        <p className="muted" style={{ fontSize: '.84rem', margin: '0 0 10px' }}>
+          People who missed the same meeting several times in a row. No more tasks are made for them until you decide, or until they are ticked present at a service.<HelpMark topic="faLapsed" />
+        </p>
+        {lapsedLoading && <div className="card"><Skeleton shape="list" /></div>}
+        {lapsed && lapsed.length === 0 && <div className="card"><div className="empty">Nobody is Lapsed.</div></div>}
+        {(lapsed ?? []).map((p) => <LapsedItem key={`${p.kind}-${p.id}`} p={p} />)}
       </>}
 
       {tab === 'overview' && <>

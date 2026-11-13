@@ -262,6 +262,7 @@ export function MemberProfilePage() {
             <Badge color="blue">{locationName(member.location)}</Badge>
             {member.status && member.status !== 'active' && <Badge color="gray">{member.status === 'left' ? 'Left the church' : 'Moved away'}</Badge>}
             {member.away_to && member.away_to >= new Date().toLocaleDateString('en-CA') && <Badge color="blue">Away until {dayText(member.away_to)}</Badge>}
+            {member.lapsed_since && member.status === 'active' && <span className="lapsed-tag" title={`Missed ${member.lapsed_meeting || 'a meeting'} ${member.lapsed_run ? `${member.lapsed_run} times` : 'several times'} in a row`}><Badge color="amber">Lapsed since {dayText(member.lapsed_since)}</Badge><HelpMark topic="faLapsed" /></span>}
             {member.is_leader && <Badge color="green">Leader</Badge>}
           </div>
 

@@ -220,6 +220,7 @@ class FollowUpRulesSerializer(serializers.ModelSerializer):
         "falling_percent": (1, 100), "falling_window": (2, 52), "shepherd_limit": (1, 50),
         "check_hours_after_start": (1, 12), "target_on_time": (1, 100),
         "target_first_contact_hours": (1, 168), "target_reached": (1, 100),
+        "lapsed_after_misses": (0, 20),
     }
 
     def get_updated_by_name(self, obj):

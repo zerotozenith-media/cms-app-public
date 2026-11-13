@@ -183,3 +183,58 @@ class EligibleView(APIView):
                f"{acts.person_name(task)} is a {'woman' if gender == 'Female' else 'man'}." if gender
                else f"Only shepherds at {person.location.name} are offered.")
         return Response({"results": rows, "why": why})
+
+
+class LapsedListView(APIView):
+    """People who are Lapsed (13 November 2026), for the Review list."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from .lapsed import lapsed_people
+        loc = _location(request)
+        _reviewer(request.user, loc)
+        return Response({"results": lapsed_people(loc)})
+
+
+class LapsedDecideView(APIView):
+    """Follow up again, or mark as left (Not Interested for a newcomer)."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from members.models import Member
+        from newcomers.models import Newcomer
+        from .lapsed import decide
+        kind = request.data.get("kind")
+        model = {"member": Member, "newcomer": Newcomer}.get(kind)
+        if model is None:
+            raise ValidationError({"kind": "Say whether this is a member or a newcomer."})
+        person = model.objects.filter(pk=request.data.get("id")).first()
+        if person is None:
+            raise ValidationError({"detail": "That person was not found. They may have been removed."})
+        return Response({"choice": decide(person, request.user, request.data.get("choice"),
+                                          request.data.get("note", ""))})
+
+
+class CleanupView(APIView):
+    """
+    The one-off follow-up cleanup (13 November 2026), in Admin, Follow-up
+    Rules. GET shows what it would do, POST does it. Only an administrator
+    covering All locations, as for the rules themselves.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def _check(self, user):
+        from accounts.permissions import user_has
+        if not (user.is_superuser or (user_has(user, "admin", "can_edit") and not user.location_id)):
+            raise PermissionDenied("The cleanup changes tasks at every location, so only an administrator "
+                                   "covering All locations can run it.")
+
+    def get(self, request):
+        from .lapsed import cleanup
+        self._check(request.user)
+        return Response(cleanup(request.user, apply=False))
+
+    def post(self, request):
+        from .lapsed import cleanup
+        self._check(request.user)
+        return Response(cleanup(request.user, apply=True))

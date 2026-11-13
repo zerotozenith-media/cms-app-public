@@ -81,9 +81,9 @@ class MemberSerializer(serializers.ModelSerializer):
             "category_history", "total_given", "assigned_to", "assigned_to_name",
             "shepherd_problem", "is_leader",
             "status", "status_date", "status_note",
-            "away_from", "away_to", "away_reason", "away_note",
+            "away_from", "away_to", "away_reason", "away_note", "lapsed_since", "lapsed_meeting", "lapsed_run",
         ]
-        read_only_fields = ["id", "category"]
+        read_only_fields = ["id", "category", "lapsed_since", "lapsed_meeting", "lapsed_run"]
         # Help 11.14: say who already has the number, in plain words.
         extra_kwargs = {"phone": {"validators": []}}
         # `category` is deliberately read-only here: changing it directly via

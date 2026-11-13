@@ -20,6 +20,9 @@ export interface FollowUpRules {
   /** All-locations accounts can shepherd at any location (5 November 2026). */
   shepherd_anywhere: boolean;
   newcomer_stages: string[];
+  /** Fewer tasks (13 November 2026). */
+  one_open_task: boolean;
+  lapsed_after_misses: number;
   check_hours_after_start: number;
   remind_administrators: boolean;
   remind_location_coordinators: boolean;
@@ -62,6 +65,29 @@ export function useResetFollowUpRules() {
       // Who can shepherd where follows the rules.
       qc.invalidateQueries({ queryKey: ['eligible-shepherds'] });
       qc.invalidateQueries({ queryKey: ['shepherds-not-offered'] });
+    },
+  });
+}
+
+export interface CleanupResult { tasks_joined: number; people_with_extra_tasks: number; lapsed: number; lapsed_names: string[] }
+
+/** The one-off cleanup (13 November 2026): check first, then run. */
+export function useCleanupPreview(enabled: boolean) {
+  return useQuery({
+    queryKey: ['followup-cleanup'],
+    queryFn: async () => (await apiClient.get<CleanupResult>('/followup/cleanup/')).data,
+    enabled,
+    staleTime: 0,
+  });
+}
+
+export function useRunCleanup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => (await apiClient.post<CleanupResult>('/followup/cleanup/')).data,
+    onSuccess: () => {
+      ['followup-cleanup', 'followup-lapsed', 'followup-review', 'my-followup', 'outstanding'].forEach((k) =>
+        qc.invalidateQueries({ queryKey: [k] }));
     },
   });
 }

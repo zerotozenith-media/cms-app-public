@@ -136,9 +136,10 @@ class NewcomerSerializer(serializers.ModelSerializer):
             "is_first_timer", "is_new_resident",
             "wants_visit", "wants_to_know_more", "wants_salvation_info", "keep_in_touch",
             "invited_by_member", "invited_by_member_name", "invited_by_name",
-            "away_from", "away_to", "away_reason", "away_note",
+            "away_from", "away_to", "away_reason", "away_note", "lapsed_since", "lapsed_meeting", "lapsed_run",
         ]
-        read_only_fields = ["id", "stage", "stage_since", "created_at", "not_interested_note", "invited_by_member"]
+        read_only_fields = ["id", "stage", "stage_since", "created_at", "not_interested_note", "invited_by_member", "lapsed_since",
+                            "lapsed_meeting", "lapsed_run"]
         # stage is read-only for the same reason category/status are elsewhere:
         # the only correct way to change it is change_stage(), which bundles
         # the field update with a NewcomerStatusHistory entry atomically.

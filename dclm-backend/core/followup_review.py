@@ -211,9 +211,9 @@ def open_tasks(location_id=None):
     from members.models import MemberFollowUpTask
     from newcomers.models import NewcomerTask
     m = (MemberFollowUpTask.objects.filter(done=False).select_related("member", "assigned_to", "handed_from")
-         .prefetch_related("reviews", "attempts"))
+         .prefetch_related("reviews", "attempts", "covers"))
     n = (NewcomerTask.objects.filter(done=False).select_related("newcomer", "assigned_to", "handed_from")
-         .prefetch_related("reviews", "attempts"))
+         .prefetch_related("reviews", "attempts", "covers"))
     if location_id:
         m = m.filter(member__location_id=location_id)
         n = n.filter(newcomer__location_id=location_id)
@@ -239,6 +239,9 @@ def task_row(task, now, r):
         "missed_meeting_name": task.missed_meeting_name,
         "missed_date": task.missed_date,
         "missed_in_row": task.missed_in_row,
+        # Further misses added to this open task (13 November 2026).
+        "missed_also": sorted(({"date": c.missed_date, "meeting": c.missed_meeting_name} for c in task.covers.all()
+                               if c.result == "joined"), key=lambda x: x["date"] or datetime.date.min),
         "due_at": task.due_at,
         "due_date": task.due_date,
         "is_late": bool(task.due_at and now >= task.due_at) or (not task.due_at and task.due_date < timezone.localdate(now)),
@@ -320,7 +323,7 @@ def late_this_quarter(user_id, now):
     for model in (MemberFollowUpTask, NewcomerTask):
         for t in model.objects.filter(assigned_to_id=user_id, due_at__gte=start, due_at__lte=now).only(
                 "due_at", "closed_at", "done", "result"):
-            if t.result in ("was-present", "cancelled"):
+            if t.result in ("was-present", "cancelled", "joined"):
                 continue
             if not t.done or (t.closed_at and t.closed_at > t.due_at):
                 n += 1

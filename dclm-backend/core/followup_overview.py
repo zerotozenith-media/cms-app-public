@@ -10,7 +10,8 @@ measures against the targets in Follow-up Rules, and one row per shepherd.
   3 Fridays or more  people with an open task at the visit-task run or more
 
 Tasks closed as Was present or Cancelled are left out of every measure,
-because they were never really owed.
+because they were never really owed, and so are misses Added to the open
+task, which the open task already counts.
 """
 import calendar
 import datetime
@@ -21,7 +22,7 @@ from accounts.names import display_name
 from .followup_rules import at, rules
 from . import followup_review as rev
 
-LEFT_OUT = ("was-present", "cancelled")
+LEFT_OUT = ("was-present", "cancelled", "joined")
 
 
 def _month_bounds(month):

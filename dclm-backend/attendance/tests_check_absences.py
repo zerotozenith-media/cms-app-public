@@ -19,6 +19,10 @@ from .models import MeetingType, AttendanceSession, AttendanceSessionMember
 
 class CheckAbsencesCommandTestCase(TestCase):
     def setUp(self):
+        # These tests cover the rules from 26 October 2026, which still
+        # apply with One open task per person off and Lapsed off.
+        from core.models import FollowUpRules
+        FollowUpRules.objects.update_or_create(pk=1, defaults={"one_open_task": False, "lapsed_after_misses": 0})
         self.bahrain = Location.objects.create(id="bahrain", name="Bahrain", is_core=True)
         self.role = Role.objects.create(name="Location Coordinator")
         self.shepherd = User.objects.create_user(email="shepherd@test.com", password="x", role=self.role,

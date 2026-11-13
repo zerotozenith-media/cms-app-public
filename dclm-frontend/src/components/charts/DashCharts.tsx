@@ -156,7 +156,7 @@ export function CountBars({ rows, color = C.green, label }: { rows: { month: str
 }
 
 /** A donut of up to 5 shares, with the total in the middle and the list beside it. */
-export function Donut({ parts, centre, sub }: { parts: { label: string; amount: number }[]; centre: string; sub: string }) {
+export function Donut({ parts, centre, sub, amounts }: { parts: { label: string; amount: number }[]; centre: string; sub: string; amounts?: boolean }) {
   const total = parts.reduce((a, p) => a + p.amount, 0);
   const shown = parts.filter((p) => p.amount > 0);
   const cx = 80, cy = 80, r = 62, ri = 40;
@@ -164,7 +164,7 @@ export function Donut({ parts, centre, sub }: { parts: { label: string; amount: 
   const pt = (rad: number, ang: number) => `${cx + rad * Math.cos(ang)},${cy + rad * Math.sin(ang)}`;
   const gap = shown.length > 1 ? 0.03 : 0;
   return (
-    <div className="dv-donut">
+    <div className={`dv-donut${amounts ? ' amounts' : ''}`}>
       <svg viewBox="0 0 160 160" width="140" height="140" role="img" aria-label="Share of giving by fund">
         {shown.length === 1 ? <circle cx={cx} cy={cy} r={(r + ri) / 2} fill="none" stroke={SERIES[parts.indexOf(shown[0])]} strokeWidth={r - ri}><title>{`${shown[0].label}: 100%`}</title></circle>
           : shown.map((p) => {
@@ -178,8 +178,10 @@ export function Donut({ parts, centre, sub }: { parts: { label: string; amount: 
       </svg>
       <div className="dv-donut-list">
         {parts.map((p, i) => (
-          <div key={p.label} className="dv-donut-row"><i style={{ background: SERIES[i % SERIES.length] }} />{p.label}<b>{total > 0 ? `${Math.round((p.amount / total) * 100)}%` : '0%'}</b></div>
+          <div key={p.label} className="dv-donut-row"><i style={{ background: SERIES[i % SERIES.length] }} /><span className="nm">{p.label}</span>
+            {amounts && <span className="amt">{bhd(p.amount)}</span>}<b>{total > 0 ? `${Math.round((p.amount / total) * 100)}%` : '0%'}</b></div>
         ))}
+        {amounts && <div className="dv-donut-row tot"><i aria-hidden="true" /><span className="nm">Total</span><span className="amt">{bhd(total)}</span><b>100%</b></div>}
       </div>
     </div>
   );

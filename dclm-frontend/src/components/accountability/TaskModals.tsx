@@ -21,10 +21,19 @@ const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart
 const today = () => iso(new Date());
 const addDays = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return iso(d); };
 
-export function taskTitle(t: Pick<TaskRow, 'missed_meeting_name' | 'missed_date' | 'text' | 'kind'>) {
+const dayMonth = (iso: string) => {
+  const d = new Date(`${iso}T12:00:00`);
+  return `${d.getDate()} ${d.toLocaleDateString('en-GB', { month: 'long' })}`;
+};
+
+export function taskTitle(t: Pick<TaskRow, 'missed_meeting_name' | 'missed_date' | 'text' | 'kind'> & Partial<Pick<TaskRow, 'missed_also'>>) {
   if (t.missed_meeting_name && t.missed_date) {
-    const d = new Date(`${t.missed_date}T12:00:00`);
-    return `Missed ${t.missed_meeting_name}, ${d.getDate()} ${d.toLocaleDateString('en-GB', { month: 'long' })}`;
+    const base = `Missed ${t.missed_meeting_name}, ${dayMonth(t.missed_date)}`;
+    // Further misses added to this task (13 November 2026).
+    const also = (t.missed_also ?? []).filter((m) => m.date);
+    if (!also.length) return base;
+    const same = also.every((m) => m.meeting === t.missed_meeting_name);
+    return `${base}, then again ${also.map((m) => (same ? dayMonth(m.date) : `${m.meeting} ${dayMonth(m.date)}`)).join(' and ')}`;
   }
   return t.text;
 }
