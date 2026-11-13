@@ -56,6 +56,23 @@ async function refreshAccessToken(): Promise<string | null> {
   }
 }
 
+// Signing in, the second step, password reset and signing out answer 401
+// for a wrong password or code, which is not an ended sign-in.
+const SIGN_IN_CALLS = /\/auth\/(login|two-step|password-reset|logout|token)\//;
+
+/** The sign-in could not be renewed, for example after 14 days (10 November
+ *  2026). Instead of leaving the page looking signed in while every request
+ *  fails, clear it and open Sign in, which says why and returns here after. */
+function signInEnded(url?: string) {
+  if (url && SIGN_IN_CALLS.test(url)) return;
+  if (!localStorage.getItem('dclm_user')) return;
+  tokenStorage.clear();
+  localStorage.removeItem('dclm_user');
+  if (window.location.pathname.startsWith('/login')) return;
+  const here = window.location.pathname + window.location.search;
+  window.location.assign(`/login?ended=1&from=${encodeURIComponent(here)}`);
+}
+
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -70,6 +87,7 @@ apiClient.interceptors.response.use(
         return apiClient(original);
       }
     }
+    if (error.response?.status === 401) signInEnded(original?.url);
     return Promise.reject(error);
   },
 );

@@ -26,8 +26,15 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const formLoadedAt = useRef(new Date().toISOString());
 
+  // Sent here because the sign-in ended (see api/client.ts): say so, and
+  // return to the page they were on. Only paths inside this app are followed.
+  const query = new URLSearchParams(location.search);
+  const ended = query.get('ended') === '1';
+  const back = query.get('from') ?? '';
+  const backOk = back.startsWith('/') && !back.startsWith('//') && !back.startsWith('/login');
+
   function goOn() {
-    const from = (location.state as { from?: string })?.from || '/';
+    const from = (location.state as { from?: string })?.from || (backOk ? back : '/');
     navigate(from, { replace: true });
   }
 
@@ -75,6 +82,12 @@ export function LoginPage() {
     <AuthLayout>
         <h1>Welcome back</h1>
         <p className="auth-sub">Sign in with the email your account was created with.</p>
+        {ended && (
+          <p className="form-note" role="status">
+            Your sign-in has ended, so please sign in again. Each sign-in lasts 14 days. Anything you
+            had already saved is safe.
+          </p>
+        )}
         <form onSubmit={handleSubmit}>
           <div className="field">
             <label htmlFor="email">Email</label>
