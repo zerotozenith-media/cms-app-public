@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useFollowUpRules, useResetFollowUpRules, useSaveFollowUpRules, type FollowUpRules } from '../../api/followupRules';
+import {
+  useCleanupPreview, useFollowUpRules, useResetFollowUpRules, useRunCleanup, useSaveFollowUpRules, type FollowUpRules,
+} from '../../api/followupRules';
+import { refusal } from '../../api/accountability';
 import { HelpMark } from '../../components/ui/HelpMark';
 import { Skeleton } from '../../components/ui/Skeleton';
 
@@ -34,6 +37,47 @@ function example(r: Draft) {
     review: when(add((r.review_days ?? 3) * 24)),
     decide: when(add((r.decide_days ?? 5) * 24)),
   };
+}
+
+/** The one-off cleanup (13 November 2026), for an administrator covering
+ *  All locations: see what it would do, then run it. */
+function Cleanup() {
+  const [look, setLook] = useState(false);
+  const preview = useCleanupPreview(look);
+  const run = useRunCleanup();
+  const [done, setDone] = useState('');
+  const [err, setErr] = useState('');
+  const p = preview.data;
+  const nothing = p && !p.tasks_joined && !p.lapsed;
+  async function go() {
+    setErr('');
+    try {
+      const r = await run.mutateAsync();
+      setDone(`Done. ${r.tasks_joined} extra task${r.tasks_joined === 1 ? '' : 's'} added to open tasks, and ${r.lapsed} ${r.lapsed === 1 ? 'person' : 'people'} marked Lapsed. It is in the Audit Log.`);
+    } catch (e) { setErr(refusal(e, 'The cleanup could not run. Nothing was changed.')); }
+  }
+  return (
+    <div className="card fr-card">
+      <h3>One-off cleanup<HelpMark topic="frCleanup" /></h3>
+      <p className="muted fr-sub">Tidies the tasks made before One open task per person. Run it once after this update. Running it again does no harm.</p>
+      {!look && <button className="btn sm outline" onClick={() => setLook(true)}>Check what it would do</button>}
+      {look && !p && !preview.error && <Skeleton shape="rows" rows={2} />}
+      {preview.error && <p className="form-error" role="alert">{refusal(preview.error, 'The check could not be done.')}</p>}
+      {p && !done && (
+        <>
+          {nothing ? <p className="fr-done" role="status">Nothing to tidy. Every person has at most one open absence task, and nobody is at the Lapsed number of misses.</p> : (
+            <ul className="fr-list">
+              <li><b>{p.tasks_joined}</b> extra open task{p.tasks_joined === 1 ? '' : 's'}, for {p.people_with_extra_tasks} {p.people_with_extra_tasks === 1 ? 'person' : 'people'}, added to each person's oldest open task</li>
+              <li><b>{p.lapsed}</b> {p.lapsed === 1 ? 'person' : 'people'} marked Lapsed{p.lapsed ? `: ${p.lapsed_names.join(', ')}${p.lapsed > p.lapsed_names.length ? ' and more' : ''}` : ''}</li>
+            </ul>
+          )}
+          {!nothing && <button className="btn sm" onClick={go} disabled={run.isPending}>Run the cleanup</button>}
+        </>
+      )}
+      {done && <p className="fr-done" role="status">{done}</p>}
+      {err && <p className="form-error" role="alert">{err}</p>}
+    </div>
+  );
 }
 
 export function FollowUpRulesTab() {
@@ -135,6 +179,14 @@ export function FollowUpRulesTab() {
             <option value="every-second">every 2nd miss</option>
           </select></>, 'alert_from_miss')}
         {row('Follow-up Coordinator visit task at the', 'frVisit', <>{num('visit_task_at_miss', 56)} miss in a row</>, 'visit_task_at_miss', 'One visit task for the whole run, while the alerts continue')}
+        {row('One open task per person', 'frOneOpen',
+          tick('On', !!draft.one_open_task, (v) => set('one_open_task', v)), 'one_open_task',
+          'A further miss is added to the open task. Off: every missed service makes its own task.')}
+        {row('Lapsed after', 'frLapsed', <>{num('lapsed_after_misses', 56)} misses in a row</>, 'lapsed_after_misses',
+          (draft.lapsed_after_misses ?? 0) === 0
+            ? 'Off. Tasks carry on however many services are missed.'
+            : `No more tasks after that. The Follow-up Coordinator decides on the Review page, under Lapsed. 0 turns it off.${
+              (draft.visit_task_at_miss ?? 0) >= (draft.lapsed_after_misses ?? 0) ? ' The visit task is never made, because Lapsed comes first.' : ''}`)}
         {row('Failed attempts before it goes to the Follow-up Coordinator', 'frAttempts', num('attempts_before_coordinator'), 'attempts_before_coordinator')}
         {row('Attendance falling task', 'frFalling', <>fewer than {num('falling_percent', 56)}% of the last {num('falling_window', 56)} services</>, 'falling_percent')}
         {errors.falling_window && <div className="fr-err" role="alert">{errors.falling_window}</div>}
@@ -181,6 +233,8 @@ export function FollowUpRulesTab() {
           <button className="btn outline" onClick={onReset} disabled={reset.isPending}>Put back the decided values</button>
         </div>
       )}
+
+      {!locked && <Cleanup />}
     </div>
   );
 }

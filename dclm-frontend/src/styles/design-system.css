@@ -818,9 +818,10 @@
 .shepherd-tick{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:.78rem;color:var(--muted);cursor:pointer;white-space:nowrap}
 .shepherd-tick input{width:15px;height:15px;margin:0}
 
-/* Admin, Users and Roles: side by side only on wide screens. Below that the
-   users table did not fit its half of the page and scrolled sideways. */
-@media (max-width:1439px){ .admin-users-grid{grid-template-columns:1fr} }
+/* Admin, Users and Roles: one above the other at every width (13 November
+   2026). Side by side, the users table did not fit its half of the page and
+   scrolled sideways, even on a 1920 pixel screen. */
+.grid.admin-users-grid{grid-template-columns:minmax(0,1fr)}
 
 /* Dashboard greeting, option B (F5). */
 .dash-greeting{margin-bottom:14px}.dash-greeting h2{font-size:1.6rem;margin:2px 0 0}
@@ -1237,6 +1238,7 @@ td.td-actions .icon-btn + .icon-btn,.row-actions .icon-btn + .icon-btn,td.td-act
 .fr-tick input{width:16px;height:16px}
 .fr-example{background:#F3F7FC;border-radius:10px;padding:10px 12px;margin-top:10px;font-size:.84rem}
 .fr-actions{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 8px}
+.fr-list{margin:4px 0 12px;padding-left:20px;font-size:.86rem;line-height:1.55}
 .fr-done{background:#E1F5EE;color:#085041;border-radius:8px;padding:9px 12px;font-size:.84rem}
 .fr-box-note{background:#F3F7FC;border-radius:10px;padding:10px 12px;font-size:.84rem;margin:8px 0 12px}
 .fr-group{border:1px solid var(--line);border-radius:10px;padding:10px;margin:8px 0 12px}
@@ -1489,6 +1491,25 @@ a.dv-pill:hover{text-decoration:underline}
 .dv-donut-row{display:flex;align-items:center;gap:8px;font-size:13px;padding:3px 0}
 .dv-donut-row i{width:10px;height:10px;border-radius:3px;flex:none}
 .dv-donut-row b{margin-left:auto}
+.dv-donut-row .nm{min-width:0;overflow-wrap:break-word}
+.dv-stack .dv-donut.amounts{gap:12px}
+.dv-stack .dv-donut.amounts svg{width:112px;height:112px}
+.dv-donut.amounts .dv-donut-row{gap:7px}
+/* Giving by fund with amounts (13 November 2026). */
+.dv-donut.amounts .dv-donut-row .amt{margin-left:auto;color:#5A667C;font-variant-numeric:tabular-nums;white-space:nowrap}
+.dv-donut.amounts .dv-donut-row b{margin-left:12px;min-width:36px;text-align:right}
+.dv-donut-row.tot{border-top:1px solid #E3E8F0;margin-top:4px;padding-top:7px;font-weight:600}
+.dv-donut-row.tot i{background:transparent}
+.dv-donut-row.tot .amt{color:#0F1B2E}
+.dv-one{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:10px 0}
+.dv-one-name{display:flex;align-items:center;gap:8px;font-size:14px}
+.dv-one-name i{width:10px;height:10px;border-radius:3px}
+.dv-one-fig{font-size:28px;font-weight:700;color:#082C69;font-variant-numeric:tabular-nums}
+.dv-one-note{font-size:13px;color:#5A667C;max-width:300px}
+.dv-funds.alone{display:flex;flex-direction:column}
+.dv-funds.alone .dv-mix-body{flex:1;justify-content:center}
+.dv-funds.alone .dv-donut{flex-direction:column;align-items:stretch;gap:16px}
+.dv-funds.alone .dv-donut svg{width:170px;height:170px;align-self:center}
 .dv-also{border-top:1px solid #E4E9F1;padding-top:6px}
 .dv-also div{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:5px 0;color:#5A667C}
 .dv-also b{color:#0F1B2E;white-space:nowrap}
@@ -1610,3 +1631,20 @@ a.dv-pill:hover{text-decoration:underline}
 .ts-wide{width:100%;justify-content:center}
 .fr-inline{display:inline-flex;align-items:center;gap:6px}
 .dv-table .linkish{text-align:left;justify-content:flex-start}.dv-table .badge{white-space:nowrap}
+
+/* Lapsed badge with its help mark (13 November 2026). */
+.lapsed-tag{display:inline-flex;align-items:center;gap:2px}
+
+/* Giving by fund alone, under the chart (tablet) and on a phone (13 November 2026). */
+@container dv (max-width:1000px){
+  .dv-funds.alone .dv-mix-body{display:flex}
+  .dv-funds.alone .dv-donut{flex-direction:row;align-items:center;gap:32px}
+  .dv-funds.alone .dv-donut svg{width:140px;height:140px}
+  .dv-funds.alone .dv-donut-list{max-width:400px}
+}
+@container dv (max-width:560px){
+  .dv-funds.alone .dv-mix-body{flex-direction:column}
+  .dv-funds.alone .dv-donut{flex-direction:column;align-items:stretch;gap:14px;width:100%}
+  .dv-funds.alone .dv-donut svg{width:140px;height:140px;align-self:center}
+  .dv-funds.alone .dv-donut-list{max-width:none}
+}

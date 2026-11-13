@@ -28,12 +28,12 @@ export async function downloadManual(printed?: number): Promise<HelpMsg> {
     const url = await manualBlobUrl();
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'DCLM-user-manual-v11.20.pdf';
+    a.download = 'DCLM-user-manual-v11.21.pdf';
     document.body.appendChild(a);
     a.click();
     a.remove();
-    return { text: printed ? `The manual is saved as DCLM-user-manual-v11.20.pdf. Open it and go to page ${printed}.`
-      : 'The manual is saved as DCLM-user-manual-v11.20.pdf.', error: false };
+    return { text: printed ? `The manual is saved as DCLM-user-manual-v11.21.pdf. Open it and go to page ${printed}.`
+      : 'The manual is saved as DCLM-user-manual-v11.21.pdf.', error: false };
   } catch {
     return { text: 'The manual could not be downloaded. Check your connection and try again.', error: true };
   }

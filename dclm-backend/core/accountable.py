@@ -23,6 +23,10 @@ class TaskResult(models.TextChoices):
     MOVED_AWAY = "moved-away", "Moved away or left"
     WAS_PRESENT = "was-present", "Was present"
     CANCELLED = "cancelled", "Cancelled"
+    # 13 November 2026: a further miss added to the person's open task,
+    # and the tasks closed when the person became Lapsed.
+    JOINED = "joined", "Added to the open task"
+    LAPSED = "lapsed", "Lapsed"
 
 
 class Escalation(models.TextChoices):

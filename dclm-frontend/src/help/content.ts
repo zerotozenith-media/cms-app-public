@@ -56,7 +56,7 @@ export const HELP_SECTIONS: HelpSection[] = [
   { key: 'goals', label: 'Goals and reports', group: 'Reference' },
   { key: 'alerts', label: 'Alerts on your phone', group: 'Reference' },
   { key: 'admin', label: 'Accounts and roles', group: 'Reference' },
-  { key: 'new', label: 'Versions 11.14 to 11.20', group: "What's new", intro: 'What changed in versions 11.14 to 11.20, and where to read about it.' },
+  { key: 'new', label: 'Versions 11.14 to 11.21', group: "What's new", intro: 'What changed in versions 11.14 to 11.21, and where to read about it.' },
 ];
 
 const SH: HelpRole[] = ['Shepherd'];
@@ -141,7 +141,7 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
   ],
 
   shepherd: [
-    { h: 'How you find out someone missed church', roles: SH, p: 'You do not watch for it. Three hours after a tracked service starts, everyone you look after who was not ticked gets a task, and you get an alert. Each missed service has its own task. Newcomers in the New, Contacted or Attending stage are included.', manual: 60 },
+    { h: 'How you find out someone missed church', roles: SH, p: 'You do not watch for it. Three hours after a tracked service starts, everyone you look after who was not ticked gets a task, and you get an alert. If they already have an open task, a further miss is added to it, so each person has one task. After 3 misses in a row they become Lapsed and the Follow-up Coordinator decides. Newcomers in the New, Contacted or Attending stage are included.', manual: 96 },
     { h: 'Your list: My follow-up', roles: SH, img: 'my', steps: [
       'Open My follow-up in the menu.',
       'Everyone you follow up is listed, members and newcomers together, with late tasks first.',
@@ -173,6 +173,11 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
   ],
 
   coordinator: [
+    { h: 'Deciding for someone who is Lapsed', roles: ['Follow-up Coordinator', 'Administrator'], steps: [
+      'Open Follow-up Review and press Lapsed. The number beside it is how many people are waiting.',
+      'On the person\'s card, press Follow up again, or Left the church for a member, or Not Interested for a newcomer.',
+      'Add a note if it helps, then press Confirm.',
+    ], note: 'Follow up again: their next missed service makes a task again, and earlier misses no longer count. Left the church or Not Interested: their record changes and open tasks close. Both can be changed back on their record.', manual: 97 },
     { h: 'What the Follow-up Coordinator does', roles: FC, p: 'Reviews late tasks and their reasons, is alerted on repeated absences, decides what happens next, and sees every shepherd\'s people and record. Any account can be one through the Follow-up Coordinator tick in Admin, Users, covering All locations or one location.', manual: 64 },
     { h: 'Who gets late tasks and alerts', roles: FC, p: 'The Follow-up Coordinator for the person\'s location first, then one covering All locations, then the administrators. Someone with no shepherd has their tasks given to the Follow-up Coordinator until a shepherd is chosen.', manual: 64 },
     { h: 'The Review list', roles: FC, img: 'review', steps: [
@@ -333,11 +338,16 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
   ],
 
   why: [
+    { h: 'Why did no new task appear when someone missed again?', say: '"Missed Friday Worship Service, 30 October, then again 6 November"', why: 'They already had an open task, so the miss was added to it. One task per person keeps lists short.', fix: 'Work the one task. Its title lists every date missed.', roles: ALL, manual: 96 },
+    { h: 'Why are there no tasks for someone who keeps missing?', say: '"Lapsed since Friday 6 November"', why: 'After 3 misses in a row of the same meeting, they became Lapsed, so no more tasks are made until the Follow-up Coordinator decides. They may also be marked Away.', fix: 'Look on their record. The Follow-up Coordinator decides on the Follow-up Review page, under Lapsed.', roles: ALL, manual: 97 },
+    { h: 'Why can\'t I decide for someone who is Lapsed?', say: '"Only a Follow-up Coordinator or an administrator decides about someone who is Lapsed"', why: 'It changes whether they are followed up at all.', fix: 'Tell your Follow-up Coordinator what you know, for example by logging an attempt on their record.', roles: ALL, manual: 97 },
+    { h: 'Why can\'t I run the one-off cleanup?', say: '"The cleanup changes tasks at every location"', why: 'Only an administrator covering All locations can run it, as for the Follow-up Rules themselves.', fix: 'Ask an administrator covering All locations.', roles: ['Administrator'], manual: 99 },
     // Dashboard and two-step sign-in (11.20)
     { h: 'Why is there no change shown on a card?', say: '"No earlier figure to compare"', why: 'The earlier days it would be compared with are before the month the records start, so there is nothing real to compare with.', fix: 'Choose This month, Last month or Quarter, which are compared with the period just before.', roles: ALL, manual: 88 },
     { h: "Why can't I export the dashboard table?", say: '"This dashboard has no table to export."', why: 'A Follow-up dashboard shows your own follow-ups and has no summary table.', fix: 'Nothing to do. The figures you need are on My follow-up.', roles: SH, manual: 91 },
     { h: 'Why did the PDF not download?', say: '"The PDF could not be made."', why: 'Something went wrong while drawing it. Nothing was changed.', fix: 'Try again, or choose Excel instead and tell an administrator.', roles: ALL, manual: 91 },
     { h: 'Why is my number not accepted?', say: '"The number is not right. Type the 6-digit number the app shows now, or one of your backup codes."', why: 'The number changes every 30 seconds, and each one works once. A phone clock set by hand can be out.', fix: 'Type the number shown now. Set your phone to set its clock automatically. After 5 wrong tries, sign-in pauses for 15 minutes.', roles: ALL, manual: 95 },
+    { h: 'Why was I sent back to Sign in?', say: '"Your sign-in has ended, so please sign in again."', why: 'Each sign-in lasts 14 days. After that the app cannot renew it, so it opens Sign in instead of showing pages that cannot load.', fix: 'Sign in again. You return to the page you were on, and anything you had already saved is safe.', roles: ALL, manual: 4 },
     { h: 'Why must I sign in again?', say: '"This sign-in has expired or was already used. Sign in again with your password."', why: 'The step after the password lasts 10 minutes.', fix: 'Press Sign in again and type your password, then the number.', roles: ALL, manual: 93 },
     { h: "Why can't I turn off two-step sign-in?", say: '"Two-step sign-in cannot be turned off for your role."', why: 'An Administrator has made it Required for your role, to keep church records safe.', fix: 'Lost your phone? Ask another Administrator to reset it, then set it up again.', roles: ALL, manual: 93 },
     { h: "Why can't I turn on two-step sign-in?", say: '"Two-step sign-in is not offered for your role."', why: 'An Administrator has set it to Off for your role in Admin, Settings.', fix: 'Ask an Administrator if you would like it.', roles: ALL, manual: 92 },
@@ -496,8 +506,9 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
 
   followup: [
     { h: 'The follow-up clock', roles: ALL, p: 'For a Friday service starting 6:00 pm: tasks made at 9:00 pm, due Saturday 6:00 pm, a reason needed from Sunday 6:00 pm, on the Review list from Monday 6:00 pm, decided by Wednesday 6:00 pm. All set in Admin, Follow-up Rules.', manual: 60 },
-    { h: 'Each missed service has its own task', roles: ALL, p: 'Missing again adds another task, even if one is still open, so every absence is followed up. One visit closes them all.', manual: 61 },
-    { h: 'Repeated absences', roles: ALL, p: 'From the 2nd miss of the same meeting in a row, the Follow-up Coordinator is alerted each time. At the 3rd, they get a visit task of their own, one for the whole run.', manual: 64 },
+    { h: 'One open task per person', roles: ALL, p: 'Missing again while a task is open adds the miss to that task, and the shepherd is told. The title lists each date, for example "Missed Friday Worship Service, 30 October, then again 6 November". The task keeps the time limit of the first miss. Turned off in Admin, Follow-up Rules, every missed service makes its own task instead.', manual: 96 },
+    { h: 'Lapsed', roles: ALL, p: 'After 3 misses in a row of the same meeting, the person becomes Lapsed: their open tasks close, no more are made, and the Follow-up Coordinator decides on the Follow-up Review page, under Lapsed. Example: missing Friday Worship Service on 23 October, 30 October and 6 November makes someone Lapsed from 6 November. Being ticked present at any service ends it. The number is set in Admin, Follow-up Rules.', manual: 96 },
+    { h: 'Repeated absences', roles: ALL, p: 'From the 2nd miss of the same meeting in a row, the Follow-up Coordinator is alerted each time. A visit task of their own comes at the 3rd miss only when Lapsed is set higher than 3, because Lapsed comes first.', manual: 64 },
     { h: 'Attendance falling', roles: ALL, p: 'Someone who came to fewer than half of the last 8 services, without missing several in a row, gets an Attendance falling task, checked each morning.', manual: 69 },
     { h: 'Which meetings count', roles: ALL, p: 'Only meetings with Follows up absence ticked and a start time. Friday Worship is on by default. Only the people a meeting is for are followed up: Everyone, Workers or Leadership.', manual: 53 },
     { h: 'Which newcomers are followed up', roles: ALL, p: 'Newcomers in the New, Contacted or Attending stage, until marked Not Interested or they become members. Set in Follow-up Rules.', manual: 69 },
@@ -544,6 +555,12 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
   ],
 
   admin: [
+    { h: 'One open task per person and Lapsed', roles: ['Administrator'], p: 'In Admin, Follow-up Rules, under Repeated absences. One open task per person is On at first. Lapsed after is 3 misses in a row at first, and 0 turns it off. Each change is written to the Audit Log.', manual: 98 },
+    { h: 'The one-off cleanup', roles: ['Administrator'], steps: [
+      'Open Admin, then Follow-up Rules, and go to One-off cleanup at the bottom.',
+      'Press Check what it would do. Nothing changes yet.',
+      'Read how many tasks would be added to open tasks and who would become Lapsed, then press Run the cleanup.',
+    ], note: 'Run it once after version 11.21. Running it again does no harm.', manual: 99 },
     { h: 'Two-step sign-in', roles: ALL, steps: [
       'Install a free authenticator app on your phone, for example Microsoft Authenticator or Google Authenticator.',
       'It is Off for every role until an Administrator turns it on in Admin, Settings. When your role requires it, the app asks you to set it up after your password. If your role lets you choose, open My profile and press Turn on.',
@@ -567,6 +584,7 @@ export const HELP_CONTENT: Record<string, HelpEntry[]> = {
   ],
 
   new: [
+    { h: '11.21: Fewer follow-up tasks', roles: ALL, p: 'A further miss is added to the person\'s open task instead of making another. After 3 misses in a row of the same meeting the person becomes Lapsed: no more tasks, and the Follow-up Coordinator decides on the Follow-up Review page, under Lapsed. Admin, Follow-up Rules has both rules and a one-off cleanup for the tasks made before. On the dashboard, Giving by fund shows each fund\'s amount and a total.', links: [{ to: 'followup', t: 'Follow-up times and rules' }, { to: 'coordinator', t: 'I coordinate follow-up' }], manual: 96 },
     { h: '11.20: The new dashboard and two-step sign-in', roles: ALL, p: 'The dashboard has the same design as DCLM Canada: period buttons, one line for what needs attention, cards compared with an earlier period, charts by month with gaps where nothing was recorded, On track for membership, and a table for your role with Export. Admin, Settings holds the financial year, when records start, the receipt amount and two-step sign-in, which stays Off until an Administrator turns it on for a role.', links: [{ to: 'start', t: 'Start here' }, { to: 'admin', t: 'Accounts and roles' }], manual: 88 },
     { h: '11.18: Shepherds anywhere, and why someone is not offered', roles: ALL, p: 'All-locations accounts can shepherd at any location, set in Admin, Follow-up Rules. Every shepherd box lists who is not offered and why. Removing a fellowship removes its empty sessions too.', links: [{ to: 'admin', t: 'Accounts and roles' }], manual: 85 },
     { h: '11.17: Reports, sessions and the Audit Log', roles: ALL, p: 'All locations reports add the same meeting on the same day into one row, the zonal report shows house caring fellowships, New session asks before a meeting on the wrong day, administrators can change a session\'s date or meeting, the Audit Log has search and filters, and sign-in says when the server cannot be reached.', links: [{ to: 'usher', t: 'I record attendance' }, { to: 'runchurch', t: 'I run the church' }], manual: 81 },

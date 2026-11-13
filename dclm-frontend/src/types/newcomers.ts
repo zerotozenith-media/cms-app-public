@@ -10,6 +10,10 @@ export interface Newcomer {
   /** Away dates: no absence tasks are made between them. */
   away_from?: string | null;
   away_to?: string | null;
+  /** Lapsed (13 November 2026): no absence tasks until decided or ticked present. */
+  lapsed_since?: string | null;
+  lapsed_meeting?: string;
+  lapsed_run?: number;
   away_reason?: string;
   away_note?: string;
   id: number;

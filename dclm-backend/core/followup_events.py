@@ -52,11 +52,18 @@ def tasks_made(tasks):
     from collections import defaultdict
     r = rules()
     per_shepherd = defaultdict(list)
+    again = defaultdict(list)
     for t in tasks:
         p = person_of(t)
         coords = coordinators_for(p.location_id)
         name = person_name(t)
-        if not t.assigned_to_id and coords:
+        if t.done and t.covered_by_id:
+            # A further miss added to the open task (13 November 2026):
+            # the shepherd of the open task hears once, nothing new to open.
+            owner = t.covered_by.assigned_to_id
+            if owner:
+                again[owner].append((name, t))
+        elif not t.assigned_to_id and coords:
             t.assigned_to = coords[0]
             t.escalation, t.escalated_at = Escalation.NO_SHEPHERD, timezone.now()
             t.save(update_fields=["assigned_to", "escalation", "escalated_at"])
@@ -74,6 +81,13 @@ def tasks_made(tasks):
                 extra = " A visit task for you is on your list." if v else ""
             _notify([u.id for u in coords], f"{name} missed a {_ordinal(run)} {t.missed_meeting_name} in a row",
                     f"Shepherd: {shep}.{extra}", _link(t), f"run-{type(t).__name__}-{p.id}-{run}")
+    for uid, items in again.items():
+        names = [n for n, _ in items]
+        first = items[0][1]
+        who = names[0] if len(names) == 1 else (", ".join(names[:2]) + (f" and {len(names) - 2} more" if len(names) > 2 else ""))
+        _notify([uid], f"{who} missed {first.missed_meeting_name} again",
+                "Added to the task you already have open, so there is no new task.",
+                "/follow-up", f"again-{uid}-{first.missed_session_id}")
     # One alert per shepherd, naming the people, rather than one per task.
     for uid, items in per_shepherd.items():
         names = [n for n, _ in items]

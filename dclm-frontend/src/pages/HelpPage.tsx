@@ -183,7 +183,7 @@ export function HelpPage() {
         />
         <div className="help-top-btns">
           <button type="button" className="btn outline" onClick={async () => setErr(await downloadManual())}
-            title="The whole user manual, with pictures of every screen">Download the manual (PDF, about 7 MB)</button>
+            title="The whole user manual, with pictures of every screen">Download the manual (PDF, about 11 MB)</button>
           <button type="button" className="btn outline" onClick={() => jump('new')}>What's new</button>
           <button type="button" className="btn outline" onClick={() => jump('why')}>Why can't I...?</button>
         </div>

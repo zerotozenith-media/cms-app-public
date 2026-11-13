@@ -56,6 +56,7 @@ class Command(BaseCommand):
         self.check_alerts()
         self.check_backups()
         self.check_two_step()
+        self.check_fewer_tasks()
 
         self.stdout.write("")
         if self.problems:
@@ -468,6 +469,32 @@ class Command(BaseCommand):
                 "no database backup is scheduled",
                 "The database holds everything. See deploy/crontab.example.",
             )
+
+    def check_fewer_tasks(self):
+        """Fewer follow-up tasks (13 November 2026): the two switches, and
+        how many extra open tasks the one-off cleanup would tidy."""
+        from django.db.models import Count
+        from core.followup_rules import rules
+        from core.lapsed import lapsed_people
+        from members.models import MemberFollowUpTask
+        from newcomers.models import NewcomerTask
+        r = rules()
+        self.ok(f"one open task per person is {'on' if r.one_open_task else 'off'}, "
+                + (f"Lapsed after {r.lapsed_after_misses} misses in a row" if r.lapsed_after_misses
+                   else "Lapsed is off"))
+        extra = 0
+        for model, field in ((MemberFollowUpTask, "member"), (NewcomerTask, "newcomer")):
+            for row in (model.objects.filter(kind="absence", done=False).values(field).annotate(n=Count("id"))
+                        .filter(n__gt=1)):
+                extra += row["n"] - 1
+        if extra:
+            self.warn(f"{extra} extra open absence task(s) from before one open task per person",
+                      "In Admin, Follow-up Rules, an administrator covering All locations can run the one-off "
+                      "cleanup. It adds them to each person's open task and marks Lapsed anyone already at the "
+                      "Lapsed number of misses.")
+        n = len(lapsed_people())
+        if n:
+            self.ok(f"{n} people are Lapsed, on the Follow-up Coordinator's Review list")
 
     def check_two_step(self):
         """Two-step sign-in (10 November 2026): which roles need it, and who

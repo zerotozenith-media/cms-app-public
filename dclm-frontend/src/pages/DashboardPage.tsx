@@ -208,14 +208,29 @@ function MoneyCard({ d }: { d: Dashboard }) {
   );
 }
 
-function FundsCard({ d }: { d: Dashboard }) {
+/**
+ * Giving by fund (13 November 2026, Option A): each fund's amount beside
+ * its share, with a total. With giving in one fund only, a full ring says
+ * nothing, so the fund and its amount are shown instead. Beside the money
+ * chart on a wide screen ("alone") it fills the card's height.
+ */
+function FundsCard({ d, alone }: { d: Dashboard; alone?: boolean }) {
   const parts = (d.charts.funds ?? []).map((f) => ({ label: f.fund, amount: f.amount }));
   const total = parts.reduce((a, p) => a + p.amount, 0);
+  const given = parts.filter((p) => p.amount > 0);
+  const one = given.length === 1 ? given[0] : null;
   return (
-    <Card title="Giving by fund" sub={`Share of giving, ${d.period.span}`} className="dv-mix">
+    <Card title="Giving by fund" sub={`In BHD, ${d.period.span}`}
+      className={`dv-mix dv-funds${alone ? ' alone' : ''}`}>
       <div className="dv-mix-body">
-        {total > 0 ? <Donut parts={parts} centre={total >= 10000 ? `${(total / 1000).toFixed(1)}k` : whole(total)} sub="BHD" />
-          : <div className="empty">No giving recorded for this period yet.</div>}
+        {total <= 0 ? <div className="empty">No giving recorded for this period yet.</div>
+          : one ? (
+            <div className="dv-one">
+              <div className="dv-one-name"><i style={{ background: C.blue }} />{one.label}</div>
+              <div className="dv-one-fig">BHD {bhd(one.amount)}</div>
+              <div className="dv-one-note">All giving in this period went to one fund, so there is no split to show.</div>
+            </div>
+          ) : <Donut parts={parts} centre={total >= 10000 ? `${(total / 1000).toFixed(1)}k` : whole(total)} sub="BHD" amounts />}
       </div>
     </Card>
   );
@@ -570,7 +585,7 @@ export function DashboardPage() {
           <MoneyCard d={d} />
           {c.expense_categories ? (
             <div className="dv-stack"><FundsCard d={d} /><CategoriesCard d={d} /></div>
-          ) : <FundsCard d={d} />}
+          ) : <FundsCard d={d} alone />}
         </div>
       )}
 

@@ -91,6 +91,16 @@ class Newcomer(models.Model):
                  ("other", "Other")])
     away_note = models.CharField(max_length=300, blank=True, default="")
 
+    # Lapsed (13 November 2026): missed the number of services in a row set
+    # in Follow-up Rules. No absence tasks are made while set. It clears
+    # when they are ticked present. follow_up_from is set when the
+    # Follow-up Coordinator chooses Follow up again, so misses before it
+    # no longer count.
+    lapsed_since = models.DateField(null=True, blank=True)
+    lapsed_meeting = models.CharField(max_length=150, blank=True, default="")
+    lapsed_run = models.PositiveSmallIntegerField(default=0)
+    follow_up_from = models.DateField(null=True, blank=True)
+
     def away_on(self, day):
         return bool(self.away_from and self.away_to and self.away_from <= day <= self.away_to)
 

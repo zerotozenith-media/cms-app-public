@@ -22,7 +22,8 @@ urlpatterns = urlpatterns + [path("tasks/run/", run_scheduled_task, name="run-sc
 
 from .help_views import HelpContactsView, HelpImageView, ManualView  # noqa: E402
 from .followup_views import (AccessView, EligibleView, ReasonsView, MyFollowUpView, ReviewDecideView, ReviewListView,  # noqa: E402
-                             ReviewOverviewView, ShepherdPeopleView)
+                             ReviewOverviewView, ShepherdPeopleView, LapsedListView, LapsedDecideView,
+                             CleanupView)
 
 urlpatterns = urlpatterns + [
     path("followup/access/", AccessView.as_view(), name="followup-access"),
@@ -36,4 +37,7 @@ urlpatterns = urlpatterns + [
     path("followup/review/overview/", ReviewOverviewView.as_view(), name="followup-review-overview"),
     path("followup/review/shepherd/<int:pk>/", ShepherdPeopleView.as_view(), name="followup-review-shepherd"),
     path("followup/review/eligible/", EligibleView.as_view(), name="followup-review-eligible"),
+    path("followup/lapsed/", LapsedListView.as_view(), name="followup-lapsed"),
+    path("followup/lapsed/decide/", LapsedDecideView.as_view(), name="followup-lapsed-decide"),
+    path("followup/cleanup/", CleanupView.as_view(), name="followup-cleanup"),
 ]

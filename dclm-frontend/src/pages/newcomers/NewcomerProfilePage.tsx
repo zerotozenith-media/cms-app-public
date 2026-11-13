@@ -351,6 +351,7 @@ export function NewcomerProfilePage() {
           <div className="person-chips">
             <Badge color="blue">Newcomer</Badge>
             <Badge color={stageBadgeColor(n.stage)}>{stageLabel(n.stage)}</Badge>
+            {n.lapsed_since && <span className="lapsed-tag" title={`Missed ${n.lapsed_meeting || 'a meeting'} ${n.lapsed_run ? `${n.lapsed_run} times` : 'several times'} in a row`}><Badge color="amber">Lapsed since {dayText(n.lapsed_since)}</Badge><HelpMark topic="faLapsed" /></span>}
             <Badge color="blue">{locationName(n.location)}</Badge>
           </div>
           {/* F9: the edit opens here, under the name, where the pencil is. */}
